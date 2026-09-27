@@ -43,7 +43,7 @@ export function buildIcsCalendar(input: { name: string; events: IcsEvent[] }): s
     "PRODID:-//DuoWei//Calendar//ZH",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    foldLine(`X-WR-CALNAME:${icsEscape(input.name || "多维日历")}`),
+    foldLine(`X-WR-CALNAME:${icsEscape(input.name || "知行人生日历")}`),
   ];
   for (const event of input.events) {
     const day = toIcsDate(event.date);

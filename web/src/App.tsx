@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { applyQuery } from "../../src/query.js";
 import type { BaseMember, BaseSummary, Field, McpAgent, PublicUser, RowAccessRule, TablePayload, View, ViewType } from "../../src/types.js";
 import { FIELD_TYPE_LABELS, VIEW_TYPE_LABELS } from "../../src/types.js";
-import { api } from "./api";
+import { api, type BackupLogDto, type BackupSettingsDto } from "./api";
 import { AuthScreen } from "./AuthScreen";
 import { DashboardView } from "./DashboardView";
 import { CalendarView, FormView, GalleryView, GanttView } from "./ExtraViews";
@@ -42,7 +42,7 @@ export function App() {
   }, [publicToken]);
 
   if (publicToken) return <PublicShareScreen token={publicToken} />;
-  if (booting) return <div className="boot">正在打开多维…</div>;
+  if (booting) return <div className="boot">正在打开知行人生…</div>;
   if (!user) return <AuthScreen onUser={setUser} />;
   return <Workspace user={user} onUser={setUser} onLogout={() => setUser(null)} />;
 }
@@ -100,8 +100,8 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     if (
       !window.confirm(
         tables.length <= 1
-          ? `删除数据表「${payload.name}」？这是当前多维表格下的最后一张表，表内记录与视图都会去掉。`
-          : `删除数据表「${payload.name}」？表内记录与视图都会去掉。`,
+                          ? `删除清单「${payload.name}」？这是当前空间下的最后一张表，内容都会去掉。`
+          : `删除清单「${payload.name}」？表内记录与视图都会去掉。`,
       )
     ) {
       return;
@@ -261,7 +261,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       <aside className="sidebar">
         <div className="brand">
           <span className="logo" aria-hidden="true" />
-          多维
+          知行人生
         </div>
         <div className="side-scroll">
           {bases.map((item) => (
@@ -276,7 +276,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 }}
                 onDoubleClick={() => {
                   if (!canOwn || item.id !== baseId) return;
-                  const name = window.prompt("重命名多维表格", item.name);
+                  const name = window.prompt("重命名空间", item.name);
                   if (!name || name === item.name) return;
                   api.renameBase(item.id, name).then(() => refreshBases({ baseId: item.id, tableId })).catch(fail);
                 }}
@@ -301,15 +301,15 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                     <button
                       type="button"
                       className="table-delete"
-                      title="删除数据表"
-                      aria-label={`删除数据表 ${table.name}`}
+                      title="删除清单"
+                      aria-label={`删除清单 ${table.name}`}
                       onClick={(event) => {
                         event.stopPropagation();
                         if (
                           !window.confirm(
                             item.tables.length <= 1
-                              ? `删除数据表「${table.name}」？这是当前多维表格下的最后一张表，表内记录与视图都会去掉。`
-                              : `删除数据表「${table.name}」？表内记录与视图都会去掉。`,
+                              ? `删除清单「${table.name}」？这是当前空间下的最后一张表，内容都会去掉。`
+                              : `删除清单「${table.name}」？表内记录与视图都会去掉。`,
                           )
                         ) {
                           return;
@@ -331,12 +331,12 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               ))}
             </div>
           ))}
-          {bases.length === 0 && <p className="side-empty">还没有多维表格。可以从模板开始，或新建一张空表。</p>}
+          {bases.length === 0 && <p className="side-empty">还没有空间。可以从模板开始，或新建一个空白空间。</p>}
         </div>
         <div className="side-actions">
           <button type="button" onClick={() => setDialog("template")}>＋ 从模板新建</button>
-          <button type="button" onClick={() => setDialog("base")}>＋ 新建多维表格</button>
-          {base && canEdit && <button type="button" onClick={() => setDialog("table")}>＋ 新建数据表</button>}
+          <button type="button" onClick={() => setDialog("base")}>＋ 新建空间</button>
+          {base && canEdit && <button type="button" onClick={() => setDialog("table")}>＋ 新建清单</button>}
         </div>
       </aside>
       <section className="main">
@@ -344,7 +344,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           <div className="top-title">
             <input
               value={payload?.name ?? ""}
-              aria-label="数据表名称"
+              aria-label="清单名称"
               disabled={!payload || !canEdit}
               onChange={(event) => setPayload((current) => (current ? { ...current, name: event.target.value } : current))}
               onBlur={(event) => {
@@ -359,14 +359,16 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 className="ghost danger-text"
                 onClick={() => deleteCurrentTable().catch(fail)}
               >
-                删除数据表
+                删除清单
               </button>
             )}
           </div>
           <div className="top-user">
             <button type="button" className="secondary" onClick={() => setDialog("tokens")}>访问令牌</button>
-            <button type="button" className="secondary" onClick={() => setDialog("help")}>上手指南</button>
+            <button type="button" className="secondary" onClick={() => setDialog("agent-brief")}>给 Agent</button>
+            <button type="button" className="secondary" onClick={() => setDialog("help")}>使用说明</button>
             {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("admin")}>用户管理</button>}
+            {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("backup")}>数据备份</button>}
             {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("agents")}>Agent 管理</button>}
             <span>{user.name}</span>
             <button
@@ -399,20 +401,22 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 </button>
               )}
               {canEdit && view && (
-                <select
+                <FancySelect
+                  compact
                   aria-label="视图保护"
                   value={view.protection ?? "public"}
-                  onChange={(event) => {
+                  options={[
+                    { value: "public", label: "公共视图" },
+                    { value: "locked", label: "锁定视图" },
+                    { value: "personal", label: "个人视图" },
+                  ]}
+                  onChange={(value) => {
                     api
-                      .setViewProtection(view.id, event.target.value as "public" | "locked" | "personal")
+                      .setViewProtection(view.id, value as "public" | "locked" | "personal")
                       .then(() => reloadTable())
                       .catch(fail);
                   }}
-                >
-                  <option value="public">公共视图</option>
-                  <option value="locked">锁定视图</option>
-                  <option value="personal">个人视图</option>
-                </select>
+                />
               )}
               {canEdit && view && !appMode && (
                 <button
@@ -453,10 +457,16 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 <>
                   <label className="inline-select">
                     分组
-                    <select
+                    <FancySelect
+                      compact
+                      aria-label="分组"
                       value={view.config.groups[0]?.fieldId ?? ""}
-                      onChange={(event) => {
-                        const fieldId = event.target.value;
+                      placeholder="无"
+                      options={[
+                        { value: "", label: "无" },
+                        ...payload.fields.map((field) => ({ value: field.id, label: field.name })),
+                      ]}
+                      onChange={(fieldId) => {
                         api
                           .updateView(view.id, {
                             config: { ...view.config, groups: fieldId ? [{ fieldId }] : [] },
@@ -464,80 +474,71 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                           .then(patchView)
                           .catch(fail);
                       }}
-                    >
-                      <option value="">无</option>
-                      {payload.fields.map((field) => (
-                        <option key={field.id} value={field.id}>
-                          {field.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
                   <label className="inline-select">
                     行高
-                    <select
+                    <FancySelect
+                      compact
+                      aria-label="行高"
                       value={view.config.rowHeight}
-                      onChange={(event) => {
+                      options={[
+                        { value: "short", label: "矮" },
+                        { value: "medium", label: "中" },
+                        { value: "tall", label: "高" },
+                        { value: "extra", label: "超高" },
+                      ]}
+                      onChange={(value) => {
                         api
                           .updateView(view.id, {
                             config: {
                               ...view.config,
-                              rowHeight: event.target.value as View["config"]["rowHeight"],
+                              rowHeight: value as View["config"]["rowHeight"],
                             },
                           })
                           .then(patchView)
                           .catch(fail);
                       }}
-                    >
-                      <option value="short">矮</option>
-                      <option value="medium">中</option>
-                      <option value="tall">高</option>
-                      <option value="extra">超高</option>
-                    </select>
+                    />
                   </label>
                 </>
               )}
               {view.type === "kanban" && canEdit && (
                 <label className="inline-select">
                   看板分组
-                  <select
+                  <FancySelect
+                    compact
+                    aria-label="看板分组"
                     value={view.config.groupFieldId ?? ""}
-                    onChange={(event) => {
-                      api.updateView(view.id, { config: { ...view.config, groupFieldId: event.target.value || null } })
+                    options={payload.fields
+                      .filter((field) => field.type === "single_select")
+                      .map((field) => ({ value: field.id, label: field.name }))}
+                    onChange={(value) => {
+                      api
+                        .updateView(view.id, { config: { ...view.config, groupFieldId: value || null } })
                         .then(patchView)
                         .catch(fail);
                     }}
-                  >
-                    {payload.fields
-                      .filter((field) => field.type === "single_select")
-                      .map((field) => (
-                        <option key={field.id} value={field.id}>
-                          {field.name}
-                        </option>
-                      ))}
-                  </select>
+                  />
                 </label>
               )}
               {(view.type === "calendar" || view.type === "gantt") && canEdit && (
                 <label className="inline-select">
                   日期字段
-                  <select
+                  <FancySelect
+                    compact
+                    aria-label="日期字段"
                     value={view.config.dateFieldId ?? ""}
-                    onChange={(event) => {
+                    options={payload.fields
+                      .filter((field) => field.type === "date")
+                      .map((field) => ({ value: field.id, label: field.name }))}
+                    onChange={(value) => {
                       api
-                        .updateView(view.id, { config: { ...view.config, dateFieldId: event.target.value || null } })
+                        .updateView(view.id, { config: { ...view.config, dateFieldId: value || null } })
                         .then(patchView)
                         .catch(fail);
                     }}
-                  >
-                    {payload.fields
-                      .filter((field) => field.type === "date")
-                      .map((field) => (
-                        <option key={field.id} value={field.id}>
-                          {field.name}
-                        </option>
-                      ))}
-                  </select>
+                  />
                 </label>
               )}
               {canEdit && (
@@ -711,7 +712,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         )}
       </section>
       {dialog === "base" && (
-        <NameDialog title="新建多维表格" label="名称" onClose={() => setDialog(null)} onSubmit={async (name) => {
+        <NameDialog title="新建空间" label="名称" onClose={() => setDialog(null)} onSubmit={async (name) => {
           const created = await api.createBase(name);
           await refreshBases({ baseId: created.id });
         }} />
@@ -758,6 +759,9 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         />
       )}
       {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
+      {dialog === "agent-brief" && (
+        <AgentBriefDialog isAdmin={user.role === "admin"} onClose={() => setDialog(null)} />
+      )}
       {dialog === "view" && payload && (
         <ViewDialog
           fields={payload.fields}
@@ -896,6 +900,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       )}
       {dialog === "tokens" && <TokenDialog onClose={() => setDialog(null)} />}
       {dialog === "admin" && <AdminDialog selfId={user.id} onSelf={onUser} onClose={() => setDialog(null)} />}
+      {dialog === "backup" && user.role === "admin" && <BackupDialog onClose={() => setDialog(null)} />}
       {dialog === "agents" && user.role === "admin" && (
         <AgentManageDialog bases={bases} onClose={() => setDialog(null)} />
       )}
@@ -944,7 +949,7 @@ function TableDialog({
   const [withKanban, setWithKanban] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Modal title="新建数据表" onClose={onClose}>
+    <Modal title="新建清单" onClose={onClose}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -1083,11 +1088,12 @@ function FieldDialog({
         {(type === "link" || type === "duplex_link") && (
           <label>
             关联数据表
-            <select value={linkTableId} onChange={(event) => setLinkTableId(event.target.value)} required>
-              {tables.map((table) => (
-                <option key={table.id} value={table.id}>{table.name}</option>
-              ))}
-            </select>
+            <FancySelect
+              value={linkTableId}
+              required
+              onChange={setLinkTableId}
+              options={tables.map((table) => ({ value: table.id, label: table.name }))}
+            />
           </label>
         )}
         {type === "duplex_link" && (
@@ -1100,12 +1106,16 @@ function FieldDialog({
           <>
             <label>
               关联字段
-              <select value={lookupLinkFieldId} onChange={(event) => setLookupLinkFieldId(event.target.value)} required>
-                <option value="">选择</option>
-                {linkFields.map((field) => (
-                  <option key={field.id} value={field.id}>{field.name}</option>
-                ))}
-              </select>
+              <FancySelect
+                value={lookupLinkFieldId}
+                required
+                placeholder="选择"
+                onChange={setLookupLinkFieldId}
+                options={[
+                  { value: "", label: "选择" },
+                  ...linkFields.map((field) => ({ value: field.id, label: field.name })),
+                ]}
+              />
             </label>
             <label>
               目标字段 ID
@@ -1121,11 +1131,15 @@ function FieldDialog({
             </label>
             <label>
               动作（关联当前记录）
-              <select value={buttonActionType} onChange={(event) => setButtonActionType(event.target.value as typeof buttonActionType)}>
-                <option value="add_comment">添加评论</option>
-                <option value="set_field">设置字段</option>
-                <option value="open_url">打开链接</option>
-              </select>
+              <FancySelect
+                value={buttonActionType}
+                onChange={(v) => setButtonActionType(v as typeof buttonActionType)}
+                options={[
+                  { value: "add_comment", label: "添加评论" },
+                  { value: "set_field", label: "设置字段" },
+                  { value: "open_url", label: "打开链接" },
+                ]}
+              />
             </label>
             {buttonActionType === "add_comment" && (
               <label>
@@ -1137,13 +1151,11 @@ function FieldDialog({
               <>
                 <label>
                   目标字段
-                  <select value={buttonSetFieldId} onChange={(event) => setButtonSetFieldId(event.target.value)}>
-                    {(fields ?? []).map((field) => (
-                      <option key={field.id} value={field.id}>
-                        {field.name}
-                      </option>
-                    ))}
-                  </select>
+                  <FancySelect
+                    value={buttonSetFieldId}
+                    onChange={setButtonSetFieldId}
+                    options={(fields ?? []).map((field) => ({ value: field.id, label: field.name }))}
+                  />
                 </label>
                 <label>
                   值
@@ -1252,14 +1264,15 @@ function OptionsDialog({
         </label>
         <label>
           选项联动目标字段（可选）
-          <select value={targetFieldId} onChange={(event) => setTargetFieldId(event.target.value)}>
-            <option value="">不启用</option>
-            {targets.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
+          <FancySelect
+            value={targetFieldId}
+            placeholder="不启用"
+            onChange={setTargetFieldId}
+            options={[
+              { value: "", label: "不启用" },
+              ...targets.map((item) => ({ value: item.id, label: item.name })),
+            ]}
+          />
         </label>
         {targetFieldId && (
           <label>
@@ -1337,18 +1350,25 @@ function PublicShareDialog({
           }
         }}
       >
-        <select value={kind} onChange={(event) => setKind(event.target.value as "view" | "form")}>
-          <option value="view">独立分享视图</option>
-          <option value="form">公开表单</option>
-        </select>
+        <FancySelect
+          value={kind}
+          compact
+          onChange={(v) => setKind(v as "view" | "form")}
+          options={[
+            { value: "view", label: "独立分享视图" },
+            { value: "form", label: "公开表单" },
+          ]}
+        />
         {kind === "view" && (
-          <select value={viewId} onChange={(event) => setViewId(event.target.value)}>
-            {views.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}（{VIEW_TYPE_LABELS[item.type]}）
-              </option>
-            ))}
-          </select>
+          <FancySelect
+            value={viewId}
+            compact
+            onChange={setViewId}
+            options={views.map((item) => ({
+              value: item.id,
+              label: `${item.name}（${VIEW_TYPE_LABELS[item.type]}）`,
+            }))}
+          />
         )}
         <button type="submit" className="primary">
           创建链接
@@ -1468,77 +1488,84 @@ function ViewDialog({
         </label>
         <label>
           类型
-          <select
+          <FancySelect
             value={type}
-            onChange={(event) => {
-              const next = event.target.value as ViewType;
+            onChange={(v) => {
+              const next = v as ViewType;
               setType(next);
               setName(VIEW_TYPE_LABELS[next]);
             }}
-          >
-            {(Object.keys(VIEW_TYPE_LABELS) as ViewType[]).map((id) => (
-              <option key={id} value={id}>{VIEW_TYPE_LABELS[id]}</option>
-            ))}
-          </select>
+            options={(Object.keys(VIEW_TYPE_LABELS) as ViewType[]).map((id) => ({
+              value: id,
+              label: VIEW_TYPE_LABELS[id],
+            }))}
+          />
         </label>
         {(type === "kanban" || type === "gantt") && (
           <label>
             分组字段
-            <select value={groupField} onChange={(event) => setGroupField(event.target.value)}>
-              {selects.map((field) => (
-                <option key={field.id} value={field.name}>{field.name}</option>
-              ))}
-            </select>
+            <FancySelect
+              value={groupField}
+              onChange={setGroupField}
+              options={selects.map((field) => ({ value: field.name, label: field.name }))}
+            />
           </label>
         )}
         {(type === "calendar" || type === "gantt") && (
           <label>
             开始日期字段
-            <select value={dateField} onChange={(event) => setDateField(event.target.value)} required>
-              {dates.map((field) => (
-                <option key={field.id} value={field.name}>{field.name}</option>
-              ))}
-            </select>
+            <FancySelect
+              value={dateField}
+              required
+              onChange={setDateField}
+              options={dates.map((field) => ({ value: field.name, label: field.name }))}
+            />
           </label>
         )}
         {type === "gantt" && (
           <>
             <label>
               结束日期字段
-              <select value={endDateField} onChange={(event) => setEndDateField(event.target.value)}>
-                {dates.map((field) => (
-                  <option key={field.id} value={field.name}>{field.name}</option>
-                ))}
-              </select>
+              <FancySelect
+                value={endDateField}
+                onChange={setEndDateField}
+                options={dates.map((field) => ({ value: field.name, label: field.name }))}
+              />
             </label>
             <label>
               进度字段
-              <select value={progressField} onChange={(event) => setProgressField(event.target.value)}>
-                <option value="">无</option>
-                {progresses.map((field) => (
-                  <option key={field.id} value={field.name}>{field.name}</option>
-                ))}
-              </select>
+              <FancySelect
+                value={progressField}
+                placeholder="无"
+                onChange={setProgressField}
+                options={[
+                  { value: "", label: "无" },
+                  ...progresses.map((field) => ({ value: field.name, label: field.name })),
+                ]}
+              />
             </label>
             <label>
               依赖字段
-              <select value={dependencyField} onChange={(event) => setDependencyField(event.target.value)}>
-                <option value="">无</option>
-                {links.map((field) => (
-                  <option key={field.id} value={field.name}>{field.name}</option>
-                ))}
-              </select>
+              <FancySelect
+                value={dependencyField}
+                placeholder="无"
+                onChange={setDependencyField}
+                options={[
+                  { value: "", label: "无" },
+                  ...links.map((field) => ({ value: field.name, label: field.name })),
+                ]}
+              />
             </label>
           </>
         )}
         {(type === "gallery" || type === "form" || type === "gantt") && (
           <label>
             标题字段
-            <select value={titleField} onChange={(event) => setTitleField(event.target.value)}>
-              {fields.map((field) => (
-                <option key={field.id} value={field.name}>{field.name}</option>
-              ))}
-            </select>
+            <FancySelect
+              value={titleField}
+              onChange={setTitleField}
+              options={fields.map((field) => ({ value: field.name, label: field.name }))}
+            />
           </label>
         )}
         {error && <p className="form-error">{error}</p>}
@@ -1584,31 +1611,35 @@ function FilterDialog({
       >
         <label>
           条件关系
-          <select value={conjunction} onChange={(event) => setConjunction(event.target.value as "and" | "or")}>
-            <option value="and">满足全部</option>
-            <option value="or">满足任一</option>
-          </select>
+          <FancySelect
+            value={conjunction}
+            onChange={(v) => setConjunction(v as "and" | "or")}
+            options={[
+              { value: "and", label: "满足全部" },
+              { value: "or", label: "满足任一" },
+            ]}
+          />
         </label>
         {filters.map((filter, index) => (
           <div className="filter-row" key={index}>
-            <select
+            <FancySelect
+              compact
               value={filter.fieldId}
-              onChange={(event) => setFilters((current) => current.map((item, i) => (i === index ? { ...item, fieldId: event.target.value } : item)))}
-            >
-              {fields.map((field) => (
-                <option key={field.id} value={field.id}>{field.name}</option>
-              ))}
-            </select>
-            <select
+              onChange={(fieldId) => setFilters((current) => current.map((item, i) => (i === index ? { ...item, fieldId } : item)))}
+              options={fields.map((field) => ({ value: field.id, label: field.name }))}
+            />
+            <FancySelect
+              compact
               value={filter.op}
-              onChange={(event) => setFilters((current) => current.map((item, i) => (i === index ? { ...item, op: event.target.value as typeof filter.op } : item)))}
-            >
-              <option value="eq">等于</option>
-              <option value="neq">不等于</option>
-              <option value="contains">包含</option>
-              <option value="is_empty">为空</option>
-              <option value="is_not_empty">不为空</option>
-            </select>
+              onChange={(op) => setFilters((current) => current.map((item, i) => (i === index ? { ...item, op: op as typeof filter.op } : item)))}
+              options={[
+                { value: "eq", label: "等于" },
+                { value: "neq", label: "不等于" },
+                { value: "contains", label: "包含" },
+                { value: "is_empty", label: "为空" },
+                { value: "is_not_empty", label: "不为空" },
+              ]}
+            />
             {filter.op !== "is_empty" && filter.op !== "is_not_empty" && (
               <input
                 value={filter.value ?? ""}
@@ -1701,11 +1732,16 @@ function ShareDialog({
         }}
       >
         <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required placeholder="已开通账号的邮箱" />
-        <select value={role} onChange={(event) => setRole(event.target.value)}>
-          <option value="owner">所有者</option>
-          <option value="editor">可编辑</option>
-          <option value="viewer">可查看</option>
-        </select>
+        <FancySelect
+          value={role}
+          compact
+          onChange={setRole}
+          options={[
+            { value: "owner", label: "所有者" },
+            { value: "editor", label: "可编辑" },
+            { value: "viewer", label: "可查看" },
+          ]}
+        />
         <button type="submit" className="primary">添加</button>
       </form>
       <ul className="member-list">
@@ -1715,20 +1751,22 @@ function ShareDialog({
               <strong>{member.name}</strong>
               <span>{member.email}</span>
             </div>
-            <select
+            <FancySelect
+              compact
               value={member.role}
-              onChange={async (event) => {
+              onChange={async (value) => {
                 try {
-                  onChange(await api.share(baseId, member.email, event.target.value));
+                  onChange(await api.share(baseId, member.email, value));
                 } catch (err) {
                   setError(message(err));
                 }
               }}
-            >
-              <option value="owner">所有者</option>
-              <option value="editor">可编辑</option>
-              <option value="viewer">可查看</option>
-            </select>
+              options={[
+                { value: "owner", label: "所有者" },
+                { value: "editor", label: "可编辑" },
+                { value: "viewer", label: "可查看" },
+              ]}
+            />
             <button
               type="button"
               onClick={async () => {
@@ -1750,10 +1788,10 @@ function ShareDialog({
           type="button"
           className="danger-text"
           onClick={() => {
-            if (window.confirm("删除整个多维表格？其中的数据表和记录都会去掉。")) onDelete().catch((err) => setError(message(err)));
+            if (window.confirm("删除整个空间？其中的清单和记录都会去掉。")) onDelete().catch((err) => setError(message(err)));
           }}
         >
-          删除多维表格
+          删除空间
         </button>
         <button type="button" onClick={onClose}>完成</button>
       </div>
@@ -1906,26 +1944,28 @@ function AgentManageDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: 
         </button>
       </form>
       <div className="agent-base-picks">
-        <span className="fine">可访问的多维表格（创建/批准时生效，也可稍后在列表中调整）：</span>
+        <span className="fine">可访问的空间（创建/批准时生效，也可稍后在列表中调整）：</span>
         <div className="agent-base-grid">
           {bases.map((base) => (
             <label key={base.id} className="agent-base-item">
               <input type="checkbox" checked={Boolean(selectedBases[base.id])} onChange={() => toggleBase(base.id)} />
               <span>{base.name}</span>
               {selectedBases[base.id] && (
-                <select
+                <FancySelect
+                  compact
                   value={selectedBases[base.id]}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     setSelectedBases((current) => ({
                       ...current,
-                      [base.id]: event.target.value as "viewer" | "editor" | "owner",
+                      [base.id]: value as "viewer" | "editor" | "owner",
                     }))
                   }
-                >
-                  <option value="viewer">可查看</option>
-                  <option value="editor">可编辑</option>
-                  <option value="owner">所有者</option>
-                </select>
+                  options={[
+                    { value: "viewer", label: "可查看" },
+                    { value: "editor", label: "可编辑" },
+                    { value: "owner", label: "所有者" },
+                  ]}
+                />
               )}
             </label>
           ))}
@@ -2104,10 +2144,14 @@ function AdminDialog({ selfId, onSelf, onClose }: { selfId: string; onSelf: (use
         </label>
         <label>
           角色
-          <select value={role} onChange={(event) => setRole(event.target.value as "admin" | "member")}>
-            <option value="member">成员</option>
-            <option value="admin">管理员</option>
-          </select>
+          <FancySelect
+            value={role}
+            onChange={(v) => setRole(v as "admin" | "member")}
+            options={[
+              { value: "member", label: "成员" },
+              { value: "admin", label: "管理员" },
+            ]}
+          />
         </label>
         <button type="submit" className="primary">
           创建用户
@@ -2121,22 +2165,24 @@ function AdminDialog({ selfId, onSelf, onClose }: { selfId: string; onSelf: (use
               <span>{person.email}</span>
               {person.disabled && <em className="badge-warn">已停用</em>}
             </div>
-            <select
+            <FancySelect
+              compact
               value={person.role}
               disabled={person.id === selfId}
-              onChange={async (event) => {
+              onChange={async (value) => {
                 try {
-                  const updated = await api.updateUser(person.id, { role: event.target.value });
+                  const updated = await api.updateUser(person.id, { role: value });
                   setUsers((current) => current.map((item) => (item.id === updated.id ? updated : item)));
                   if (updated.id === selfId) onSelf(updated);
                 } catch (err) {
                   setError(message(err));
                 }
               }}
-            >
-              <option value="admin">管理员</option>
-              <option value="member">成员</option>
-            </select>
+              options={[
+                { value: "admin", label: "管理员" },
+                { value: "member", label: "成员" },
+              ]}
+            />
             <button
               type="button"
               disabled={person.id === selfId}
@@ -2186,6 +2232,246 @@ function AdminDialog({ selfId, onSelf, onClose }: { selfId: string; onSelf: (use
         ))}
       </ul>
       {error && <p className="form-error">{error}</p>}
+    </Modal>
+  );
+}
+
+function formatBytes(size: number | null) {
+  if (size == null) return "—";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatWhen(ts: number | null) {
+  if (ts == null) return "—";
+  return new Date(ts).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false });
+}
+
+function BackupDialog({ onClose }: { onClose: () => void }) {
+  const [settings, setSettings] = useState<BackupSettingsDto | null>(null);
+  const [logs, setLogs] = useState<BackupLogDto[]>([]);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"save" | "test" | "run" | null>(null);
+
+  async function reload() {
+    const data = await api.backupStatus();
+    setSettings(data.settings);
+    setLogs(data.logs);
+  }
+
+  useEffect(() => {
+    reload().catch((err) => setError(message(err)));
+  }, []);
+
+  if (!settings) {
+    return (
+      <Modal title="数据备份" onClose={onClose} size="wide">
+        <p className="fine">{error ?? "加载中…"}</p>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal title="数据备份 · 坚果云" onClose={onClose} size="wide">
+      <p className="fine">
+        配置坚果云 WebDAV 后，系统会按计划把数据库与附件打包上传，并只保留最近若干份。应用密码请在坚果云「账户信息 → 安全选项」中生成。
+      </p>
+      <form
+        className="backup-form"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setError(null);
+          setNotice(null);
+          setBusy("save");
+          try {
+            const updated = await api.updateBackup({
+              enabled: settings.enabled,
+              davUrl: settings.davUrl,
+              username: settings.username,
+              password: password || undefined,
+              remotePath: settings.remotePath,
+              hour: settings.hour,
+              minute: settings.minute,
+              keepDays: settings.keepDays,
+            });
+            setSettings(updated.settings);
+            setPassword("");
+            setNotice("配置已保存");
+            await reload();
+          } catch (err) {
+            setError(message(err));
+          } finally {
+            setBusy(null);
+          }
+        }}
+      >
+        <label className="backup-check">
+          <input
+            type="checkbox"
+            checked={settings.enabled}
+            onChange={(event) => setSettings({ ...settings, enabled: event.target.checked })}
+          />
+          启用每日自动备份
+        </label>
+        <label>
+          WebDAV 地址
+          <input
+            value={settings.davUrl}
+            onChange={(event) => setSettings({ ...settings, davUrl: event.target.value })}
+            placeholder="https://dav.jianguoyun.com/dav/"
+            required
+          />
+        </label>
+        <label>
+          坚果云账号（邮箱）
+          <input
+            type="email"
+            value={settings.username}
+            onChange={(event) => setSettings({ ...settings, username: event.target.value })}
+            placeholder="you@example.com"
+            required
+          />
+        </label>
+        <label>
+          应用密码{settings.hasPassword ? "（已配置，留空则不修改）" : ""}
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder={settings.hasPassword ? "••••••••" : "坚果云应用密码"}
+            autoComplete="new-password"
+          />
+        </label>
+        <label>
+          远程目录
+          <input
+            value={settings.remotePath}
+            onChange={(event) => setSettings({ ...settings, remotePath: event.target.value })}
+            placeholder="/知行人生备份"
+            required
+          />
+        </label>
+        <label>
+          每日备份时间（北京时间）
+          <div className="backup-time">
+            <input
+              type="number"
+              min={0}
+              max={23}
+              value={settings.hour}
+              onChange={(event) => setSettings({ ...settings, hour: Number(event.target.value) })}
+              aria-label="小时"
+            />
+            <span>:</span>
+            <input
+              type="number"
+              min={0}
+              max={59}
+              value={settings.minute}
+              onChange={(event) => setSettings({ ...settings, minute: Number(event.target.value) })}
+              aria-label="分钟"
+            />
+          </div>
+        </label>
+        <label>
+          保留份数
+          <input
+            type="number"
+            min={1}
+            max={30}
+            value={settings.keepDays}
+            onChange={(event) => setSettings({ ...settings, keepDays: Number(event.target.value) })}
+          />
+        </label>
+        <div className="backup-actions">
+          <button type="submit" className="primary" disabled={busy !== null}>
+            {busy === "save" ? "保存中…" : "保存配置"}
+          </button>
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={async () => {
+              setError(null);
+              setNotice(null);
+              setBusy("test");
+              try {
+                await api.updateBackup({
+                  enabled: settings.enabled,
+                  davUrl: settings.davUrl,
+                  username: settings.username,
+                  password: password || undefined,
+                  remotePath: settings.remotePath,
+                  hour: settings.hour,
+                  minute: settings.minute,
+                  keepDays: settings.keepDays,
+                });
+                const result = await api.testBackup();
+                setPassword("");
+                setNotice(`连接成功：${result.remotePath}`);
+                await reload();
+              } catch (err) {
+                setError(message(err));
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            {busy === "test" ? "测试中…" : "测试连接"}
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={busy !== null}
+            onClick={async () => {
+              setError(null);
+              setNotice(null);
+              setBusy("run");
+              try {
+                await api.runBackup();
+                setNotice("备份完成");
+                await reload();
+              } catch (err) {
+                setError(message(err));
+                await reload().catch(() => undefined);
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            {busy === "run" ? "备份中…" : "立即备份"}
+          </button>
+        </div>
+      </form>
+      <div className="backup-meta">
+        <span>上次备份：{formatWhen(settings.lastRunAt)}</span>
+        <span>下次计划：{formatWhen(settings.nextRunAt)}（北京时间）</span>
+      </div>
+      {notice && <p className="form-ok">{notice}</p>}
+      {error && <p className="form-error">{error}</p>}
+      <h3 className="backup-logs-title">备份日志</h3>
+      {logs.length === 0 ? (
+        <p className="fine">暂无备份记录。</p>
+      ) : (
+        <ul className="backup-logs">
+          {logs.map((log) => (
+            <li key={log.id} data-status={log.status}>
+              <div className="backup-log-head">
+                <strong className={`backup-status backup-status-${log.status}`}>
+                  {log.status === "ok" ? "成功" : log.status === "error" ? "失败" : "进行中"}
+                </strong>
+                <span>{formatWhen(log.startedAt)}</span>
+                <span>{log.fileName ?? "—"}</span>
+                <span>{formatBytes(log.fileSize)}</span>
+              </div>
+              <p>{log.message}</p>
+              {log.remotePath && <p className="fine">{log.remotePath}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
     </Modal>
   );
 }
@@ -2456,19 +2742,27 @@ function DetailPageDialog({
       >
         <label>
           样式
-          <select value={style} onChange={(event) => setStyle(event.target.value as typeof style)}>
-            <option value="single">单列</option>
-            <option value="multi">多列</option>
-            <option value="grouped">分组</option>
-          </select>
+          <FancySelect
+            value={style}
+            onChange={(v) => setStyle(v as typeof style)}
+            options={[
+              { value: "single", label: "单列" },
+              { value: "multi", label: "多列" },
+              { value: "grouped", label: "分组" },
+            ]}
+          />
         </label>
         {style === "multi" && (
           <label>
             列数
-            <select value={columns} onChange={(event) => setColumns(Number(event.target.value) as 1 | 2 | 3)}>
-              <option value={2}>2</option>
-              <option value={3}>3</option>
-            </select>
+            <FancySelect
+              value={String(columns)}
+              onChange={(v) => setColumns(Number(v) as 1 | 2 | 3)}
+              options={[
+                { value: "2", label: "2" },
+                { value: "3", label: "3" },
+              ]}
+            />
           </label>
         )}
         <label>
@@ -2525,33 +2819,31 @@ function ColorRulesDialog({
       >
         {rules.map((rule, index) => (
           <div key={rule.id} className="filter-row">
-            <select
+            <FancySelect
+              compact
               value={rule.fieldId}
-              onChange={(event) => {
+              onChange={(fieldId) => {
                 const next = [...rules];
-                next[index] = { ...rule, fieldId: event.target.value };
+                next[index] = { ...rule, fieldId };
                 setRules(next);
               }}
-            >
-              {fields.map((field) => (
-                <option key={field.id} value={field.id}>
-                  {field.name}
-                </option>
-              ))}
-            </select>
-            <select
+              options={fields.map((field) => ({ value: field.id, label: field.name }))}
+            />
+            <FancySelect
+              compact
               value={rule.op}
-              onChange={(event) => {
+              onChange={(op) => {
                 const next = [...rules];
-                next[index] = { ...rule, op: event.target.value as typeof rule.op };
+                next[index] = { ...rule, op: op as typeof rule.op };
                 setRules(next);
               }}
-            >
-              <option value="eq">等于</option>
-              <option value="neq">不等于</option>
-              <option value="contains">包含</option>
-              <option value="is_empty">为空</option>
-            </select>
+              options={[
+                { value: "eq", label: "等于" },
+                { value: "neq", label: "不等于" },
+                { value: "contains", label: "包含" },
+                { value: "is_empty", label: "为空" },
+              ]}
+            />
             <input
               value={rule.value ?? ""}
               onChange={(event) => {
@@ -2627,9 +2919,9 @@ function AutomationDialog({
   const [scheduleCron, setScheduleCron] = useState("every:5");
   const [commentBody, setCommentBody] = useState("自动化备注 {recordId}");
   const [emailTo, setEmailTo] = useState("ops@example.com");
-  const [emailSubject, setEmailSubject] = useState("多维通知");
+  const [emailSubject, setEmailSubject] = useState("知行人生通知");
   const [emailText, setEmailText] = useState("记录 {recordId} 触发了自动化");
-  const [feishuText, setFeishuText] = useState("【多维】{标题} · {状态} · 截止 {截止日期}");
+  const [feishuText, setFeishuText] = useState("【知行人生】{标题} · {状态} · 截止 {截止日期}");
   const [error, setError] = useState<string | null>(null);
   async function reload() {
     setItems(await api.automations(tableId));
@@ -2679,25 +2971,28 @@ function AutomationDialog({
         </label>
         <label>
           触发方式
-          <select value={triggerType} onChange={(event) => setTriggerType(event.target.value as typeof triggerType)}>
-            <option value="record_created">记录创建</option>
-            <option value="button">按钮字段</option>
-            <option value="webhook">Webhook</option>
-            <option value="schedule">定时</option>
-          </select>
+          <FancySelect
+            value={triggerType}
+            onChange={(v) => setTriggerType(v as typeof triggerType)}
+            options={[
+              { value: "record_created", label: "记录创建" },
+              { value: "button", label: "按钮字段" },
+              { value: "webhook", label: "Webhook" },
+              { value: "schedule", label: "定时" },
+            ]}
+          />
         </label>
         {triggerType === "button" && (
           <label>
             按钮字段
-            <select value={buttonFieldId} onChange={(event) => setButtonFieldId(event.target.value)} required>
-              {fields
+            <FancySelect
+              value={buttonFieldId}
+              required
+              onChange={setButtonFieldId}
+              options={fields
                 .filter((field) => field.type === "button")
-                .map((field) => (
-                  <option key={field.id} value={field.id}>
-                    {field.name}
-                  </option>
-                ))}
-            </select>
+                .map((field) => ({ value: field.id, label: field.name }))}
+            />
           </label>
         )}
         {triggerType === "webhook" && (
@@ -2709,20 +3004,21 @@ function AutomationDialog({
         {triggerType === "schedule" && (
           <label>
             周期表达式
-            <select
+            <FancySelect
               value={["every:5", "every:60", "hourly", "daily:09:00", "weekly:1:09:00", "0 9 * * *"].includes(scheduleCron) ? scheduleCron : "__custom__"}
-              onChange={(event) => {
-                if (event.target.value !== "__custom__") setScheduleCron(event.target.value);
+              onChange={(v) => {
+                if (v !== "__custom__") setScheduleCron(v);
               }}
-            >
-              <option value="every:5">每 5 分钟</option>
-              <option value="every:60">每 60 分钟</option>
-              <option value="hourly">每小时</option>
-              <option value="daily:09:00">每天 09:00</option>
-              <option value="weekly:1:09:00">每周一 09:00</option>
-              <option value="0 9 * * *">cron：每天 9 点</option>
-              <option value="__custom__">自定义…</option>
-            </select>
+              options={[
+                { value: "every:5", label: "每 5 分钟" },
+                { value: "every:60", label: "每 60 分钟" },
+                { value: "hourly", label: "每小时" },
+                { value: "daily:09:00", label: "每天 09:00" },
+                { value: "weekly:1:09:00", label: "每周一 09:00" },
+                { value: "0 9 * * *", label: "cron：每天 9 点" },
+                { value: "__custom__", label: "自定义…" },
+              ]}
+            />
             <input
               value={scheduleCron}
               onChange={(event) => setScheduleCron(event.target.value)}
@@ -2734,26 +3030,28 @@ function AutomationDialog({
         )}
         <label>
           动作
-          <select value={actionType} onChange={(event) => setActionType(event.target.value as typeof actionType)}>
-            <option value="set_field">设置字段</option>
-            <option value="add_comment">添加评论</option>
-            <option value="http_request">HTTP 请求</option>
-            <option value="send_email">发送邮件</option>
-            <option value="feishu_bot">飞书机器人（单条）</option>
-            <option value="feishu_digest">飞书待办摘要</option>
-          </select>
+          <FancySelect
+            value={actionType}
+            onChange={(v) => setActionType(v as typeof actionType)}
+            options={[
+              { value: "set_field", label: "设置字段" },
+              { value: "add_comment", label: "添加评论" },
+              { value: "http_request", label: "HTTP 请求" },
+              { value: "send_email", label: "发送邮件" },
+              { value: "feishu_bot", label: "飞书机器人（单条）" },
+              { value: "feishu_digest", label: "飞书待办摘要" },
+            ]}
+          />
         </label>
         {actionType === "set_field" && (
           <>
             <label>
               设置字段
-              <select value={fieldId} onChange={(event) => setFieldId(event.target.value)}>
-                {fields.map((field) => (
-                  <option key={field.id} value={field.id}>
-                    {field.name}
-                  </option>
-                ))}
-              </select>
+              <FancySelect
+                value={fieldId}
+                onChange={setFieldId}
+                options={fields.map((field) => ({ value: field.id, label: field.name }))}
+              />
             </label>
             <label>
               值
@@ -2780,7 +3078,7 @@ function AutomationDialog({
           </label>
         )}
         {actionType === "feishu_digest" && (
-          <p className="fine">将汇总截止日期在未来 2 天内、且未完成的记录，推到本表所属多维表格配置的飞书机器人。</p>
+          <p className="fine">将汇总截止日期在未来 2 天内、且未完成的记录，推到本空间配置的飞书机器人。</p>
         )}
         {actionType === "send_email" && (
           <>
@@ -2917,13 +3215,11 @@ function AclDialog({
       <p className="fine">按成员配置隐藏列，以及条件行权限（创建人 / 人员字段 / 字段等于 / 字段属于集合 / 白名单）。</p>
       <label>
         成员
-        <select value={userId} onChange={(event) => setUserId(event.target.value)}>
-          {members.map((member) => (
-            <option key={member.userId} value={member.userId}>
-              {member.name}
-            </option>
-          ))}
-        </select>
+        <FancySelect
+          value={userId}
+          onChange={setUserId}
+          options={members.map((member) => ({ value: member.userId, label: member.name }))}
+        />
       </label>
       <h3 className="section-title">列权限</h3>
       <div className="acl-fields">
@@ -2948,44 +3244,41 @@ function AclDialog({
       <h3 className="section-title">行权限</h3>
       <label>
         可见范围
-        <select
+        <FancySelect
           value={rowMode}
-          onChange={(event) => {
-            setRowMode(event.target.value as typeof rowMode);
+          onChange={(v) => {
+            setRowMode(v as typeof rowMode);
             setPreview(null);
           }}
-        >
-          <option value="all">全部行</option>
-          <option value="created_by">仅自己创建的行</option>
-          <option value="person_in">人员字段包含自己</option>
-          <option value="field_equals">字段等于指定值</option>
-          <option value="field_in">字段属于集合</option>
-          <option value="allow_ids">仅白名单</option>
-        </select>
+          options={[
+            { value: "all", label: "全部行" },
+            { value: "created_by", label: "仅自己创建的行" },
+            { value: "person_in", label: "人员字段包含自己" },
+            { value: "field_equals", label: "字段等于指定值" },
+            { value: "field_in", label: "字段属于集合" },
+            { value: "allow_ids", label: "仅白名单" },
+          ]}
+        />
       </label>
       {rowMode === "person_in" && (
         <label>
           人员字段
-          <select value={personFieldId} onChange={(event) => setPersonFieldId(event.target.value)}>
-            {personFields.map((field) => (
-              <option key={field.id} value={field.id}>
-                {field.name}
-              </option>
-            ))}
-          </select>
+          <FancySelect
+            value={personFieldId}
+            onChange={setPersonFieldId}
+            options={personFields.map((field) => ({ value: field.id, label: field.name }))}
+          />
         </label>
       )}
       {rowMode === "field_equals" && (
         <>
           <label>
             字段
-            <select value={equalsFieldId} onChange={(event) => setEqualsFieldId(event.target.value)}>
-              {fields.map((field) => (
-                <option key={field.id} value={field.id}>
-                  {field.name}
-                </option>
-              ))}
-            </select>
+            <FancySelect
+              value={equalsFieldId}
+              onChange={setEqualsFieldId}
+              options={fields.map((field) => ({ value: field.id, label: field.name }))}
+            />
           </label>
           <label>
             等于
@@ -2997,13 +3290,11 @@ function AclDialog({
         <>
           <label>
             字段
-            <select value={inFieldId} onChange={(event) => setInFieldId(event.target.value)}>
-              {fields.map((field) => (
-                <option key={field.id} value={field.id}>
-                  {field.name}
-                </option>
-              ))}
-            </select>
+            <FancySelect
+              value={inFieldId}
+              onChange={setInFieldId}
+              options={fields.map((field) => ({ value: field.id, label: field.name }))}
+            />
           </label>
           <label>
             允许值（逗号分隔）
@@ -3198,7 +3489,7 @@ function WorkflowDialog({
         </label>
         <label className="check-line">
           <input type="checkbox" checked={proxyBaseOnly} onChange={(e) => setProxyBaseOnly(e.target.checked)} />
-          仅限当前多维表格
+          仅限当前空间
         </label>
         <label className="check-line">
           <input type="checkbox" checked={proxyWorkflowOnly} onChange={(e) => setProxyWorkflowOnly(e.target.checked)} />
@@ -3354,10 +3645,14 @@ function WorkflowDialog({
             </label>
             <label>
               一级策略
-              <select value={strategy} onChange={(event) => setStrategy(event.target.value as "any" | "all")}>
-                <option value="any">任一通过</option>
-                <option value="all">全部通过</option>
-              </select>
+              <FancySelect
+                value={strategy}
+                onChange={(v) => setStrategy(v as "any" | "all")}
+                options={[
+                  { value: "any", label: "任一通过" },
+                  { value: "all", label: "全部通过" },
+                ]}
+              />
             </label>
             <label>
               一级审批人
@@ -3377,11 +3672,11 @@ function WorkflowDialog({
         )}
         <label>
           通过后写入字段
-          <select value={fieldId} onChange={(event) => setFieldId(event.target.value)}>
-            {fields.map((field) => (
-              <option key={field.id} value={field.id}>{field.name}</option>
-            ))}
-          </select>
+          <FancySelect
+            value={fieldId}
+            onChange={setFieldId}
+            options={fields.map((field) => ({ value: field.id, label: field.name }))}
+          />
         </label>
         <label>
           写入值
@@ -3624,19 +3919,19 @@ function SyncDialog({
         </label>
         <label>
           源表
-          <select value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
-            {tables.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+          <FancySelect
+            value={sourceId}
+            onChange={setSourceId}
+            options={tables.map((t) => ({ value: t.id, label: t.name }))}
+          />
         </label>
         <label>
           目标表
-          <select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-            {tables.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+          <FancySelect
+            value={targetId}
+            onChange={setTargetId}
+            options={tables.map((t) => ({ value: t.id, label: t.name }))}
+          />
         </label>
         <label>
           字段映射（源=目标，逗号分隔）
@@ -3653,17 +3948,25 @@ function SyncDialog({
         </label>
         <label>
           模式
-          <select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
-            <option value="incremental">增量</option>
-            <option value="full">全量</option>
-          </select>
+          <FancySelect
+            value={mode}
+            onChange={(v) => setMode(v as typeof mode)}
+            options={[
+              { value: "incremental", label: "增量" },
+              { value: "full", label: "全量" },
+            ]}
+          />
         </label>
         <label>
           冲突策略
-          <select value={conflict} onChange={(e) => setConflict(e.target.value as typeof conflict)}>
-            <option value="skip_if_target_nonempty">目标非空则跳过</option>
-            <option value="overwrite">覆盖</option>
-          </select>
+          <FancySelect
+            value={conflict}
+            onChange={(v) => setConflict(v as typeof conflict)}
+            options={[
+              { value: "skip_if_target_nonempty", label: "目标非空则跳过" },
+              { value: "overwrite", label: "覆盖" },
+            ]}
+          />
         </label>
         <button type="submit" className="primary">创建任务</button>
       </form>
@@ -3684,18 +3987,20 @@ function SyncDialog({
             </div>
             <label>
               重跑策略
-              <select
+              <FancySelect
+                compact
                 value={job.conflict}
-                onChange={(e) =>
+                onChange={(v) =>
                   api
-                    .updateSyncJob(job.id, { conflict: e.target.value })
+                    .updateSyncJob(job.id, { conflict: v })
                     .then(reload)
                     .catch((err) => setError(message(err)))
                 }
-              >
-                <option value="skip_if_target_nonempty">目标非空则跳过</option>
-                <option value="overwrite">覆盖</option>
-              </select>
+                options={[
+                  { value: "skip_if_target_nonempty", label: "目标非空则跳过" },
+                  { value: "overwrite", label: "覆盖" },
+                ]}
+              />
             </label>
             <div className="row-actions">
               <button
@@ -3874,13 +4179,11 @@ function CalendarFeishuDialog({
       <h3 className="section-title">日历订阅</h3>
       <label>
         日期字段
-        <select value={dateFieldId} onChange={(event) => setDateFieldId(event.target.value)}>
-          {dateFields.map((field) => (
-            <option key={field.id} value={field.id}>
-              {field.name}
-            </option>
-          ))}
-        </select>
+        <FancySelect
+          value={dateFieldId}
+          onChange={setDateFieldId}
+          options={dateFields.map((field) => ({ value: field.id, label: field.name }))}
+        />
       </label>
       <div className="dialog-actions" style={{ justifyContent: "flex-start" }}>
         <a className="button" href={`/api/tables/${tableId}/calendar.ics${dateFieldId ? `?dateFieldId=${dateFieldId}` : ""}`}>
@@ -3924,6 +4227,149 @@ function CalendarFeishuDialog({
   );
 }
 
+function buildAgentBrief(origin: string, token: string) {
+  const cleanOrigin = origin.replace(/\/$/, "");
+  const cleanToken = token.trim() || "dwa_把令牌粘贴到这里";
+  return `# 知行人生 · Agent 使用说明（请完整阅读后开始操作）
+
+你正在协助用户使用「知行人生」——一套自托管的人生管理工具（空间 / 清单 / 看板 / 日历）。
+请用 HTTP 调用其 REST API；不要臆造 tableId / recordId，先 list 再写。
+
+## 接入信息
+
+- **API 根地址**：\`${cleanOrigin}\`
+- **鉴权头**：\`Authorization: Bearer ${cleanToken}\`
+- 令牌类型：
+  - \`dwa_…\`：MCP Agent 令牌（管理员在网页「Agent 管理」创建/批准后获得，**只显示一次**）
+  - \`dw_…\`：个人访问令牌（网页「访问令牌」创建；仅 REST）
+- 所有请求 \`Content-Type: application/json\`（有 body 时）
+- 健康检查（无需登录）：\`GET ${cleanOrigin}/api/health\` → \`{"ok":true}\`
+
+## 每次会话开场（必做）
+
+1. \`GET ${cleanOrigin}/api/auth/me\` — 确认身份
+2. \`GET ${cleanOrigin}/api/bases\` — 列出可见「空间」及其「清单」（tables）
+3. 选定 \`tableId\` 后：\`GET ${cleanOrigin}/api/tables/{tableId}\` 了解字段与记录
+4. 需要筛选：\`POST ${cleanOrigin}/api/tables/{tableId}/query\`，body 示例：
+\`\`\`json
+{
+  "filters": [{ "field": "状态", "op": "eq", "value": "进行中" }],
+  "conjunction": "and",
+  "limit": 50
+}
+\`\`\`
+
+若 \`/api/bases\` 为空：请用户在「Agent 管理」为你的 Agent 勾选可访问空间。
+
+## 产品语义 ↔ API
+
+| 界面用语 | API |
+|----------|-----|
+| 空间 | base（\`baseId\`） |
+| 清单 / 数据表 | table（\`tableId\`） |
+| 记录 | record（\`recordId\`） |
+| 字段 | 读写记录时用**字段名**作 JSON 键，不要用内部 field id |
+
+## 写数据约定（极易踩坑）
+
+- \`POST /api/tables/{tableId}/records\` 创建；\`PATCH /api/records/{recordId}\` 更新
+- body 形如：\`{ "fields": { "标题": "…", "状态": "进行中", "截止日期": "2026-10-01" } }\`
+- **单选**：传选项**名称**（如 \`"进行中"\`），不是选项内部 id
+- **多选**：字符串数组
+- **日期**：\`YYYY-MM-DD\`
+- **公式 / 按钮 / 部分系统字段**：一般不要直接 update
+- 筛选运算符：\`eq\` \`neq\` \`contains\` \`not_contains\` \`gt\` \`gte\` \`lt\` \`lte\` \`is_empty\` \`is_not_empty\`
+
+## 常用能力
+
+- 模板建空间：\`POST ${cleanOrigin}/api/templates/{id}\`
+  - \`todos\` 个人待办（看板+日历+飞书摘要）
+  - \`research\` 科研管理（论文 / 任务 / 投稿）
+  - \`requirements\` 需求管理；\`engineering\` 研发进度
+- 新建清单：\`POST ${cleanOrigin}/api/bases/{baseId}/tables\`
+- 新建字段：\`POST ${cleanOrigin}/api/tables/{tableId}/fields\`
+- 评论：\`POST ${cleanOrigin}/api/records/{recordId}/comments\`
+- 导出 CSV：\`GET ${cleanOrigin}/api/tables/{tableId}/export.csv\`（同样带 Bearer）
+- 飞书：在空间设置里配置 webhook 后，可用相关 integrations 接口测通/发摘要
+
+## 推荐工作流示例
+
+**查并进行中的待办并勾掉一条**
+1. \`GET /api/bases\` → 找到「个人待办」空间下的待办表 \`tableId\`
+2. \`POST /api/tables/{tableId}/query\`，筛选 \`状态 eq 进行中\`（或表内实际选项名）
+3. \`PATCH /api/records/{recordId}\`，\`{ "fields": { "状态": "已完成" } }\`
+
+**从模板开一套科研管理**
+1. \`POST /api/templates/research\`
+2. \`GET /api/bases\` 确认新空间
+3. 按字段名往「论文」「任务」「投稿记录」写记录
+
+## 权限提醒
+
+- Agent 只能看到管理员授权给它的空间
+- 删空间 / 部分管理接口需要更高角色；失败时阅读返回 JSON 的 \`error\` 字段，不要重试硬闯
+- 不要把令牌写进公开仓库或聊天记录；用户若只给了占位符，先请用户粘贴真实 \`dwa_\` / \`dw_\` 令牌
+
+## 给 Cursor / Codex / WorkBuddy 等的用法
+
+把**本说明全文**贴进对话，并补上真实令牌。然后直接下任务，例如：
+「列出我所有空间和清单」「把科研管理里截稿在本周的论文列出来」「在个人待办新建一条：本周五前提交周报」。
+
+你应优先用 REST 完成任务，并在关键操作后用简短中文向用户汇报结果。
+`;
+}
+
+function AgentBriefDialog({ isAdmin, onClose }: { isAdmin: boolean; onClose: () => void }) {
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://task.zhaopeinan.com";
+  const [token, setToken] = useState("dwa_把令牌粘贴到这里");
+  const [copied, setCopied] = useState(false);
+  const brief = useMemo(() => buildAgentBrief(origin, token), [origin, token]);
+
+  async function copyBrief() {
+    try {
+      await navigator.clipboard.writeText(brief);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+      const area = document.getElementById("agent-brief-text") as HTMLTextAreaElement | null;
+      area?.focus();
+      area?.select();
+      document.execCommand("copy");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  return (
+    <Modal title="给 Agent 的使用说明" onClose={onClose} size="wide">
+      <p className="fine">
+        复制下方说明，粘贴给 Cursor / Codex / WorkBuddy 等 Agent，它们即可按 REST 操作「知行人生」。
+        {isAdmin ? " 请先在「Agent 管理」创建 Agent 并复制 dwa_ 令牌填入下方。" : " 请向管理员索取 Agent 令牌（dwa_…），或到「访问令牌」创建个人令牌（dw_…）。"}
+      </p>
+      <label>
+        令牌（会写入说明文本）
+        <input
+          value={token}
+          onChange={(event) => setToken(event.target.value)}
+          placeholder="dwa_… 或 dw_…"
+          spellCheck={false}
+          autoComplete="off"
+        />
+      </label>
+      <textarea id="agent-brief-text" className="agent-brief" readOnly value={brief} rows={18} spellCheck={false} />
+      <div className="dialog-actions">
+        <button type="button" className="secondary" onClick={onClose}>
+          关闭
+        </button>
+        <button type="button" className="primary" onClick={() => void copyBrief()}>
+          {copied ? "已复制" : "复制给 Agent"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 function HelpDialog({ onClose }: { onClose: () => void }) {
   const [limits, setLimits] = useState<{
     description: string;
@@ -3936,16 +4382,16 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
     api.limits().then(setLimits).catch(() => setLimits(null));
   }, []);
   return (
-    <Modal title="上手指南" onClose={onClose} size="wide">
-      <h3 className="section-title">快速上手</h3>
+    <Modal title="使用说明" onClose={onClose} size="wide">
+      <h3 className="section-title">用知行人生推进日子</h3>
       <ol className="fine" style={{ paddingLeft: 18, lineHeight: 1.7 }}>
-        <li>个人待办用「个人待办」；论文投稿用「科研管理」（论文 + 任务 + 投稿记录）。</li>
-        <li>在「日历 / 飞书」填写飞书机器人 Webhook，并把 ICS 订阅到系统日历或飞书日历。</li>
-        <li>从模板新建或空白新建多维表格，再添加数据表与字段。</li>
-        <li>用表格 / 看板 / 日历等视图整理数据；筛选、分组、填色在工具栏。</li>
-        <li>配置自动化、工作流与仪表盘；需要时开启高级权限与公开分享。</li>
-        <li>字段菜单可「更改类型」；按钮字段动作关联当前记录。</li>
-        <li>「AI 助手」可本地问数；MCP 须在「Agent 管理」注册获批后使用 dwa_ 令牌。</li>
+        <li>日常节奏用「个人待办」；论文与投稿用「科研管理」（论文 + 任务 + 投稿记录）。</li>
+        <li>在「日历 / 飞书」填写飞书机器人 Webhook，并把 ICS 订到系统日历或飞书日历。</li>
+        <li>从模板或空白新建「空间」，再添加清单与字段。</li>
+        <li>用表格 / 看板 / 日历整理节奏；筛选、分组、填色在工具栏。</li>
+        <li>需要时配置自动化、工作流与仪表盘，或开启分享与权限。</li>
+        <li>字段菜单可「更改类型」；按钮动作关联当前记录。</li>
+        <li>「AI 助手」可本地问数；把对接说明交给外部 Agent：点顶栏「给 Agent」一键复制。</li>
       </ol>
       <h3 className="section-title">按钮类型</h3>
       <p className="fine">
@@ -4014,13 +4460,15 @@ function ChangeTypeDialog({
         >
           <label>
             新类型
-            <select value={nextType} onChange={(event) => setNextType(event.target.value)} required>
-              {targets.map((type) => (
-                <option key={type} value={type}>
-                  {FIELD_TYPE_LABELS[type as Field["type"]] ?? type}
-                </option>
-              ))}
-            </select>
+            <FancySelect
+              value={nextType}
+              required
+              onChange={setNextType}
+              options={targets.map((type) => ({
+                value: type,
+                label: FIELD_TYPE_LABELS[type as Field["type"]] ?? type,
+              }))}
+            />
           </label>
           {error && <p className="form-error">{error}</p>}
           <div className="dialog-actions">
@@ -4359,24 +4807,32 @@ function PortalDialog({
       >
         <label>
           时区
-          <select value={timezone} onChange={(event) => setTimezone(event.target.value)}>
-            <option value="Asia/Shanghai">Asia/Shanghai</option>
-            <option value="UTC">UTC</option>
-            <option value="America/Los_Angeles">America/Los_Angeles</option>
-            <option value="Europe/London">Europe/London</option>
-          </select>
+          <FancySelect
+            value={timezone}
+            onChange={setTimezone}
+            options={[
+              { value: "Asia/Shanghai", label: "Asia/Shanghai" },
+              { value: "UTC", label: "UTC" },
+              { value: "America/Los_Angeles", label: "America/Los_Angeles" },
+              { value: "Europe/London", label: "Europe/London" },
+            ]}
+          />
         </label>
         <label>
           应用门户标题
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="默认用多维表格名" />
+          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="默认用空间名" />
         </label>
         <label>
           主题
-          <select value={theme} onChange={(event) => setTheme(event.target.value as typeof theme)}>
-            <option value="light">浅色</option>
-            <option value="blue">蓝色</option>
-            <option value="green">绿色</option>
-          </select>
+          <FancySelect
+            value={theme}
+            onChange={(v) => setTheme(v as typeof theme)}
+            options={[
+              { value: "light", label: "浅色" },
+              { value: "blue", label: "蓝色" },
+              { value: "green", label: "绿色" },
+            ]}
+          />
         </label>
         <div className="acl-fields">
           {tables.map((table) => {
@@ -4405,10 +4861,10 @@ function PortalDialog({
             <div key={widget.id} className="chart-edit-row">
               <label>
                 类型
-                <select
+                <FancySelect
                   value={widget.type}
-                  onChange={(event) => {
-                    const type = event.target.value as WidgetDraft["type"];
+                  onChange={(v) => {
+                    const type = v as WidgetDraft["type"];
                     const tableId = widget.tableId || tables[0]?.id || "";
                     void ensureFields(tableId);
                     const next = [...widgets];
@@ -4428,11 +4884,12 @@ function PortalDialog({
                     }
                     setWidgets(next);
                   }}
-                >
-                  <option value="list">列表</option>
-                  <option value="tags">标签</option>
-                  <option value="image">图片</option>
-                </select>
+                  options={[
+                    { value: "list", label: "列表" },
+                    { value: "tags", label: "标签" },
+                    { value: "image", label: "图片" },
+                  ]}
+                />
               </label>
               <label>
                 标题
@@ -4447,10 +4904,10 @@ function PortalDialog({
               </label>
               <label>
                 数据表
-                <select
+                <FancySelect
                   value={widget.tableId}
-                  onChange={(event) => {
-                    const tableId = event.target.value;
+                  placeholder="选择"
+                  onChange={(tableId) => {
                     void ensureFields(tableId);
                     const next = [...widgets];
                     if (widget.type === "tags") next[index] = { ...widget, tableId, fieldId: "" };
@@ -4458,34 +4915,29 @@ function PortalDialog({
                     else next[index] = { ...widget, tableId, titleFieldId: "" };
                     setWidgets(next);
                   }}
-                >
-                  <option value="">选择</option>
-                  {tables.map((table) => (
-                    <option key={table.id} value={table.id}>
-                      {table.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "", label: "选择" },
+                    ...tables.map((table) => ({ value: table.id, label: table.name })),
+                  ]}
+                />
               </label>
               {widget.type === "list" && (
                 <>
                   <label>
                     标题字段
-                    <select
+                    <FancySelect
                       value={widget.titleFieldId}
-                      onChange={(event) => {
+                      placeholder="自动"
+                      onChange={(titleFieldId) => {
                         const next = [...widgets];
-                        next[index] = { ...widget, titleFieldId: event.target.value };
+                        next[index] = { ...widget, titleFieldId };
                         setWidgets(next);
                       }}
-                    >
-                      <option value="">自动</option>
-                      {fields.map((field) => (
-                        <option key={field.id} value={field.id}>
-                          {field.name}
-                        </option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: "", label: "自动" },
+                        ...fields.map((field) => ({ value: field.id, label: field.name })),
+                      ]}
+                    />
                   </label>
                   <label>
                     条数
@@ -4506,46 +4958,42 @@ function PortalDialog({
               {widget.type === "tags" && (
                 <label>
                   标签字段
-                  <select
+                  <FancySelect
                     value={widget.fieldId}
-                    onChange={(event) => {
+                    required
+                    placeholder="选择"
+                    onChange={(fieldId) => {
                       const next = [...widgets];
-                      next[index] = { ...widget, fieldId: event.target.value };
+                      next[index] = { ...widget, fieldId };
                       setWidgets(next);
                     }}
-                    required
-                  >
-                    <option value="">选择</option>
-                    {fields.map((field) => (
-                      <option key={field.id} value={field.id}>
-                        {field.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "", label: "选择" },
+                      ...fields.map((field) => ({ value: field.id, label: field.name })),
+                    ]}
+                  />
                 </label>
               )}
               {widget.type === "image" && (
                 <>
                   <label>
                     附件字段
-                    <select
+                    <FancySelect
                       value={widget.attachmentFieldId}
-                      onChange={(event) => {
+                      required
+                      placeholder="选择"
+                      onChange={(attachmentFieldId) => {
                         const next = [...widgets];
-                        next[index] = { ...widget, attachmentFieldId: event.target.value };
+                        next[index] = { ...widget, attachmentFieldId };
                         setWidgets(next);
                       }}
-                      required
-                    >
-                      <option value="">选择</option>
-                      {fields
-                        .filter((field) => field.type === "attachment")
-                        .map((field) => (
-                          <option key={field.id} value={field.id}>
-                            {field.name}
-                          </option>
-                        ))}
-                    </select>
+                      options={[
+                        { value: "", label: "选择" },
+                        ...fields
+                          .filter((field) => field.type === "attachment")
+                          .map((field) => ({ value: field.id, label: field.name })),
+                      ]}
+                    />
                   </label>
                   <label>
                     张数

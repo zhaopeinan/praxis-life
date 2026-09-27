@@ -4,12 +4,9 @@ import type { PublicUser } from "../../src/types.js";
 
 export function AuthScreen({ onUser }: { onUser: (user: PublicUser) => void }) {
   const [needsBootstrap, setNeedsBootstrap] = useState<boolean | null>(null);
-  const [useCode, setUseCode] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [captchaId, setCaptchaId] = useState("");
   const [captchaSvg, setCaptchaSvg] = useState("");
   const [captcha, setCaptcha] = useState("");
@@ -36,20 +33,6 @@ export function AuthScreen({ onUser }: { onUser: (user: PublicUser) => void }) {
     }
   }, [needsBootstrap]);
 
-  async function sendCode() {
-    setError(null);
-    setPending(true);
-    try {
-      const result = await api.sendCode(email);
-      setDevCode(result.devCode ?? null);
-      if (result.devCode) setCode(result.devCode);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "验证码发送失败");
-    } finally {
-      setPending(false);
-    }
-  }
-
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -60,11 +43,7 @@ export function AuthScreen({ onUser }: { onUser: (user: PublicUser) => void }) {
         onUser(result.user);
         return;
       }
-      const result = await api.login(
-        useCode
-          ? { email, code, captchaId, captcha }
-          : { email, password, captchaId, captcha },
-      );
+      const result = await api.login({ email, password, captchaId, captcha });
       onUser(result.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败");
@@ -78,93 +57,93 @@ export function AuthScreen({ onUser }: { onUser: (user: PublicUser) => void }) {
   }
 
   if (needsBootstrap === null) {
-    return <div className="boot">正在打开多维…</div>;
+    return <div className="boot">正在打开知行人生…</div>;
   }
 
   return (
     <main className="auth-shell">
-      <section className="auth-hero">
-        <div className="brand">
-          <span className="logo" aria-hidden="true" />
-          多维
+      <section className="auth-hero" aria-label="知行人生">
+        <div className="auth-sky" aria-hidden="true">
+          <span className="auth-orb auth-orb-a" />
+          <span className="auth-orb auth-orb-b" />
+          <span className="auth-orb auth-orb-c" />
+          <span className="auth-grain" />
+          <div className="auth-orbit">
+            <span className="auth-orbit-ring" />
+            <span className="auth-orbit-ring delay" />
+            <span className="auth-orbit-dot d1">先做</span>
+            <span className="auth-orbit-dot d2">记录</span>
+            <span className="auth-orbit-dot d3">复盘</span>
+            <span className="auth-orbit-dot d4">再改</span>
+          </div>
         </div>
-        <h1>表格、看板、日历，同一份数据。</h1>
-        <p>工作、生活、科研都能管；团队协作，Agent 通过接口或 MCP 直接读写。</p>
-        <div className="hero-board" aria-hidden="true">
-          <div>
-            <b>待办</b>
-            <span>导出 CSV</span>
-            <span>关联项目</span>
+        <div className="auth-hero-copy">
+          <div className="brand brand-hero">
+            <span className="logo" aria-hidden="true" />
+            <span className="brand-word">知行人生</span>
           </div>
-          <div>
-            <b>进行中</b>
-            <span>看板拖拽</span>
-            <span>权限分享</span>
-          </div>
-          <div>
-            <b>已完成</b>
-            <span>表格编辑</span>
-          </div>
+          <p className="auth-kicker">人生管理工具</p>
+          <h1>不要为完美而等待。</h1>
+          <p className="auth-lead">先记下、先推进，在知与行里一点点完善。目标、待办、科研与日常节奏，都放在这里。</p>
+          <ul className="auth-beats">
+            <li>
+              <strong>先做</strong>
+              <span>想到就记，未完成也可以开始</span>
+            </li>
+            <li>
+              <strong>知行</strong>
+              <span>看板、日历与提醒帮你看见进度</span>
+            </li>
+            <li>
+              <strong>完善</strong>
+              <span>复盘与迭代，让计划越用越准</span>
+            </li>
+          </ul>
         </div>
       </section>
+
       <section className="auth-panel">
         <div className="auth-card">
-          <h2 className="auth-title">{needsBootstrap ? "初始化管理员" : "登录"}</h2>
+          <div className="brand brand-panel">
+            <span className="logo" aria-hidden="true" />
+            <span className="brand-word">知行人生</span>
+          </div>
+          <h2 className="auth-title">{needsBootstrap ? "创建你的管理员" : "欢迎回来"}</h2>
           <p className="fine">
             {needsBootstrap
-              ? "系统尚无账号。创建首位管理员后，由管理员在「用户管理」中开通其他人。"
-              : "账号由管理员开通，不支持自助注册。"}
+              ? "第一次使用：先建首位管理员，之后再在「用户管理」里为家人或伙伴开通账号。"
+              : "使用账号与密码登录。账号由管理员开通。"}
           </p>
           <form onSubmit={submit}>
             {needsBootstrap && (
               <label>
                 姓名
-                <input value={name} onChange={(event) => setName(event.target.value)} required placeholder="管理员姓名" />
+                <input value={name} onChange={(event) => setName(event.target.value)} required placeholder="怎么称呼你" />
               </label>
             )}
             <label>
-              邮箱
+              账号
               <input
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
-                placeholder="you@team.com"
-                autoComplete="email"
+                placeholder="邮箱账号"
+                autoComplete="username"
               />
             </label>
-            {(needsBootstrap || !useCode) && (
-              <label>
-                密码
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  minLength={8}
-                  placeholder={needsBootstrap ? "至少 8 位" : undefined}
-                  autoComplete={needsBootstrap ? "new-password" : "current-password"}
-                />
-              </label>
-            )}
-            {!needsBootstrap && useCode && (
-              <label>
-                邮箱验证码
-                <div className="code-row">
-                  <input
-                    value={code}
-                    onChange={(event) => setCode(event.target.value)}
-                    required
-                    inputMode="numeric"
-                    placeholder="6 位验证码"
-                    autoComplete="one-time-code"
-                  />
-                  <button type="button" className="secondary" onClick={sendCode} disabled={pending || !email}>
-                    获取验证码
-                  </button>
-                </div>
-              </label>
-            )}
+            <label>
+              密码
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                minLength={8}
+                placeholder={needsBootstrap ? "至少 8 位" : undefined}
+                autoComplete={needsBootstrap ? "new-password" : "current-password"}
+              />
+            </label>
             {!needsBootstrap && (
               <label>
                 图形验证码
@@ -190,25 +169,11 @@ export function AuthScreen({ onUser }: { onUser: (user: PublicUser) => void }) {
                 </div>
               </label>
             )}
-            {devCode && <p className="dev-code">当前未配置邮箱服务，邮箱验证码是 {devCode}</p>}
             {error && <p className="form-error">{error}</p>}
             <button type="submit" className="primary wide" disabled={pending}>
-              {pending ? "请稍候…" : needsBootstrap ? "创建管理员并进入" : "进入多维"}
+              {pending ? "请稍候…" : needsBootstrap ? "开始知行人生" : "进入知行人生"}
             </button>
           </form>
-          {!needsBootstrap && (
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => {
-                setUseCode((value) => !value);
-                setDevCode(null);
-                setError(null);
-              }}
-            >
-              {useCode ? "改用密码登录" : "改用邮箱验证码登录"}
-            </button>
-          )}
         </div>
       </section>
     </main>

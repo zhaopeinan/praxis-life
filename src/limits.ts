@@ -30,7 +30,7 @@ export type LimitsSnapshot = typeof LIMITS & {
 export function getLimitsSnapshot(): LimitsSnapshot {
   return {
     ...LIMITS,
-    description: "DuoWei 自托管上限（对标飞书多维表格常见上限）",
+    description: "知行人生自托管上限（表格类产品常见上限）",
     cellCaps: [
       { type: "text / long_text", cap: `字数 ≤ ${LIMITS.textMaxLen}` },
       { type: "person", cap: `个数 ≤ ${LIMITS.personPerCell}` },

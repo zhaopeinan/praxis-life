@@ -26,7 +26,7 @@ export async function sendVerificationMail(email: string, code: string, purpose:
   await transport.sendMail({
     from: process.env.SMTP_FROM,
     to: email,
-    subject: `多维登录验证码`,
+    subject: `知行人生登录验证码`,
     text: `你的登录验证码是 ${code}，10 分钟内有效。如果不是你本人操作，请忽略这封邮件。`,
   });
 }

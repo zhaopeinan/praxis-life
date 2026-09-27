@@ -26,6 +26,30 @@ type WorkflowAuditRow = {
   createdAt: number;
 };
 
+export type BackupSettingsDto = {
+  enabled: boolean;
+  davUrl: string;
+  username: string;
+  hasPassword: boolean;
+  remotePath: string;
+  hour: number;
+  minute: number;
+  keepDays: number;
+  lastRunAt: number | null;
+  nextRunAt: number | null;
+};
+
+export type BackupLogDto = {
+  id: string;
+  startedAt: number;
+  finishedAt: number | null;
+  status: "running" | "ok" | "error";
+  message: string;
+  fileName: string | null;
+  fileSize: number | null;
+  remotePath: string | null;
+};
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -620,5 +644,25 @@ export const api = {
   deleteUpload: (uploadId: string) => request(`/api/uploads/${uploadId}`, { method: "DELETE" }),
   mcpTools: () =>
     request<{ tools: Array<{ name: string; description: string }>; hint: string }>("/api/mcp/tools"),
+  backupStatus: () =>
+    request<{
+      settings: BackupSettingsDto;
+      logs: BackupLogDto[];
+    }>("/api/system/backup"),
+  updateBackup: (body: {
+    enabled?: boolean;
+    davUrl?: string;
+    username?: string;
+    password?: string;
+    remotePath?: string;
+    hour?: number;
+    minute?: number;
+    keepDays?: number;
+  }) => request<{ settings: BackupSettingsDto }>("/api/system/backup", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  }),
+  testBackup: () => request<{ ok: true; url: string; remotePath: string }>("/api/system/backup/test", { method: "POST" }),
+  runBackup: () => request<{ log: BackupLogDto }>("/api/system/backup/run", { method: "POST" }),
 };
 

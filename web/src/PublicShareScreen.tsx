@@ -43,7 +43,7 @@ export function PublicShareScreen({ token }: { token: string }) {
   return (
     <div className="public-share">
       <header>
-        <p className="eyebrow">DuoWei 公开分享</p>
+        <p className="eyebrow">知行人生 · 公开分享</p>
         <h1>{data.table.name}</h1>
         <p className="fine">{data.kind === "form" ? "填写并提交表单" : "只读视图"}</p>
       </header>

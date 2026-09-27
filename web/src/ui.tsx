@@ -11,6 +11,9 @@ export function FancySelect({
   placeholder = "请选择",
   required,
   id,
+  "aria-label": ariaLabel,
+  className,
+  compact,
 }: {
   value: string;
   options: SelectOption[];
@@ -19,6 +22,10 @@ export function FancySelect({
   placeholder?: string;
   required?: boolean;
   id?: string;
+  "aria-label"?: string;
+  className?: string;
+  /** 工具栏等窄位：更矮、宽度随内容 */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -71,23 +78,25 @@ export function FancySelect({
     const openUp = spaceBelow < 200 && spaceAbove > spaceBelow;
     const maxHeight = Math.max(140, Math.min(maxMenu, openUp ? spaceAbove : spaceBelow));
     const top = openUp ? Math.max(8, rect.top - maxHeight - gap) : rect.bottom + gap;
+    const width = Math.max(rect.width, compact ? 140 : 180);
     return {
       position: "fixed" as const,
       top,
-      left: Math.min(rect.left, window.innerWidth - Math.max(rect.width, 180) - 8),
-      width: Math.max(rect.width, 180),
+      left: Math.min(rect.left, window.innerWidth - width - 8),
+      width,
       maxHeight,
       zIndex: 80,
     };
   })();
 
   return (
-    <div className={`fancy-select${open ? " open" : ""}`} ref={wrapRef}>
+    <div className={`fancy-select${compact ? " compact" : ""}${open ? " open" : ""}${className ? ` ${className}` : ""}`} ref={wrapRef}>
       <button
         id={id}
         type="button"
         className="fancy-select-trigger"
         disabled={disabled}
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => {
@@ -114,7 +123,7 @@ export function FancySelect({
         rect &&
         createPortal(
           <div className="menu fancy-select-menu" role="listbox" ref={menuRef} style={menuStyle}>
-            {!required && (
+            {!required && placeholder != null && options.every((item) => item.value !== "") && (
               <button
                 type="button"
                 role="option"
@@ -131,9 +140,10 @@ export function FancySelect({
               <button
                 type="button"
                 role="option"
-                key={option.value}
+                key={option.value || "__empty"}
                 disabled={option.disabled}
                 className={option.value === value ? "on" : ""}
+                aria-selected={option.value === value}
                 onClick={() => {
                   if (option.disabled) return;
                   onChange(option.value);

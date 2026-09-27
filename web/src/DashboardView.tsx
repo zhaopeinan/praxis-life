@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ChartType, DashboardChart, DashboardConfig, Field, TableSummary } from "../../src/types.js";
 import { api } from "./api";
+import { FancySelect } from "./ui";
 
 type DashRow = { id: string; name: string; config: DashboardConfig };
 type ChartData = { id: string; title: string; type: string; labels: string[]; values: number[] };
@@ -202,22 +203,29 @@ export function DashboardView({
                   {data.slicers.map((slicer) => (
                     <label key={slicer.id} className="slicer">
                       <span>{slicer.title}</span>
-                      <select
-                        multiple
-                        value={slicerValues[slicer.id] ?? []}
-                        onChange={(event) => {
-                          const selected = [...event.target.selectedOptions].map((option) => option.value);
-                          const next = { ...slicerValues, [slicer.id]: selected };
-                          setSlicerValues(next);
-                          if (activeId) void loadData(activeId, next);
-                        }}
-                      >
-                        {slicer.options.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="slicer-multi" role="group" aria-label={slicer.title}>
+                        {slicer.options.map((option) => {
+                          const selected = slicerValues[slicer.id] ?? [];
+                          const checked = selected.includes(option);
+                          return (
+                            <label key={option} className="slicer-multi-item">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  const nextSelected = checked
+                                    ? selected.filter((item) => item !== option)
+                                    : [...selected, option];
+                                  const next = { ...slicerValues, [slicer.id]: nextSelected };
+                                  setSlicerValues(next);
+                                  if (activeId) void loadData(activeId, next);
+                                }}
+                              />
+                              {option}
+                            </label>
+                          );
+                        })}
+                      </div>
                     </label>
                   ))}
                 </div>
@@ -281,41 +289,36 @@ function DashboardEditor({
             </label>
             <label>
               数据表
-              <select
+              <FancySelect
                 value={slicer.tableId}
-                onChange={(event) => {
-                  const tableId = event.target.value;
+                placeholder="选择"
+                onChange={(tableId) => {
                   onNeedFields(tableId);
                   const next = [...slicers];
                   next[index] = { ...slicer, tableId, fieldId: "" };
                   onSlicers(next);
                 }}
-              >
-                <option value="">选择</option>
-                {tables.map((table) => (
-                  <option key={table.id} value={table.id}>
-                    {table.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "选择" },
+                  ...tables.map((table) => ({ value: table.id, label: table.name })),
+                ]}
+              />
             </label>
             <label>
               字段
-              <select
+              <FancySelect
                 value={slicer.fieldId}
-                onChange={(event) => {
+                placeholder="选择"
+                onChange={(fieldId) => {
                   const next = [...slicers];
-                  next[index] = { ...slicer, fieldId: event.target.value };
+                  next[index] = { ...slicer, fieldId };
                   onSlicers(next);
                 }}
-              >
-                <option value="">选择</option>
-                {fields.map((field) => (
-                  <option key={field.id} value={field.id}>
-                    {field.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "选择" },
+                  ...fields.map((field) => ({ value: field.id, label: field.name })),
+                ]}
+              />
             </label>
             <button type="button" onClick={() => onSlicers(slicers.filter((item) => item.id !== slicer.id))}>
               删除
@@ -358,58 +361,48 @@ function DashboardEditor({
             </label>
             <label>
               类型
-              <select
+              <FancySelect
                 value={chart.type}
-                onChange={(event) => {
+                onChange={(type) => {
                   const next = [...charts];
-                  next[index] = { ...chart, type: event.target.value as ChartType };
+                  next[index] = { ...chart, type: type as ChartType };
                   onCharts(next);
                 }}
-              >
-                {CHART_TYPES.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+                options={CHART_TYPES.map((item) => ({ value: item.id, label: item.label }))}
+              />
             </label>
             <label>
               数据表
-              <select
+              <FancySelect
                 value={chart.tableId}
-                onChange={(event) => {
-                  const tableId = event.target.value;
+                placeholder="选择"
+                onChange={(tableId) => {
                   onNeedFields(tableId);
                   const next = [...charts];
                   next[index] = { ...chart, tableId, fieldId: "" };
                   onCharts(next);
                 }}
-              >
-                <option value="">选择</option>
-                {tables.map((table) => (
-                  <option key={table.id} value={table.id}>
-                    {table.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "选择" },
+                  ...tables.map((table) => ({ value: table.id, label: table.name })),
+                ]}
+              />
             </label>
             <label>
               字段
-              <select
+              <FancySelect
                 value={chart.fieldId}
-                onChange={(event) => {
+                placeholder="选择"
+                onChange={(fieldId) => {
                   const next = [...charts];
-                  next[index] = { ...chart, fieldId: event.target.value };
+                  next[index] = { ...chart, fieldId };
                   onCharts(next);
                 }}
-              >
-                <option value="">选择</option>
-                {fields.map((field) => (
-                  <option key={field.id} value={field.id}>
-                    {field.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "选择" },
+                  ...fields.map((field) => ({ value: field.id, label: field.name })),
+                ]}
+              />
             </label>
             <button
               type="button"

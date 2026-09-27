@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { DisplayValue, Field, PublicRecord } from "../../src/types.js";
+import { FancySelect } from "./ui";
 
 function titleOf(record: PublicRecord, fields: Field[], titleFieldId: string | null): string {
   const field = fields.find((item) => item.id === titleFieldId) ?? fields[0];
@@ -243,11 +244,11 @@ export function FormView({
                 }
               />
             ) : field.type === "single_select" ? (
-              <select
+              <FancySelect
                 value={values[field.id] ?? ""}
                 disabled={readOnly || busy}
-                onChange={(event) => {
-                  const next = event.target.value;
+                placeholder="请选择"
+                onChange={(next) => {
                   setValues((current) => {
                     const updated = { ...current, [field.id]: next };
                     const cascade = field.config.optionCascade;
@@ -264,14 +265,11 @@ export function FormView({
                     return updated;
                   });
                 }}
-              >
-                <option value="">请选择</option>
-                {optionsFor(field).map((option) => (
-                  <option key={option.id} value={option.name}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "请选择" },
+                  ...optionsFor(field).map((option) => ({ value: option.name, label: option.name })),
+                ]}
+              />
             ) : field.type === "geolocation" ? (
               <input
                 type="text"

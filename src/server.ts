@@ -7,6 +7,7 @@ import path from "node:path";
 import { ZodError, z } from "zod";
 import { Accounts } from "./accounts.js";
 import { assertBaseRole } from "./access.js";
+import { BackupService } from "./backup.js";
 import { DomainError, type Store } from "./store.js";
 import { createTemplate, TEMPLATES, type TemplateId } from "./templates.js";
 import {
@@ -182,7 +183,8 @@ const AutomationConditionSchema = z.object({
   value: z.string().optional(),
 });
 
-export function createApp(store: Store, accounts: Accounts) {
+export function createApp(store: Store, accounts: Accounts, backupService?: BackupService) {
+  const backup = backupService ?? new BackupService(store.database, path.dirname(store.uploadsDir));
   const app = new Hono();
 
   app.onError((err, c) => {
@@ -195,6 +197,47 @@ export function createApp(store: Store, accounts: Accounts) {
   });
 
   app.get("/api/health", (c) => c.json({ ok: true }));
+
+  app.get("/api/system/backup", async (c) => {
+    await requireAdmin(c);
+    return c.json({
+      settings: await backup.getSettings(),
+      logs: await backup.listLogs(50),
+    });
+  });
+
+  app.put("/api/system/backup", async (c) => {
+    await requireAdmin(c);
+    const body = z
+      .object({
+        enabled: z.boolean().optional(),
+        davUrl: z.string().optional(),
+        username: z.string().optional(),
+        password: z.string().optional(),
+        remotePath: z.string().optional(),
+        hour: z.number().int().min(0).max(23).optional(),
+        minute: z.number().int().min(0).max(59).optional(),
+        keepDays: z.number().int().min(1).max(30).optional(),
+      })
+      .parse(await readBody(c));
+    return c.json({ settings: await backup.updateSettings(body) });
+  });
+
+  app.post("/api/system/backup/test", async (c) => {
+    await requireAdmin(c);
+    return c.json(await backup.testConnection());
+  });
+
+  app.post("/api/system/backup/run", async (c) => {
+    await requireAdmin(c);
+    return c.json({ log: await backup.runBackup("manual") });
+  });
+
+  app.get("/api/system/backup/logs", async (c) => {
+    await requireAdmin(c);
+    const limit = Number(c.req.query("limit") ?? 50);
+    return c.json(await backup.listLogs(Number.isFinite(limit) ? limit : 50));
+  });
   app.get("/api/templates", (c) => c.json(TEMPLATES));
   app.get("/api/limits", async (c) => {
     await requireUser(c);
@@ -512,7 +555,7 @@ export function createApp(store: Store, accounts: Accounts) {
     const webhook = body.webhookUrl || settings.integrations.feishuWebhookUrl;
     if (!webhook) throw new DomainError("请先配置飞书机器人 Webhook");
     const { sendFeishuText } = await import("./feishu.js");
-    const result = await sendFeishuText(webhook, body.text || "多维测试：飞书机器人已连通。");
+    const result = await sendFeishuText(webhook, body.text || "知行人生测试：飞书机器人已连通。");
     if (!result.ok) throw new DomainError(result.message || "飞书发送失败", 400);
     return c.json({ ok: true });
   });
