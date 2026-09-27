@@ -1,0 +1,52 @@
+# DuoWei 对标飞书多维表格 · 实现进度
+
+依据 `docs/feishu-bitable/catalog/`。目标：目录能力全部落地。状态：`done` / `partial` / `todo` / `n/a`。
+
+## 总览结论
+
+核心路径与上一轮缺口能力已落地。本轮将仅存的 **partial** 模块补齐为 `done*`：
+
+- **基础介绍**：上手指南、常见上限、字段类型变更约束、按钮类型说明（**付费权益仍 out-of-scope**）
+- **多维表格 AI**：服务端本地智能问答 + MCP/REST（**知识库 / 大模型 Agent 仍 out-of-scope**）
+
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| 快速入门 / 基础介绍 | done* | 建表/模板 + 上手指南 + 上限 API/校验 + 字段改类型 + 按钮动作说明；**付费 out-of-scope** |
+| 快速入门 / 基础设置 | done* | 筛选排序、分组、行高、CSV、时区、填色、编组、快捷键 |
+| 快速入门 / 多维表格 AI | done* | `/api/assistant/query` 本地问数 + MCP 数据面/控制面（ACL/自动化/工作流/仪表盘/分享等）；**LLM Agent 本体仍 out-of-scope** |
+| 字段 | done* | 含地理位置/签字/选项联动/群组；附件本地盘；可改类型（受限） |
+| 视图 | done* | 六类视图 + 公开分享 + 保护视图 |
+| 记录 | done* | CRUD、评论、历史、关注、详情页布局 |
+| 公式 | done* | 常用函数 + 跨表 TABLEROWS/TABLESUM/TABLECOUNT |
+| 自动化 | done* | 创建/按钮/Webhook/定时（every/daily/weekly/cron） |
+| 工作流 | done* | 多级审批主路径 |
+| 仪表盘 | done* | 图表画布 + 切片器 |
+| 高级权限 | done* | 行列规则含 field_in |
+| 应用模式 | done* | 门户 + 列表/标签/图片组件 |
+| 同步与插件 | done* | 字段映射同步 + 市场雏形；沙箱后续 |
+| 功能实践 | n/a | — |
+
+\*相对飞书仍可继续加深（查询页、可视化编排、公式/图表全集、插件沙箱），但目录主路径与原 partial 项已落地。
+
+## 本轮交付（partial → done*）
+
+1. **常见上限**：`/api/limits`；创建表/字段/视图与单元格人数/群组/附件等校验  
+2. **字段变更**：`POST /api/fields/:id/change-type` + 兼容矩阵；大表串行约束；UI「更改类型」  
+3. **按钮类型**：创建字段可选 add_comment / set_field / open_url；指南说明关联 vs 非关联  
+4. **上手指南**：顶栏「上手指南」汇总路径与上限  
+5. **智能问答**：`POST /api/assistant/query` 服务端规则引擎；助手面板快捷问法  
+
+## Out-of-scope / 后续基础设施
+
+- 付费能力、商业套餐  
+- **Agent / 多维表格 AI 全家桶**：已单独摘出，见 [`docs/AGENT_SCOPE.md`](./AGENT_SCOPE.md)（含智能体本体、字段捷径、工作流 AI 节点、AI 搭建等分期）  
+- 对象存储 / CDN（当前 `data/uploads`）  
+- 插件沙箱与安装包市场  
+
+## 可选后续（非阻塞，主产品）
+
+- 查询页 / 更完整可视化自动化编排  
+- 飞书公式与仪表盘图表全集  
+- 插件沙箱安装包  
+
+> Agent 相关不在此表继续标 partial；立项与验收以 `AGENT_SCOPE.md` 为准。

@@ -1,0 +1,20 @@
+services:
+  duowei:
+    build: .
+    image: duowei:latest
+    container_name: duowei
+    restart: unless-stopped
+    ports:
+      - "80:8787"
+    volumes:
+      - ./data:/app/data
+    environment:
+      DUOWEI_HOST: "0.0.0.0"
+      DUOWEI_PORT: "8787"
+      DUOWEI_WEB_ROOT: "/app/dist-web"
+      DUOWEI_DEV_CODES: "0"
+      DUOWEI_COOKIE_SECURE: "0"
+      # 首次部署可取消注释以自动创建管理员；也可打开页面走引导
+      # DUOWEI_BOOTSTRAP_EMAIL: "admin@example.com"
+      # DUOWEI_BOOTSTRAP_PASSWORD: "change-me-please"
+      # DUOWEI_BOOTSTRAP_NAME: "管理员"

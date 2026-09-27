@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-web
+data
+.DS_Store
+*.local
+.env
+.env.*
+!.env.example
+aliyun.env
+*.pem
+*.key
+.duowei-*.tar

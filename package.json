@@ -1,0 +1,42 @@
+{
+  "name": "duowei",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:server": "tsx watch src/listen.ts",
+    "dev:web": "vite",
+    "start": "tsx src/listen.ts",
+    "mcp": "tsx src/mcp.ts",
+    "test": "tsx src/formula.test.ts && tsx src/store.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build:feishu-index": "tsx scripts/build-feishu-index.mts",
+    "scrape:feishu": "tsx scripts/scrape-feishu-bitable.mts",
+    "scrape:feishu:parallel": "tsx scripts/scrape-feishu-bitable-parallel.mts",
+    "scrape:feishu:all": "bash scripts/scrape-feishu-until-done.sh",
+    "build:web": "vite build"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "@libsql/client": "^0.15.15",
+    "@modelcontextprotocol/sdk": "^1.18.1",
+    "hono": "^4.9.8",
+    "nodemailer": "^7.0.6",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tsx": "^4.20.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "@types/nodemailer": "^7.0.1",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.3",
+    "concurrently": "^9.2.1",
+    "puppeteer-core": "^25.11.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.6"
+  }
+}

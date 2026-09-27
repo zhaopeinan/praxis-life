@@ -1,0 +1,9 @@
+node_modules
+data
+dist
+dist-web
+.git
+.DS_Store
+*.local
+.env
+docs/feishu-bitable
