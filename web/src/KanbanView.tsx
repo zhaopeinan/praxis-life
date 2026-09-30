@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { DisplayValue, Field, PublicRecord } from "../../src/types.js";
+import { beginTouchDrag } from "./touchDrag";
 
 export function KanbanView({
   fields,
@@ -19,6 +20,7 @@ export function KanbanView({
   onDelete: (recordId: string) => void;
 }) {
   const [over, setOver] = useState<string | null>(null);
+  const [touchDragging, setTouchDragging] = useState<string | null>(null);
   const dragId = useRef<string | null>(null);
   const options = groupField.config.options ?? [];
   const primary = fields[0];
@@ -40,6 +42,7 @@ export function KanbanView({
           <section
             key={column.key}
             className={over === column.key ? "column over" : "column"}
+            data-drop-key={column.key}
             onDragOver={(event) => {
               if (readOnly) return;
               event.preventDefault();
@@ -63,12 +66,27 @@ export function KanbanView({
               {cards.map((record) => (
                 <article
                   key={record.id}
+                  className={touchDragging === record.id ? "touch-dragging" : undefined}
                   draggable={!readOnly}
                   onDragStart={() => {
                     dragId.current = record.id;
                   }}
                   onDragEnd={() => {
                     dragId.current = null;
+                  }}
+                  onTouchStart={(event) => {
+                    if (readOnly) return;
+                    beginTouchDrag(event, {
+                      onActivate: () => setTouchDragging(record.id),
+                      onTargetChange: (key) => setOver(key),
+                      onDrop: (key) => {
+                        if (key) onChange(record.id, groupField.name, key === "__empty__" ? null : key);
+                      },
+                      onEnd: () => {
+                        setTouchDragging(null);
+                        setOver(null);
+                      },
+                    });
                   }}
                 >
                   <div className="card-top">

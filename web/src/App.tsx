@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { applyQuery } from "../../src/query.js";
-import type { BaseMember, BaseSummary, Field, McpAgent, PublicUser, RowAccessRule, TablePayload, View, ViewType } from "../../src/types.js";
+import type { BaseMember, BaseSummary, DisplayValue, Field, McpAgent, PublicRecord, PublicUser, RowAccessRule, TablePayload, View, ViewType } from "../../src/types.js";
 import { FIELD_TYPE_LABELS, VIEW_TYPE_LABELS } from "../../src/types.js";
 import { api, type BackupLogDto, type BackupSettingsDto } from "./api";
 import { AuthScreen } from "./AuthScreen";
 import { DashboardView } from "./DashboardView";
 import { CalendarView, FormView, GalleryView, GanttView } from "./ExtraViews";
-import { GridView } from "./GridView";
+import { Cell, GridView } from "./GridView";
 import { KanbanView } from "./KanbanView";
+import { BottomBar, MobileAgenda, MobileKanban, RecordCardList } from "./mobile";
 import { PublicShareScreen } from "./PublicShareScreen";
-import { FancySelect } from "./ui";
+import { DropMenu, FancySelect, useMediaQuery } from "./ui";
 
 const FIELD_TYPES = (Object.keys(FIELD_TYPE_LABELS) as Field["type"][]).map((id) => ({
   id,
@@ -63,6 +64,62 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const [appMode, setAppMode] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [widgetsKey, setWidgetsKey] = useState(0);
+  const [navOpen, setNavOpen] = useState(false);
+  const [mobileSearch, setMobileSearch] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const isMobile = useMediaQuery("(max-width: 860px)");
+  const detailPushed = useRef(false);
+  const dialogPushed = useRef(false);
+
+  function closeDetail() {
+    if (detailPushed.current) {
+      detailPushed.current = false;
+      window.history.back();
+    }
+    setDetailRecordId(null);
+  }
+
+  function closeDialog() {
+    if (dialogPushed.current) {
+      dialogPushed.current = false;
+      window.history.back();
+    }
+    setDialog(null);
+  }
+
+  useEffect(() => {
+    if (detailRecordId && !detailPushed.current) {
+      detailPushed.current = true;
+      window.history.pushState({ dwDetail: true }, "");
+    } else if (!detailRecordId) {
+      detailPushed.current = false;
+    }
+  }, [detailRecordId]);
+
+  useEffect(() => {
+    if (dialog && !dialogPushed.current) {
+      dialogPushed.current = true;
+      window.history.pushState({ dwDialog: true }, "");
+    } else if (!dialog) {
+      dialogPushed.current = false;
+    }
+  }, [dialog]);
+
+  useEffect(() => {
+    function onPopState() {
+      if (dialogPushed.current) {
+        dialogPushed.current = false;
+        setDialog(null);
+        return;
+      }
+      if (detailPushed.current) {
+        detailPushed.current = false;
+        setDetailRecordId(null);
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const base = bases.find((item) => item.id === baseId) ?? null;
   const view = payload?.views.find((item) => item.id === viewId) ?? payload?.views[0] ?? null;
@@ -112,6 +169,12 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     if (!remaining) setPayload(null);
   }
 
+  function renameCurrentBase(item: BaseSummary) {
+    const name = window.prompt("重命名空间", item.name);
+    if (!name || name === item.name) return;
+    api.renameBase(item.id, name).then(() => refreshBases({ baseId: item.id, tableId })).catch(fail);
+  }
+
   async function deleteCurrentView() {
     if (!payload || !view || !canEdit) return;
     if (view.protection === "locked") {
@@ -138,9 +201,10 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       const tag = (event.target as HTMLElement | null)?.tagName;
       const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (event.target as HTMLElement)?.isContentEditable;
       if (event.key === "Escape") {
-        if (dialog) setDialog(null);
-        else if (detailRecordId) setDetailRecordId(null);
+        if (dialog) closeDialog();
+        else if (detailRecordId) closeDetail();
         else if (showDashboard) setShowDashboard(false);
+        else if (navOpen) setNavOpen(false);
         return;
       }
       if (typing || !canEdit || appMode || !payload) return;
@@ -155,7 +219,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dialog, detailRecordId, showDashboard, canEdit, appMode, payload]);
+  }, [dialog, detailRecordId, showDashboard, navOpen, canEdit, appMode, payload]);
 
   useEffect(() => {
     if (!tableId) {
@@ -256,9 +320,234 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
 
   const groupField = payload?.fields.find((field) => field.id === view?.config.groupFieldId && field.type === "single_select");
 
+  const searchInput = (
+    <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索记录" aria-label="搜索记录" />
+  );
+  const filterButton = canEdit && view ? (
+    <button type="button" onClick={() => setDialog("filter")}>
+      筛选{view.config.filters.length ? ` ${view.config.filters.length}` : ""}
+    </button>
+  ) : null;
+  const gridTuning = payload && view?.type === "grid" && canEdit ? (
+    <>
+      <label className="inline-select">
+        分组
+        <FancySelect
+          compact
+          aria-label="分组"
+          value={view.config.groups[0]?.fieldId ?? ""}
+          placeholder="无"
+          options={[
+            { value: "", label: "无" },
+            ...payload.fields.map((field) => ({ value: field.id, label: field.name })),
+          ]}
+          onChange={(fieldId) => {
+            api
+              .updateView(view.id, {
+                config: { ...view.config, groups: fieldId ? [{ fieldId }] : [] },
+              })
+              .then(patchView)
+              .catch(fail);
+          }}
+        />
+      </label>
+      <label className="inline-select">
+        行高
+        <FancySelect
+          compact
+          aria-label="行高"
+          value={view.config.rowHeight}
+          options={[
+            { value: "short", label: "矮" },
+            { value: "medium", label: "中" },
+            { value: "tall", label: "高" },
+            { value: "extra", label: "超高" },
+          ]}
+          onChange={(value) => {
+            api
+              .updateView(view.id, {
+                config: {
+                  ...view.config,
+                  rowHeight: value as View["config"]["rowHeight"],
+                },
+              })
+              .then(patchView)
+              .catch(fail);
+          }}
+        />
+      </label>
+    </>
+  ) : null;
+  const kanbanTuning = payload && view?.type === "kanban" && canEdit ? (
+    <label className="inline-select">
+      看板分组
+      <FancySelect
+        compact
+        aria-label="看板分组"
+        value={view.config.groupFieldId ?? ""}
+        options={payload.fields
+          .filter((field) => field.type === "single_select")
+          .map((field) => ({ value: field.id, label: field.name }))}
+        onChange={(value) => {
+          api
+            .updateView(view.id, { config: { ...view.config, groupFieldId: value || null } })
+            .then(patchView)
+            .catch(fail);
+        }}
+      />
+    </label>
+  ) : null;
+  const dateTuning = payload && (view?.type === "calendar" || view?.type === "gantt") && canEdit ? (
+    <label className="inline-select">
+      日期字段
+      <FancySelect
+        compact
+        aria-label="日期字段"
+        value={view.config.dateFieldId ?? ""}
+        options={payload.fields
+          .filter((field) => field.type === "date")
+          .map((field) => ({ value: field.id, label: field.name }))}
+        onChange={(value) => {
+          api
+            .updateView(view.id, { config: { ...view.config, dateFieldId: value || null } })
+            .then(patchView)
+            .catch(fail);
+        }}
+      />
+    </label>
+  ) : null;
+  const editCluster = canEdit ? (
+    <div className="toolbar-cluster">
+      <button
+        type="button"
+        onClick={async () => {
+          if (!payload) return;
+          try {
+            const csv = await api.exportCsv(payload.id);
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${payload.name}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (err) {
+            fail(err);
+          }
+        }}
+      >
+        导出
+      </button>
+      <button type="button" onClick={() => setDialog("import")}>
+        导入
+      </button>
+      <button type="button" onClick={() => setDialog("automations")}>
+        自动化
+      </button>
+      <button type="button" onClick={() => setDialog("workflows")}>
+        工作流
+      </button>
+      <button type="button" onClick={() => setDialog("sync")}>
+        同步
+      </button>
+      <button type="button" onClick={() => setDialog("plugins")}>
+        插件
+      </button>
+    </div>
+  ) : null;
+  const mainCluster = (
+    <div className="toolbar-cluster">
+      <button type="button" onClick={() => setDialog("assistant")}>
+        AI 助手
+      </button>
+      {base && (
+        <button type="button" onClick={() => setShowDashboard(true)}>
+          仪表盘
+        </button>
+      )}
+      {canOwn && <button type="button" onClick={() => setDialog("share")}>分享</button>}
+      {canEdit && payload && (
+        <button type="button" onClick={() => setDialog("public-share")}>
+          公开分享
+        </button>
+      )}
+      {canOwn && <button type="button" onClick={() => setDialog("acl")}>权限</button>}
+      {canOwn && <button type="button" onClick={() => setDialog("portal")}>门户</button>}
+      {canEdit && <button type="button" onClick={() => setDialog("calendar-feishu")}>日历 / 飞书</button>}
+      {base && (
+        <button type="button" onClick={() => setAppMode((value) => !value)}>
+          {appMode ? "退出应用" : "应用模式"}
+        </button>
+      )}
+    </div>
+  );
+
+  const viewTabs =
+    payload?.views.map((item) => (
+      <button type="button" key={item.id} className={item.id === view?.id ? "on" : ""} onClick={() => setViewId(item.id)}>
+        {item.name}
+        {item.protection === "locked" ? " 🔒" : item.protection === "personal" ? " 👤" : ""}
+      </button>
+    )) ?? null;
+  const viewMiscControls = payload && view ? (
+    <>
+      {canEdit && (
+        <button type="button" className="ghost" onClick={() => setDialog("view")}>
+          + 视图
+        </button>
+      )}
+      {canEdit && (
+        <FancySelect
+          compact
+          aria-label="视图保护"
+          value={view.protection ?? "public"}
+          options={[
+            { value: "public", label: "公共视图" },
+            { value: "locked", label: "锁定视图" },
+            { value: "personal", label: "个人视图" },
+          ]}
+          onChange={(value) => {
+            api
+              .setViewProtection(view.id, value as "public" | "locked" | "personal")
+              .then(() => reloadTable())
+              .catch(fail);
+          }}
+        />
+      )}
+      {canEdit && !appMode && (
+        <button
+          type="button"
+          className="ghost danger-text"
+          disabled={view.protection === "locked" || payload.views.length <= 1}
+          title={
+            view.protection === "locked"
+              ? "锁定视图不可删除"
+              : payload.views.length <= 1
+                ? "至少保留一个视图"
+                : "删除当前视图"
+          }
+          onClick={() => deleteCurrentView().catch(fail)}
+        >
+          删除视图
+        </button>
+      )}
+      {canEdit && (
+        <button type="button" onClick={() => setDialog("detail-page")}>
+          详情页
+        </button>
+      )}
+      {canEdit && view.type === "grid" && (
+        <button type="button" onClick={() => setDialog("color-rules")}>
+          填色{view.config.colorRules?.length ? ` ${view.config.colorRules.length}` : ""}
+        </button>
+      )}
+    </>
+  ) : null;
+
   return (
     <div className="app">
-      <aside className="sidebar">
+      {isMobile && navOpen && <div className="nav-backdrop" onClick={() => setNavOpen(false)} />}
+      <aside className={isMobile && navOpen ? "sidebar open" : "sidebar"}>
         <div className="brand">
           <span className="logo" aria-hidden="true" />
           知行人生
@@ -266,23 +555,44 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         <div className="side-scroll">
           {bases.map((item) => (
             <div key={item.id} className={item.id === baseId ? "base open" : "base"}>
-              <button
-                type="button"
-                className="base-name"
-                onClick={() => {
-                  setBaseId(item.id);
-                  setTableId(item.tables[0]?.id ?? null);
-                  setViewId(null);
-                }}
-                onDoubleClick={() => {
-                  if (!canOwn || item.id !== baseId) return;
-                  const name = window.prompt("重命名空间", item.name);
-                  if (!name || name === item.name) return;
-                  api.renameBase(item.id, name).then(() => refreshBases({ baseId: item.id, tableId })).catch(fail);
-                }}
-              >
-                {item.name}
-              </button>
+              <div className="base-head">
+                <button
+                  type="button"
+                  className="base-name"
+                  onClick={() => {
+                    setBaseId(item.id);
+                    setTableId(item.tables[0]?.id ?? null);
+                    setViewId(null);
+                    setNavOpen(false);
+                  }}
+                  onDoubleClick={() => {
+                    if (!canOwn || item.id !== baseId) return;
+                    renameCurrentBase(item);
+                  }}
+                >
+                  {item.name}
+                </button>
+                {canOwn && item.id === baseId && (
+                  <DropMenu label="⋯" ariaLabel={`空间 ${item.name} 操作`} className="base-menu">
+                    <button type="button" onClick={() => renameCurrentBase(item)}>
+                      重命名空间
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-text"
+                      onClick={() => {
+                        if (!window.confirm(`删除空间「${item.name}」？其中的清单和记录都会去掉。`)) return;
+                        api
+                          .deleteBase(item.id)
+                          .then(() => refreshBases())
+                          .catch(fail);
+                      }}
+                    >
+                      删除空间
+                    </button>
+                  </DropMenu>
+                )}
+              </div>
               {item.tables.map((table) => (
                 <div key={table.id} className={table.id === tableId ? "table-row on" : "table-row"}>
                   <button
@@ -293,6 +603,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                       setTableId(table.id);
                       setViewId(null);
                       setSearch("");
+                      setNavOpen(false);
                     }}
                   >
                     {table.name}
@@ -334,13 +645,18 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           {bases.length === 0 && <p className="side-empty">还没有空间。可以从模板开始，或新建一个空白空间。</p>}
         </div>
         <div className="side-actions">
-          <button type="button" onClick={() => setDialog("template")}>＋ 从模板新建</button>
-          <button type="button" onClick={() => setDialog("base")}>＋ 新建空间</button>
-          {base && canEdit && <button type="button" onClick={() => setDialog("table")}>＋ 新建清单</button>}
+          <button type="button" onClick={() => { setNavOpen(false); setDialog("template"); }}>＋ 从模板新建</button>
+          <button type="button" onClick={() => { setNavOpen(false); setDialog("base"); }}>＋ 新建空间</button>
+          {base && canEdit && <button type="button" onClick={() => { setNavOpen(false); setDialog("table"); }}>＋ 新建清单</button>}
         </div>
       </aside>
       <section className="main">
         <header className="topbar">
+          {isMobile && (
+            <button type="button" className="nav-toggle" aria-label="打开导航" onClick={() => setNavOpen(true)}>
+              ☰
+            </button>
+          )}
           <div className="top-title">
             <input
               value={payload?.name ?? ""}
@@ -353,7 +669,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               }}
             />
             {myRole && <span className="role-pill">{roleLabel(myRole)}</span>}
-            {payload && canOwn && !appMode && (
+            {payload && canOwn && !appMode && !isMobile && (
               <button
                 type="button"
                 className="ghost danger-text"
@@ -363,22 +679,44 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               </button>
             )}
           </div>
-          <div className="top-user">
-            <button type="button" className="secondary" onClick={() => setDialog("tokens")}>访问令牌</button>
-            <button type="button" className="secondary" onClick={() => setDialog("agent-brief")}>给 Agent</button>
-            <button type="button" className="secondary" onClick={() => setDialog("help")}>使用说明</button>
-            {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("admin")}>用户管理</button>}
-            {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("backup")}>数据备份</button>}
-            {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("agents")}>Agent 管理</button>}
-            <span>{user.name}</span>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => api.logout().finally(onLogout)}
-            >
-              退出
-            </button>
-          </div>
+          {!isMobile && (
+            <div className="top-user">
+              <button type="button" className="secondary" onClick={() => setDialog("tokens")}>访问令牌</button>
+              <button type="button" className="secondary" onClick={() => setDialog("agent-brief")}>给 Agent</button>
+              <button type="button" className="secondary" onClick={() => setDialog("help")}>使用说明</button>
+              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("admin")}>用户管理</button>}
+              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("backup")}>数据备份</button>}
+              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("agents")}>Agent 管理</button>}
+              <span>{user.name}</span>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => api.logout().finally(onLogout)}
+              >
+                退出
+              </button>
+            </div>
+          )}
+          {isMobile && (
+            <div className="top-user">
+              <DropMenu ariaLabel="用户与设置">
+                <div className="menu-user">{user.name}</div>
+                <button type="button" onClick={() => setDialog("tokens")}>访问令牌</button>
+                <button type="button" onClick={() => setDialog("agent-brief")}>给 Agent</button>
+                <button type="button" onClick={() => setDialog("help")}>使用说明</button>
+                {user.role === "admin" && <button type="button" onClick={() => setDialog("admin")}>用户管理</button>}
+                {user.role === "admin" && <button type="button" onClick={() => setDialog("backup")}>数据备份</button>}
+                {user.role === "admin" && <button type="button" onClick={() => setDialog("agents")}>Agent 管理</button>}
+                {payload && canOwn && !appMode && (
+                  <button type="button" className="danger-text" onClick={() => deleteCurrentTable().catch(fail)}>
+                    删除清单
+                  </button>
+                )}
+                <hr className="menu-sep" />
+                <button type="button" onClick={() => api.logout().finally(onLogout)}>退出登录</button>
+              </DropMenu>
+            </div>
+          )}
         </header>
         {error && (
           <div className="banner">
@@ -386,225 +724,50 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             <button type="button" onClick={() => setError(null)} aria-label="关闭提示">×</button>
           </div>
         )}
+        {notice && (
+          <div className="banner info">
+            {notice}
+            <button type="button" onClick={() => setNotice(null)} aria-label="关闭提示">×</button>
+          </div>
+        )}
         {payload && view && (
           <div className="toolbar">
-            <div className="views">
-              {payload.views.map((item) => (
-                <button type="button" key={item.id} className={item.id === view.id ? "on" : ""} onClick={() => setViewId(item.id)}>
-                  {item.name}
-                  {item.protection === "locked" ? " 🔒" : item.protection === "personal" ? " 👤" : ""}
-                </button>
-              ))}
-              {canEdit && (
-                <button type="button" className="ghost" onClick={() => setDialog("view")}>
-                  + 视图
-                </button>
-              )}
-              {canEdit && view && (
-                <FancySelect
-                  compact
-                  aria-label="视图保护"
-                  value={view.protection ?? "public"}
-                  options={[
-                    { value: "public", label: "公共视图" },
-                    { value: "locked", label: "锁定视图" },
-                    { value: "personal", label: "个人视图" },
-                  ]}
-                  onChange={(value) => {
-                    api
-                      .setViewProtection(view.id, value as "public" | "locked" | "personal")
-                      .then(() => reloadTable())
-                      .catch(fail);
-                  }}
-                />
-              )}
-              {canEdit && view && !appMode && (
-                <button
-                  type="button"
-                  className="ghost danger-text"
-                  disabled={view.protection === "locked" || payload.views.length <= 1}
-                  title={
-                    view.protection === "locked"
-                      ? "锁定视图不可删除"
-                      : payload.views.length <= 1
-                        ? "至少保留一个视图"
-                        : "删除当前视图"
-                  }
-                  onClick={() => deleteCurrentView().catch(fail)}
-                >
-                  删除视图
-                </button>
-              )}
-              {canEdit && (
-                <button type="button" onClick={() => setDialog("detail-page")}>
-                  详情页
-                </button>
-              )}
-              {canEdit && view?.type === "grid" && (
-                <button type="button" onClick={() => setDialog("color-rules")}>
-                  填色{view.config.colorRules?.length ? ` ${view.config.colorRules.length}` : ""}
-                </button>
-              )}
-            </div>
-            <div className="toolbar-right">
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索记录" aria-label="搜索记录" />
-              {canEdit && (
-                <button type="button" onClick={() => setDialog("filter")}>
-                  筛选{view.config.filters.length ? ` ${view.config.filters.length}` : ""}
-                </button>
-              )}
-              {view.type === "grid" && canEdit && (
-                <>
-                  <label className="inline-select">
-                    分组
-                    <FancySelect
-                      compact
-                      aria-label="分组"
-                      value={view.config.groups[0]?.fieldId ?? ""}
-                      placeholder="无"
-                      options={[
-                        { value: "", label: "无" },
-                        ...payload.fields.map((field) => ({ value: field.id, label: field.name })),
-                      ]}
-                      onChange={(fieldId) => {
-                        api
-                          .updateView(view.id, {
-                            config: { ...view.config, groups: fieldId ? [{ fieldId }] : [] },
-                          })
-                          .then(patchView)
-                          .catch(fail);
-                      }}
-                    />
-                  </label>
-                  <label className="inline-select">
-                    行高
-                    <FancySelect
-                      compact
-                      aria-label="行高"
-                      value={view.config.rowHeight}
-                      options={[
-                        { value: "short", label: "矮" },
-                        { value: "medium", label: "中" },
-                        { value: "tall", label: "高" },
-                        { value: "extra", label: "超高" },
-                      ]}
-                      onChange={(value) => {
-                        api
-                          .updateView(view.id, {
-                            config: {
-                              ...view.config,
-                              rowHeight: value as View["config"]["rowHeight"],
-                            },
-                          })
-                          .then(patchView)
-                          .catch(fail);
-                      }}
-                    />
-                  </label>
-                </>
-              )}
-              {view.type === "kanban" && canEdit && (
-                <label className="inline-select">
-                  看板分组
-                  <FancySelect
-                    compact
-                    aria-label="看板分组"
-                    value={view.config.groupFieldId ?? ""}
-                    options={payload.fields
-                      .filter((field) => field.type === "single_select")
-                      .map((field) => ({ value: field.id, label: field.name }))}
-                    onChange={(value) => {
-                      api
-                        .updateView(view.id, { config: { ...view.config, groupFieldId: value || null } })
-                        .then(patchView)
-                        .catch(fail);
-                    }}
-                  />
-                </label>
-              )}
-              {(view.type === "calendar" || view.type === "gantt") && canEdit && (
-                <label className="inline-select">
-                  日期字段
-                  <FancySelect
-                    compact
-                    aria-label="日期字段"
-                    value={view.config.dateFieldId ?? ""}
-                    options={payload.fields
-                      .filter((field) => field.type === "date")
-                      .map((field) => ({ value: field.id, label: field.name }))}
-                    onChange={(value) => {
-                      api
-                        .updateView(view.id, { config: { ...view.config, dateFieldId: value || null } })
-                        .then(patchView)
-                        .catch(fail);
-                    }}
-                  />
-                </label>
-              )}
-              {canEdit && (
-                <div className="toolbar-cluster">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const csv = await api.exportCsv(payload.id);
-                        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `${payload.name}.csv`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                      } catch (err) {
-                        fail(err);
-                      }
-                    }}
-                  >
-                    导出
-                  </button>
-                  <button type="button" onClick={() => setDialog("import")}>
-                    导入
-                  </button>
-                  <button type="button" onClick={() => setDialog("automations")}>
-                    自动化
-                  </button>
-                  <button type="button" onClick={() => setDialog("workflows")}>
-                    工作流
-                  </button>
-                  <button type="button" onClick={() => setDialog("sync")}>
-                    同步
-                  </button>
-                  <button type="button" onClick={() => setDialog("plugins")}>
-                    插件
-                  </button>
-                </div>
-              )}
-              <div className="toolbar-cluster">
+            {!isMobile && (
+              <div className="views">
+                {viewTabs}
+                {viewMiscControls}
+              </div>
+            )}
+            {!isMobile && (
+              <div className="toolbar-right">
+                {searchInput}
+                {filterButton}
+                {gridTuning}
+                {kanbanTuning}
+                {dateTuning}
+                {editCluster}
+                {mainCluster}
+                <span className="count">{records.length} 条</span>
+              </div>
+            )}
+            {isMobile && (
+              <div className="toolbar-right">
+                {mobileSearch || search ? searchInput : null}
+                {filterButton}
                 <button type="button" onClick={() => setDialog("assistant")}>
                   AI 助手
                 </button>
-                {base && (
-                  <button type="button" onClick={() => setShowDashboard(true)}>
-                    仪表盘
-                  </button>
-                )}
-                {canOwn && <button type="button" onClick={() => setDialog("share")}>分享</button>}
-                {canEdit && payload && (
-                  <button type="button" onClick={() => setDialog("public-share")}>
-                    公开分享
-                  </button>
-                )}
-                {canOwn && <button type="button" onClick={() => setDialog("acl")}>权限</button>}
-                {canOwn && <button type="button" onClick={() => setDialog("portal")}>门户</button>}
-                {canEdit && <button type="button" onClick={() => setDialog("calendar-feishu")}>日历 / 飞书</button>}
-                {base && (
-                  <button type="button" onClick={() => setAppMode((value) => !value)}>
-                    {appMode ? "退出应用" : "应用模式"}
-                  </button>
-                )}
+                <DropMenu ariaLabel="更多操作" panelClassName="toolbar-more">
+                  {viewMiscControls}
+                  {gridTuning}
+                  {kanbanTuning}
+                  {dateTuning}
+                  {editCluster}
+                  {mainCluster}
+                </DropMenu>
+                <span className="count">{records.length} 条</span>
               </div>
-              <span className="count">{records.length} 条</span>
-            </div>
+            )}
           </div>
         )}
         {showDashboard && base ? (
@@ -614,8 +777,18 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           {appMode && base && <AppWidgets key={widgetsKey} baseId={base.id} />}
           {loading && <p className="stage-note">加载中…</p>}
           {!loading && !payload && <p className="stage-note">选择或新建一张数据表。</p>}
-          {payload && view?.type === "grid" && (
-            <GridView
+          {payload && view?.type === "grid" &&
+            (isMobile ? (
+              <RecordCardList
+                fields={visibleFields}
+                records={records}
+                groups={view.config.groups}
+                readOnly={!canEdit || appMode}
+                onOpenRecord={setDetailRecordId}
+                onAdd={() => payload && api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
+              />
+            ) : (
+              <GridView
               fields={visibleFields}
               allFields={payload.fields}
               records={records}
@@ -645,35 +818,86 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 api.deleteField(field.id).then(() => reloadTable()).catch(fail);
               }}
               onOpenRecord={setDetailRecordId}
+              onDuplicate={(record) => {
+                const input: Record<string, unknown> = {};
+                for (const field of payload.fields) {
+                  if (["formula", "lookup", "auto_number", "created_time", "updated_time", "created_by", "button"].includes(field.type)) continue;
+                  const value = record.fields[field.name];
+                  if (value != null && value !== "") input[field.name] = value;
+                }
+                api.createRecord(payload.id, input).then(() => reloadTable()).catch(fail);
+              }}
+              onFilterBy={(record, field) => {
+                const raw = record.fields[field.name];
+                const value = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
+                if (!value) return;
+                const config = { ...view.config, filters: [...view.config.filters, { fieldId: field.id, op: "eq" as const, value }] };
+                api.updateView(view.id, { config }).then(patchView).catch(fail);
+              }}
+              onShareRecord={(record) => {
+                api
+                  .shareRecord(record.id, 30)
+                  .then(async (created) => {
+                    try {
+                      await navigator.clipboard.writeText(created.token);
+                      setNotice(`只读分享令牌已复制到剪贴板：${created.token}`);
+                    } catch {
+                      setNotice(`只读分享令牌：${created.token}`);
+                    }
+                  })
+                  .catch(fail);
+              }}
             />
-          )}
-          {payload && view?.type === "kanban" && groupField && (
-            <KanbanView
-              fields={visibleFields}
-              records={records}
-              groupField={groupField}
-              readOnly={!canEdit || appMode}
-              onChange={onChange}
-              onDelete={(recordId) => api.deleteRecord(recordId).then(() => reloadTable()).catch(fail)}
-              onAdd={(optionName) =>
-                api.createRecord(payload.id, optionName ? { [groupField.name]: optionName } : {}).then(() => reloadTable()).catch(fail)
-              }
-            />
-          )}
+            ))}
+          {payload && view?.type === "kanban" && groupField &&
+            (isMobile ? (
+              <MobileKanban
+                fields={visibleFields}
+                records={records}
+                groupField={groupField}
+                readOnly={!canEdit || appMode}
+                onChange={onChange}
+                onAdd={(optionName) =>
+                  api.createRecord(payload.id, optionName ? { [groupField.name]: optionName } : {}).then(() => reloadTable()).catch(fail)
+                }
+                onOpenRecord={setDetailRecordId}
+              />
+            ) : (
+              <KanbanView
+                fields={visibleFields}
+                records={records}
+                groupField={groupField}
+                readOnly={!canEdit || appMode}
+                onChange={onChange}
+                onDelete={(recordId) => api.deleteRecord(recordId).then(() => reloadTable()).catch(fail)}
+                onAdd={(optionName) =>
+                  api.createRecord(payload.id, optionName ? { [groupField.name]: optionName } : {}).then(() => reloadTable()).catch(fail)
+                }
+              />
+            ))}
           {payload && view?.type === "kanban" && !groupField && (
             <p className="stage-note">这个看板还没有单选分组字段。先添加一个单选字段，再在上方选择分组。</p>
           )}
-          {payload && view?.type === "calendar" && (
-            <CalendarView
-              fields={visibleFields}
-              records={records}
-              dateFieldId={view.config.dateFieldId}
-              titleFieldId={view.config.titleFieldId}
-              readOnly={!canEdit || appMode}
-              onChange={onChange}
-              onOpen={setDetailRecordId}
-            />
-          )}
+          {payload && view?.type === "calendar" &&
+            (isMobile ? (
+              <MobileAgenda
+                fields={visibleFields}
+                records={records}
+                dateFieldId={view.config.dateFieldId}
+                titleFieldId={view.config.titleFieldId}
+                onOpen={setDetailRecordId}
+              />
+            ) : (
+              <CalendarView
+                fields={visibleFields}
+                records={records}
+                dateFieldId={view.config.dateFieldId}
+                titleFieldId={view.config.titleFieldId}
+                readOnly={!canEdit || appMode}
+                onChange={onChange}
+                onOpen={setDetailRecordId}
+              />
+            ))}
           {payload && view?.type === "gantt" && (
             <GanttView
               fields={visibleFields}
@@ -711,15 +935,56 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         </div>
         )}
       </section>
+      {isMobile && !appMode && !showDashboard && payload && view && (
+        <BottomBar
+          canAdd={canEdit}
+          searchActive={mobileSearch || Boolean(search)}
+          onNav={() => setNavOpen(true)}
+          onAdd={() => api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
+          onSearch={() => setMobileSearch((value) => !value)}
+          onFilter={() => setDialog("filter")}
+          onViews={() => setDialog("views")}
+        />
+      )}
+      {dialog === "views" && payload && view && (
+        <Modal title="切换视图" onClose={closeDialog}>
+          <div className="m-view-list">
+            {payload.views.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className={item.id === view.id ? "on" : ""}
+                onClick={() => {
+                  setViewId(item.id);
+                  closeDialog();
+                }}
+              >
+                <strong>{item.name}</strong>
+                <span>
+                  {VIEW_TYPE_LABELS[item.type]}
+                  {item.protection === "locked" ? " · 🔒" : item.protection === "personal" ? " · 👤" : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+          {canEdit && (
+            <div className="dialog-actions">
+              <button type="button" className="primary" onClick={() => setDialog("view")}>
+                ＋ 新建视图
+              </button>
+            </div>
+          )}
+        </Modal>
+      )}
       {dialog === "base" && (
-        <NameDialog title="新建空间" label="名称" onClose={() => setDialog(null)} onSubmit={async (name) => {
+        <NameDialog title="新建空间" label="名称" onClose={closeDialog} onSubmit={async (name) => {
           const created = await api.createBase(name);
           await refreshBases({ baseId: created.id });
         }} />
       )}
       {dialog === "table" && base && (
         <TableDialog
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onSubmit={async (input) => {
             const created = await api.createTable(base.id, input);
             await refreshBases({ baseId: base.id, tableId: created.id });
@@ -730,7 +995,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         <FieldDialog
           tables={base?.tables ?? []}
           fields={payload.fields}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onSubmit={async (input) => {
             await api.createField(payload.id, input);
             await reloadTable();
@@ -741,7 +1006,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         <OptionsDialog
           field={optionField}
           fields={payload.fields}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onSubmit={async (options, optionCascade) => {
             await api.updateField(optionField.id, { options, optionCascade });
             await reloadTable();
@@ -751,21 +1016,21 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       {dialog === "change-type" && optionField && (
         <ChangeTypeDialog
           field={optionField}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onSubmit={async (type) => {
             await api.changeFieldType(optionField.id, type);
             await reloadTable();
           }}
         />
       )}
-      {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
+      {dialog === "help" && <HelpDialog onClose={closeDialog} />}
       {dialog === "agent-brief" && (
-        <AgentBriefDialog isAdmin={user.role === "admin"} onClose={() => setDialog(null)} />
+        <AgentBriefDialog isAdmin={user.role === "admin"} onClose={closeDialog} />
       )}
       {dialog === "view" && payload && (
         <ViewDialog
           fields={payload.fields}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onSubmit={async (input) => {
             const created = await api.createView(payload.id, input);
             await reloadTable();
@@ -775,7 +1040,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       )}
       {dialog === "import" && payload && (
         <ImportDialog
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onSubmit={async (csv) => {
             await api.importCsv(payload.id, csv);
             await reloadTable();
@@ -783,7 +1048,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         />
       )}
       {dialog === "automations" && payload && (
-        <AutomationDialog tableId={payload.id} fields={payload.fields} onClose={() => setDialog(null)} />
+        <AutomationDialog tableId={payload.id} fields={payload.fields} onClose={closeDialog} />
       )}
       {dialog === "acl" && payload && canOwn && (
         <AclDialog
@@ -791,7 +1056,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           fields={payload.fields}
           members={members}
           records={payload.records}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
         />
       )}
       {dialog === "workflows" && payload && (
@@ -799,17 +1064,17 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           tableId={payload.id}
           fields={payload.fields}
           baseId={base?.id}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
         />
       )}
       {dialog === "sync" && base && (
-        <SyncDialog tables={base.tables} onClose={() => setDialog(null)} />
+        <SyncDialog tables={base.tables} onClose={closeDialog} />
       )}
       {dialog === "plugins" && (
-        <PluginMarketDialog onClose={() => setDialog(null)} />
+        <PluginMarketDialog onClose={closeDialog} />
       )}
       {dialog === "assistant" && payload && (
-        <AssistantPanel tableId={payload.id} tableName={payload.name} onClose={() => setDialog(null)} />
+        <AssistantPanel tableId={payload.id} tableName={payload.name} onClose={closeDialog} />
       )}
       {dialog === "calendar-feishu" && base && payload && (
         <CalendarFeishuDialog
@@ -817,7 +1082,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           tableId={payload.id}
           fields={payload.fields}
           canOwn={canOwn}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
         />
       )}
       {dialog === "portal" && base && canOwn && (
@@ -825,7 +1090,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           baseId={base.id}
           tables={base.tables}
           onClose={() => {
-            setDialog(null);
+            closeDialog();
             setWidgetsKey((value) => value + 1);
           }}
         />
@@ -837,22 +1102,32 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           fields={payload.fields}
           record={payload.records.find((item) => item.id === detailRecordId) ?? null}
           canEdit={canEdit && !appMode}
-          onClose={() => setDetailRecordId(null)}
+          fullScreen={isMobile}
+          onClose={closeDetail}
           onChange={onChange}
+          onDelete={() => {
+            api
+              .deleteRecord(detailRecordId)
+              .then(() => {
+                closeDetail();
+                reloadTable();
+              })
+              .catch(fail);
+          }}
         />
       )}
       {dialog === "detail-page" && payload && (
         <DetailPageDialog
           tableId={payload.id}
           fields={payload.fields}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
         />
       )}
       {dialog === "color-rules" && payload && view && (
         <ColorRulesDialog
           fields={payload.fields}
           view={view}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onSubmit={async (colorRules) => {
             patchView(await api.updateView(view.id, { config: { ...view.config, colorRules } }));
           }}
@@ -862,7 +1137,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         <FilterDialog
           fields={payload.fields}
           view={view}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onSubmit={async (config) => {
             patchView(await api.updateView(view.id, { config }));
           }}
@@ -870,7 +1145,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       )}
       {dialog === "template" && (
         <TemplateDialog
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onSubmit={async (template) => {
             const created = await api.createTemplate(template);
             await refreshBases({ baseId: created.id, tableId: created.tables[0]?.id });
@@ -881,11 +1156,11 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         <ShareDialog
           baseId={base.id}
           members={members}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
           onChange={setMembers}
           onDelete={async () => {
             await api.deleteBase(base.id);
-            setDialog(null);
+            closeDialog();
             await refreshBases();
           }}
         />
@@ -895,14 +1170,14 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           tableId={payload.id}
           views={payload.views}
           currentViewId={view.id}
-          onClose={() => setDialog(null)}
+          onClose={closeDialog}
         />
       )}
-      {dialog === "tokens" && <TokenDialog onClose={() => setDialog(null)} />}
-      {dialog === "admin" && <AdminDialog selfId={user.id} onSelf={onUser} onClose={() => setDialog(null)} />}
-      {dialog === "backup" && user.role === "admin" && <BackupDialog onClose={() => setDialog(null)} />}
+      {dialog === "tokens" && <TokenDialog onClose={closeDialog} />}
+      {dialog === "admin" && <AdminDialog selfId={user.id} onSelf={onUser} onClose={closeDialog} />}
+      {dialog === "backup" && user.role === "admin" && <BackupDialog onClose={closeDialog} />}
       {dialog === "agents" && user.role === "admin" && (
-        <AgentManageDialog bases={bases} onClose={() => setDialog(null)} />
+        <AgentManageDialog bases={bases} onClose={closeDialog} />
       )}
     </div>
   );
@@ -2521,16 +2796,20 @@ function RecordDetailDialog({
   fields,
   record,
   canEdit,
+  fullScreen,
   onClose,
   onChange,
+  onDelete,
 }: {
   recordId: string;
   tableId: string;
   fields: Field[];
   record: { id: string; fields: Record<string, unknown> } | null;
   canEdit: boolean;
+  fullScreen?: boolean;
   onClose: () => void;
   onChange: (recordId: string, fieldName: string, value: unknown) => void;
+  onDelete?: () => void;
 }) {
   const [comments, setComments] = useState<Array<{ id: string; userName: string; body: string; createdAt: number }>>([]);
   const [history, setHistory] = useState<Array<{ id: string; action: string; userName: string | null; createdAt: number }>>([]);
@@ -2569,8 +2848,36 @@ function RecordDetailDialog({
   })();
   const columns = layout?.style === "multi" ? layout.columns || 2 : 1;
 
-  return (
-    <Modal title="记录详情" onClose={onClose} size="wide">
+  useEffect(() => {
+    if (!fullScreen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullScreen, onClose]);
+
+  function renderField(field: Field) {
+    if (!record) return null;
+    return (
+      <label key={field.id}>
+        {field.name}
+        <div className="detail-cell">
+          <Cell
+            field={field}
+            allFields={fields}
+            record={record as unknown as PublicRecord}
+            value={(record.fields[field.name] ?? null) as DisplayValue}
+            readOnly={!canEdit || ["formula", "lookup", "auto_number", "created_time", "updated_time", "created_by"].includes(field.type)}
+            onChange={(value) => onChange(recordId, field.name, value)}
+          />
+        </div>
+      </label>
+    );
+  }
+
+  const content = (
+    <>
       {record && (
         <div className={`detail-fields cols-${columns}`}>
           {layout?.style === "grouped" && layout.groups.length
@@ -2580,32 +2887,25 @@ function RecordDetailDialog({
                   {group.fieldIds.map((id) => {
                     const field = fields.find((item) => item.id === id);
                     if (!field) return null;
-                    return (
-                      <label key={field.id}>
-                        {field.name}
-                        <input
-                          value={String(record.fields[field.name] ?? "")}
-                          disabled={!canEdit || ["formula", "lookup", "auto_number", "created_time", "updated_time", "created_by"].includes(field.type)}
-                          onChange={(event) => onChange(recordId, field.name, event.target.value)}
-                        />
-                      </label>
-                    );
+                    return renderField(field);
                   })}
                 </section>
               ))
-            : orderedFields.map((field) => (
-                <label key={field.id}>
-                  {field.name}
-                  <input
-                    value={String(record.fields[field.name] ?? "")}
-                    disabled={!canEdit || ["formula", "lookup", "auto_number", "created_time", "updated_time", "created_by"].includes(field.type)}
-                    onChange={(event) => onChange(recordId, field.name, event.target.value)}
-                  />
-                </label>
-              ))}
+            : orderedFields.map((field) => renderField(field))}
         </div>
       )}
       <div className="dialog-actions">
+        {canEdit && onDelete && (
+          <button
+            type="button"
+            className="danger-text"
+            onClick={() => {
+              if (window.confirm("删除这条记录？此操作不可撤销。")) onDelete();
+            }}
+          >
+            删除记录
+          </button>
+        )}
         <button
           type="button"
           onClick={async () => {
@@ -2689,6 +2989,26 @@ function RecordDetailDialog({
         ))}
       </ul>
       {error && <p className="form-error">{error}</p>}
+    </>
+  );
+
+  if (fullScreen) {
+    return (
+      <div className="mobile-page" role="dialog" aria-modal="true" aria-label="记录详情">
+        <header className="mobile-page-bar">
+          <button type="button" className="mobile-back" onClick={onClose}>
+            ‹ 返回
+          </button>
+          <h2>记录详情</h2>
+        </header>
+        <div className="mobile-page-body">{content}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Modal title="记录详情" onClose={onClose} size="wide">
+      {content}
     </Modal>
   );
 }
@@ -5065,6 +5385,9 @@ function Modal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const [dragY, setDragY] = useState(0);
+  const touchStartY = useRef<number | null>(null);
+
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div
@@ -5073,8 +5396,24 @@ function Modal({
         aria-modal="true"
         aria-label={title}
         onMouseDown={(event) => event.stopPropagation()}
+        style={dragY > 0 ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined}
       >
-        <header>
+        <header
+          onTouchStart={(event) => {
+            touchStartY.current = event.touches[0].clientY;
+          }}
+          onTouchMove={(event) => {
+            if (touchStartY.current == null) return;
+            const dy = event.touches[0].clientY - touchStartY.current;
+            setDragY(Math.max(0, dy));
+          }}
+          onTouchEnd={() => {
+            if (dragY > 80) onClose();
+            setDragY(0);
+            touchStartY.current = null;
+          }}
+        >
+          <span className="modal-grip" aria-hidden />
           <h2>{title}</h2>
           <button type="button" className="modal-close" onClick={onClose} aria-label="关闭">
             ×

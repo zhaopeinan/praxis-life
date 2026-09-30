@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { DisplayValue, Field, PublicRecord, RowHeight, Sort, ColorRule } from "../../src/types.js";
 import { matchesFilter } from "../../src/query.js";
+import { ContextMenu, type ContextMenuItem } from "./ui";
 
 const WIDTH: Record<Field["type"], number> = {
   text: 220,
@@ -101,6 +102,9 @@ export function GridView({
   onChangeType,
   onDeleteField,
   onOpenRecord,
+  onDuplicate,
+  onFilterBy,
+  onShareRecord,
 }: {
   fields: Field[];
   allFields?: Field[];
@@ -122,6 +126,9 @@ export function GridView({
   onChangeType?: (field: Field) => void;
   onDeleteField: (field: Field) => void;
   onOpenRecord?: (recordId: string) => void;
+  onDuplicate?: (record: PublicRecord) => void;
+  onFilterBy?: (record: PublicRecord, field: Field) => void;
+  onShareRecord?: (record: PublicRecord) => void;
 }) {
   const catalog = allFields ?? fields;
   const fieldKey = fields.map((field) => field.id).join(",");
@@ -169,6 +176,24 @@ export function GridView({
     fields.map((field) => `${widths[field.id] ?? defaultWidth(field, 0)}px`).join(" ") + ` ${ADD_COL}px`;
   const grouped = useMemo(() => groupRecords(records, fields, groups ?? []), [records, fields, groups]);
   const height = ROW_PX[rowHeight] ?? 40;
+  const [ctxMenu, setCtxMenu] = useState<{ record: PublicRecord; field: Field; x: number; y: number } | null>(null);
+
+  const ctxItems = (() => {
+    if (!ctxMenu) return [];
+    const { record, field } = ctxMenu;
+    const items: ContextMenuItem[] = [];
+    if (onOpenRecord) items.push({ label: "查看详情", onClick: () => onOpenRecord(record.id) });
+    if (!readOnly && onDuplicate) items.push({ label: "复制记录", onClick: () => onDuplicate(record) });
+    const raw = record.fields[field.name];
+    const filterValue = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
+    if (onFilterBy && filterValue) items.push({ label: `按「${field.name}」筛选此值`, onClick: () => onFilterBy(record, field) });
+    if (onShareRecord) items.push({ label: "复制只读分享链接", onClick: () => onShareRecord(record) });
+    if (!readOnly) {
+      items.push("sep");
+      items.push({ label: "删除记录", danger: true, onClick: () => onDelete(record.id) });
+    }
+    return items;
+  })();
 
   return (
     <div className="grid-scroll">
@@ -227,7 +252,14 @@ export function GridView({
               return (
               <div className="grid-row" key={record.id} style={rowColor ? { background: rowColor } : undefined}>
                 {fields.map((field) => (
-                  <div className="cell" key={field.id}>
+                  <div
+                    className="cell"
+                    key={field.id}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setCtxMenu({ record, field, x: event.clientX, y: event.clientY });
+                    }}
+                  >
                     <Cell
                       field={field}
                       allFields={catalog}
@@ -280,11 +312,12 @@ export function GridView({
         )}
         {records.length === 0 && <p className="grid-empty">这张表还没有记录。</p>}
       </div>
+      {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxItems} onClose={() => setCtxMenu(null)} />}
     </div>
   );
 }
 
-function groupRecords(
+export function groupRecords(
   records: PublicRecord[],
   fields: Field[],
   groups: Array<{ fieldId: string }>,
@@ -395,7 +428,7 @@ function FieldMenu({
   );
 }
 
-function Cell({
+export function Cell({
   field,
   allFields,
   record,

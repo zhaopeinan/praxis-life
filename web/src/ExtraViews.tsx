@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { DisplayValue, Field, PublicRecord } from "../../src/types.js";
+import { beginTouchDrag } from "./touchDrag";
 import { FancySelect } from "./ui";
 
 function titleOf(record: PublicRecord, fields: Field[], titleFieldId: string | null): string {
@@ -28,6 +29,8 @@ export function CalendarView({
   onOpen?: (recordId: string) => void;
 }) {
   const dateField = fields.find((field) => field.id === dateFieldId && field.type === "date");
+  const [touchOver, setTouchOver] = useState<string | null>(null);
+  const [touchDragging, setTouchDragging] = useState<string | null>(null);
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -74,17 +77,35 @@ export function CalendarView({
           const key = day ? formatDate(day) : "";
           const items = key ? byDate.get(key) ?? [] : [];
           return (
-            <div key={key || `empty-${day}`} className={day ? "calendar-day" : "calendar-day empty"}>
+            <div
+              key={key || `empty-${day}`}
+              className={`calendar-day${day ? "" : " empty"}${day && touchOver === key ? " over" : ""}`}
+              data-drop-key={day ? key : undefined}
+            >
               {day && <em>{day.getDate()}</em>}
               <div className="calendar-events">
                 {items.map((record) => (
                   <button
                     type="button"
                     key={record.id}
-                    className="calendar-event"
+                    className={`calendar-event${touchDragging === record.id ? " touch-dragging" : ""}`}
                     onClick={() => onOpen?.(record.id)}
                     draggable={!readOnly}
                     onDragStart={(event) => event.dataTransfer.setData("text/record", record.id)}
+                    onTouchStart={(event) => {
+                      if (readOnly || !day) return;
+                      beginTouchDrag(event, {
+                        onActivate: () => setTouchDragging(record.id),
+                        onTargetChange: (dropKey) => setTouchOver(dropKey),
+                        onDrop: (dropKey) => {
+                          if (dropKey) onChange(record.id, dateField.name, dropKey);
+                        },
+                        onEnd: () => {
+                          setTouchDragging(null);
+                          setTouchOver(null);
+                        },
+                      });
+                    }}
                   >
                     {titleOf(record, fields, titleFieldId)}
                   </button>
