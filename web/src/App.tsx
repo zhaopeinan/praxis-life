@@ -2132,16 +2132,384 @@ function TokenDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+const AGENT_ROLE_OPTIONS = [
+  { value: "viewer", label: "可查看" },
+  { value: "editor", label: "可编辑" },
+  { value: "owner", label: "所有者" },
+];
+
+const AGENT_STATUS_LABEL: Record<McpAgent["status"], string> = {
+  pending: "待审批",
+  active: "已启用",
+  disabled: "已停用",
+  rejected: "已拒绝",
+};
+
+function agentStatusTone(status: McpAgent["status"]) {
+  if (status === "active") return "agent-status is-active";
+  if (status === "pending") return "agent-status is-pending";
+  if (status === "rejected") return "agent-status is-rejected";
+  return "agent-status is-off";
+}
+
+type AgentRole = "viewer" | "editor" | "owner";
+
+function grantsFrom(agent: McpAgent): Record<string, AgentRole> {
+  const next: Record<string, AgentRole> = {};
+  for (const grant of agent.bases) next[grant.baseId] = grant.role;
+  return next;
+}
+
+/** 比较两份授权是否等价；按 baseId 排序后再比，避免勾选后又取消仍被判为「有改动」。 */
+function grantsEqual(a: Record<string, AgentRole>, b: Record<string, AgentRole>): boolean {
+  const left = Object.entries(a).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
+  const right = Object.entries(b).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
+  return (
+    left.length === right.length &&
+    left.every(([baseId, role], index) => right[index][0] === baseId && right[index][1] === role)
+  );
+}
+
+function AgentTokenRow({ agent, onError }: { agent: McpAgent; onError: (text: string) => void }) {
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const token = agent.token;
+
+  async function copy() {
+    if (!token) return;
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      onError("复制失败，请点「显示」后手动选中令牌复制");
+    }
+  }
+
+  if (!token) {
+    const text =
+      agent.status === "pending"
+        ? "批准该申请时会自动生成令牌，之后可随时查看与复制。"
+        : agent.status === "rejected"
+          ? "该申请已被拒绝，没有令牌。"
+          : "此令牌由旧版本生成，明文已无法找回。点「轮换令牌」生成新令牌，之后即可随时查看与复制。";
+    return <p className="agent-token-hint">{text}</p>;
+  }
+
+  return (
+    <div className="agent-token">
+      <code className="agent-token-value">
+        {revealed ? token : `${token.slice(0, 14)}${"•".repeat(10)}`}
+      </code>
+      <button type="button" onClick={() => setRevealed((value) => !value)}>
+        {revealed ? "隐藏" : "显示"}
+      </button>
+      <button type="button" className="secondary" onClick={() => void copy()}>
+        {copied ? "已复制" : "复制令牌"}
+      </button>
+    </div>
+  );
+}
+
+function AgentGrantPicker({
+  bases,
+  agent,
+  grants,
+  onChange,
+}: {
+  bases: BaseSummary[];
+  agent: McpAgent;
+  grants: Record<string, AgentRole>;
+  onChange: (next: Record<string, AgentRole>) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const ordered = useMemo(
+    () => [...bases].sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN")),
+    [bases],
+  );
+  const known = useMemo(() => new Set(bases.map((base) => base.id)), [bases]);
+  const staleCount = agent.bases.filter((grant) => !known.has(grant.baseId)).length;
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? ordered.filter((base) => base.name.toLowerCase().includes(needle)) : ordered;
+  const selectedCount = Object.keys(grants).length;
+
+  function toggle(baseId: string) {
+    const next = { ...grants };
+    if (next[baseId]) delete next[baseId];
+    else next[baseId] = "editor";
+    onChange(next);
+  }
+
+  return (
+    <div className="agent-picker-block">
+      <div className="agent-picker-tools">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索空间名称"
+          aria-label="搜索空间"
+        />
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => {
+            const next = { ...grants };
+            for (const base of shown) if (!next[base.id]) next[base.id] = "editor";
+            onChange(next);
+          }}
+          disabled={!shown.length || shown.every((base) => grants[base.id])}
+        >
+          {needle ? "选中搜索结果" : "全选"}
+        </button>
+        <button type="button" className="secondary" onClick={() => onChange({})} disabled={!selectedCount}>
+          清空
+        </button>
+      </div>
+      <div className="agent-picker">
+        {shown.map((base) => {
+          const role = grants[base.id];
+          return (
+            <div key={base.id} className={role ? "agent-picker-row is-on" : "agent-picker-row"}>
+              <label className="agent-picker-label">
+                <input type="checkbox" checked={Boolean(role)} onChange={() => toggle(base.id)} />
+                <span className="agent-picker-name" title={base.name}>
+                  {base.name}
+                </span>
+              </label>
+              <div className="agent-picker-side">
+                <span className="agent-picker-count">{base.tables.length} 张清单</span>
+                {role && (
+                  <FancySelect
+                    compact
+                    value={role}
+                    aria-label={`${base.name} 的权限`}
+                    onChange={(value) => onChange({ ...grants, [base.id]: value as AgentRole })}
+                    options={AGENT_ROLE_OPTIONS}
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {!shown.length && <p className="fine agent-empty">没有匹配的空间。</p>}
+      </div>
+      {staleCount > 0 && (
+        <p className="fine agent-stale-note">
+          另有 {staleCount} 项授权指向已删除的空间，保存后会被一并清除。
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AgentEditPanel({
+  initial,
+  bases,
+  onBack,
+  onSaved,
+  onAgent,
+}: {
+  initial: McpAgent;
+  bases: BaseSummary[];
+  onBack: () => void;
+  onSaved: () => Promise<void>;
+  onAgent: (agent: McpAgent) => void;
+}) {
+  const [agent, setAgent] = useState(initial);
+  const [name, setName] = useState(initial.name);
+  const [contact, setContact] = useState(initial.contact);
+  const [description, setDescription] = useState(initial.description);
+  const [grants, setGrants] = useState<Record<string, AgentRole>>(() => grantsFrom(initial));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const dirty =
+    name !== agent.name ||
+    contact !== agent.contact ||
+    description !== agent.description ||
+    !grantsEqual(grants, grantsFrom(agent));
+
+  function payloadBases() {
+    return Object.entries(grants).map(([baseId, role]) => ({ baseId, role }));
+  }
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await api.updateMcpAgent(agent.id, {
+        name,
+        contact,
+        description,
+        bases: payloadBases(),
+      });
+      setAgent(updated);
+      onAgent(updated);
+      setName(updated.name);
+      setContact(updated.contact);
+      setDescription(updated.description);
+      setGrants(grantsFrom(updated));
+      await onSaved();
+      onBack();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function approve() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.approveMcpAgent(agent.id, payloadBases());
+      setAgent(result.agent);
+      onAgent(result.agent);
+      setGrants(grantsFrom(result.agent));
+      await onSaved();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reject() {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await api.updateMcpAgent(agent.id, { status: "rejected" });
+      onAgent(updated);
+      await onSaved();
+      onBack();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function rotate() {
+    if (!window.confirm("轮换后旧令牌立即失效，需同步更新该 Agent 的环境变量。继续？")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.rotateMcpAgentToken(agent.id);
+      setAgent(result.agent);
+      onAgent(result.agent);
+      await onSaved();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button type="button" className="agent-back" onClick={onBack}>
+        ← 返回 Agent 列表
+      </button>
+
+      <div className="agent-edit-head">
+        <strong>{agent.name}</strong>
+        <em className={agentStatusTone(agent.status)}>{AGENT_STATUS_LABEL[agent.status]}</em>
+        {agent.tokenPrefix && <span className="fine">前缀 {agent.tokenPrefix}…</span>}
+      </div>
+
+      <section className="agent-edit-section">
+        <h3 className="section-title">基本信息</h3>
+        <div className="agent-field-grid">
+          <label>
+            名称
+            <input value={name} onChange={(event) => setName(event.target.value)} required />
+          </label>
+          <label>
+            联系方式
+            <input
+              value={contact}
+              onChange={(event) => setContact(event.target.value)}
+              placeholder="邮箱或备注"
+            />
+          </label>
+        </div>
+        <label>
+          说明
+          <input
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="用途，例如「多模态文档检索」"
+          />
+        </label>
+      </section>
+
+      <section className="agent-edit-section">
+        <h3 className="section-title">令牌</h3>
+        <AgentTokenRow agent={agent} onError={setError} />
+        {(agent.status === "active" || agent.status === "disabled") && (
+          <div className="agent-inline-actions">
+            <button type="button" className="secondary" onClick={() => void rotate()} disabled={busy}>
+              轮换令牌
+            </button>
+            <span className="fine">轮换会立即作废旧令牌，请同步更新该 Agent 的 DUOWEI_TOKEN。</span>
+          </div>
+        )}
+      </section>
+
+      <section className="agent-edit-section">
+        <div className="agent-section-head">
+          <h3 className="section-title">可访问的空间</h3>
+          <span className="fine">
+            已选 {Object.keys(grants).length} / {bases.length}
+          </span>
+        </div>
+        <AgentGrantPicker bases={bases} agent={agent} grants={grants} onChange={setGrants} />
+      </section>
+
+      {error && <p className="form-error">{error}</p>}
+
+      <div className="dialog-actions">
+        {agent.status === "pending" ? (
+          <>
+            <button type="button" className="danger-text" onClick={() => void reject()} disabled={busy}>
+              拒绝申请
+            </button>
+            <button type="button" className="primary" onClick={() => void approve()} disabled={busy}>
+              批准并授权
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="secondary" onClick={onBack}>
+              取消
+            </button>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => void save()}
+              disabled={busy || !name.trim() || !dirty}
+            >
+              {dirty ? "保存" : "已保存"}
+            </button>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 function AgentManageDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: () => void }) {
   const [agents, setAgents] = useState<McpAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [freshToken, setFreshToken] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<McpAgent | null>(null);
+  const [freshToken, setFreshToken] = useState<{ label: string; token: string } | null>(null);
+  const [copiedFresh, setCopiedFresh] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [contact, setContact] = useState("");
-  const [selectedBases, setSelectedBases] = useState<Record<string, "viewer" | "editor" | "owner">>({});
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | McpAgent["status"]>("all");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function reload() {
     setAgents(await api.mcpAgents());
@@ -2151,65 +2519,96 @@ function AgentManageDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: 
     reload().catch((err) => setError(message(err)));
   }, []);
 
-  function currentGrants() {
-    return Object.entries(selectedBases).map(([baseId, role]) => ({ baseId, role }));
+  function rememberFresh(label: string, token: string) {
+    setFreshToken({ label, token });
+    setCopiedFresh(false);
   }
 
-  function toggleBase(baseId: string) {
-    setSelectedBases((current) => {
-      const next = { ...current };
-      if (next[baseId]) delete next[baseId];
-      else next[baseId] = "editor";
-      return next;
-    });
-  }
-
-  async function copyToken(agent: McpAgent) {
-    if (!agent.token) return;
+  async function runOn(agentId: string, work: () => Promise<void>) {
+    setBusyId(agentId);
+    setError(null);
     try {
-      await navigator.clipboard.writeText(agent.token);
-      setCopiedId(agent.id);
-      window.setTimeout(() => setCopiedId((id) => (id === agent.id ? null : id)), 2000);
-    } catch {
-      setError("复制失败，请手动选中令牌文本复制");
+      await work();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusyId(null);
     }
   }
 
-  const statusLabel: Record<McpAgent["status"], string> = {
-    pending: "待审批",
-    active: "已启用",
-    disabled: "已停用",
-    rejected: "已拒绝",
+  async function copyFresh() {
+    if (!freshToken) return;
+    try {
+      await navigator.clipboard.writeText(freshToken.token);
+      setCopiedFresh(true);
+      window.setTimeout(() => setCopiedFresh(false), 2000);
+    } catch {
+      setError("复制失败，请手动选中令牌复制");
+    }
+  }
+
+  const needle = query.trim().toLowerCase();
+  const filtered = agents.filter((agent) => {
+    if (statusFilter !== "all" && agent.status !== statusFilter) return false;
+    if (!needle) return true;
+    const haystack = `${agent.name} ${agent.contact} ${agent.description} ${agent.tokenPrefix ?? ""}`.toLowerCase();
+    return haystack.includes(needle);
+  });
+
+  const counts = {
+    all: agents.length,
+    active: agents.filter((agent) => agent.status === "active").length,
+    pending: agents.filter((agent) => agent.status === "pending").length,
+    disabled: agents.filter((agent) => agent.status === "disabled").length,
   };
 
+  if (editing) {
+    return (
+      <Modal key={`agent-edit-${editing.id}`} title={`编辑 Agent · ${editing.name}`} onClose={onClose} size="wide">
+        <AgentEditPanel
+          initial={editing}
+          bases={bases}
+          onBack={() => setEditing(null)}
+          onSaved={reload}
+          onAgent={setEditing}
+        />
+      </Modal>
+    );
+  }
+
   return (
-    <Modal title="Agent 管理" onClose={onClose} size="wide">
+    <Modal key="agent-list" title="Agent 管理" onClose={onClose} size="wide">
       <p className="fine">
-        外部 AI Agent 须先注册并获批后才能使用 MCP。令牌（<code>dwa_…</code>）在列表里随时可查看和复制，配置为环境变量{" "}
-        <code>DUOWEI_TOKEN</code>。
+        外部 AI Agent 须先注册并获批后才能使用 MCP。令牌（<code>dwa_…</code>）在列表里随时可查看和复制，填入 Agent 的环境变量{" "}
+        <code>DUOWEI_TOKEN</code>。权限与信息点每个 Agent 的「编辑」逐个调整。
       </p>
+
       {freshToken && (
-        <p className="dev-code">
-          新令牌（也已保存，可随时在下方列表复制）：<code>{freshToken}</code>
+        <p className="dev-code agent-fresh">
+          <span>{freshToken.label} 的令牌：</span>
+          <code>{freshToken.token}</code>
+          <button type="button" className="secondary" onClick={() => void copyFresh()}>
+            {copiedFresh ? "已复制" : "复制"}
+          </button>
+          <button type="button" className="secondary" onClick={() => setFreshToken(null)}>
+            知道了
+          </button>
         </p>
       )}
+
       <form
         className="admin-create"
         onSubmit={async (event) => {
           event.preventDefault();
           setError(null);
           try {
-            const created = await api.createMcpAgent({
-              name,
-              description,
-              contact,
-              bases: currentGrants(),
-            });
-            setFreshToken(created.token);
+            const created = await api.createMcpAgent({ name, description, contact });
+            rememberFresh(`Agent「${created.agent.name}」`, created.token);
             setName("");
             setDescription("");
             setContact("");
             await reload();
+            setEditing(created.agent);
           } catch (err) {
             setError(message(err));
           }
@@ -2231,168 +2630,131 @@ function AgentManageDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: 
           直接创建并启用
         </button>
       </form>
-      <div className="agent-base-picks">
-        <span className="fine">可访问的空间（创建/批准时生效，也可稍后在列表中调整）：</span>
-        <div className="agent-base-grid">
-          {bases.map((base) => (
-            <label key={base.id} className="agent-base-item">
-              <input type="checkbox" checked={Boolean(selectedBases[base.id])} onChange={() => toggleBase(base.id)} />
-              <span>{base.name}</span>
-              {selectedBases[base.id] && (
-                <FancySelect
-                  compact
-                  value={selectedBases[base.id]}
-                  onChange={(value) =>
-                    setSelectedBases((current) => ({
-                      ...current,
-                      [base.id]: value as "viewer" | "editor" | "owner",
-                    }))
-                  }
-                  options={[
-                    { value: "viewer", label: "可查看" },
-                    { value: "editor", label: "可编辑" },
-                    { value: "owner", label: "所有者" },
-                  ]}
-                />
-              )}
-            </label>
+
+      <div className="agent-toolbar">
+        <input
+          className="agent-search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索名称 / 联系方式 / 说明 / 令牌前缀"
+          aria-label="搜索 Agent"
+        />
+        <div className="agent-filters">
+          {([
+            ["all", `全部 ${counts.all}`],
+            ["active", `已启用 ${counts.active}`],
+            ["pending", `待审批 ${counts.pending}`],
+            ["disabled", `已停用 ${counts.disabled}`],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={statusFilter === value ? "is-on" : undefined}
+              onClick={() => setStatusFilter(value)}
+            >
+              {label}
+            </button>
           ))}
         </div>
       </div>
-      <ul className="member-list agent-list">
-        {agents.map((agent) => (
-          <li key={agent.id}>
-            <div className="member-meta">
-              <strong>
-                {agent.name} <em className="badge-warn">{statusLabel[agent.status]}</em>
-              </strong>
-              <span>
-                {agent.contact || "无联系方式"}
-                {agent.tokenPrefix ? ` · ${agent.tokenPrefix}…` : ""}
-                {agent.bases.length
-                  ? ` · ${agent.bases.map((g) => `${g.baseName ?? g.baseId}/${g.role}`).join(", ")}`
-                  : " · 未授权任何表"}
-              </span>
-              {agent.description && <span>{agent.description}</span>}
-              {agent.token ? (
-                <span className="agent-token">
-                  <code className="agent-token-value">
-                    {revealed[agent.id] ? agent.token : `${agent.token.slice(0, 12)}${"•".repeat(8)}`}
-                  </code>
-                  <button type="button" onClick={() => setRevealed((cur) => ({ ...cur, [agent.id]: !cur[agent.id] }))}>
-                    {revealed[agent.id] ? "隐藏" : "显示"}
+
+      <ul className="agent-cards">
+        {filtered.map((agent) => (
+          <li key={agent.id} className="agent-card">
+            <div className="agent-card-head">
+              <div className="agent-card-title">
+                <strong>{agent.name}</strong>
+                <em className={agentStatusTone(agent.status)}>{AGENT_STATUS_LABEL[agent.status]}</em>
+              </div>
+              <div className="agent-actions">
+                {agent.status !== "pending" && (
+                  <button type="button" className="secondary" onClick={() => setEditing(agent)}>
+                    编辑
                   </button>
-                  <button type="button" className="secondary" onClick={() => copyToken(agent)}>
-                    {copiedId === agent.id ? "已复制" : "复制令牌"}
+                )}
+                {agent.status === "pending" && (
+                  <button type="button" className="primary" onClick={() => setEditing(agent)}>
+                    审批并授权
                   </button>
-                </span>
-              ) : (
-                agent.status === "active" && (
-                  <span className="fine">
-                    此 Agent 的令牌由旧版本生成，无法找回。点「轮换令牌」生成新令牌后即可随时查看与复制。
+                )}
+                {agent.status === "active" && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busyId === agent.id}
+                    onClick={() =>
+                      void runOn(agent.id, async () => {
+                        await api.updateMcpAgent(agent.id, { status: "disabled" });
+                        await reload();
+                      })
+                    }
+                  >
+                    停用
+                  </button>
+                )}
+                {agent.status === "disabled" && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busyId === agent.id}
+                    onClick={() =>
+                      void runOn(agent.id, async () => {
+                        await api.updateMcpAgent(agent.id, { status: "active" });
+                        await reload();
+                      })
+                    }
+                  >
+                    启用
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="danger-text"
+                  disabled={busyId === agent.id}
+                  onClick={() =>
+                    void runOn(agent.id, async () => {
+                      if (!window.confirm(`删除 Agent「${agent.name}」？该令牌将立即失效。`)) return;
+                      await api.deleteMcpAgent(agent.id);
+                      await reload();
+                    })
+                  }
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+
+            <p className="agent-card-meta">
+              {agent.contact || "无联系方式"}
+              {agent.description ? ` · ${agent.description}` : ""}
+              {agent.tokenPrefix ? ` · ${agent.tokenPrefix}…` : ""}
+            </p>
+
+            <div className="agent-grants">
+              {agent.bases.length ? (
+                agent.bases.map((grant) => (
+                  <span className="grant-chip" key={grant.baseId}>
+                    <span title={grant.baseName ?? grant.baseId}>{grant.baseName ?? grant.baseId}</span>
+                    <em>{roleLabel(grant.role)}</em>
                   </span>
-                )
+                ))
+              ) : (
+                <span className="fine">未授权任何空间（点「编辑」勾选）</span>
               )}
             </div>
-            <div className="agent-actions">
-              {agent.status === "pending" && (
-                <button
-                  type="button"
-                  className="primary"
-                  onClick={async () => {
-                    try {
-                      const result = await api.approveMcpAgent(agent.id, currentGrants());
-                      setFreshToken(result.token);
-                      await reload();
-                    } catch (err) {
-                      setError(message(err));
-                    }
-                  }}
-                >
-                  批准并发令牌
-                </button>
-              )}
-              {agent.status === "pending" && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await api.updateMcpAgent(agent.id, { status: "rejected" });
-                    await reload();
-                  }}
-                >
-                  拒绝
-                </button>
-              )}
-              {agent.status === "active" && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await api.updateMcpAgent(agent.id, { status: "disabled" });
-                    await reload();
-                  }}
-                >
-                  停用
-                </button>
-              )}
-              {agent.status === "disabled" && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await api.updateMcpAgent(agent.id, { status: "active" });
-                    await reload();
-                  }}
-                >
-                  启用
-                </button>
-              )}
-              {(agent.status === "active" || agent.status === "disabled") && (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={async () => {
-                    try {
-                      await api.updateMcpAgent(agent.id, { bases: currentGrants() });
-                      await reload();
-                    } catch (err) {
-                      setError(message(err));
-                    }
-                  }}
-                >
-                  更新授权表
-                </button>
-              )}
-              {agent.status === "active" && (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={async () => {
-                    try {
-                      const result = await api.rotateMcpAgentToken(agent.id);
-                      setFreshToken(result.token);
-                      await reload();
-                    } catch (err) {
-                      setError(message(err));
-                    }
-                  }}
-                >
-                  轮换令牌
-                </button>
-              )}
-              <button
-                type="button"
-                className="danger-text"
-                onClick={async () => {
-                  if (!window.confirm(`删除 Agent「${agent.name}」？`)) return;
-                  await api.deleteMcpAgent(agent.id);
-                  await reload();
-                }}
-              >
-                删除
-              </button>
-            </div>
+
+            <AgentTokenRow agent={agent} onError={setError} />
           </li>
         ))}
+        {!filtered.length && (
+          <li className="agent-card agent-card-empty">
+            <span className="fine">
+              {agents.length ? "没有匹配的 Agent。" : "还没有 Agent。用上方表单创建第一个。"}
+            </span>
+          </li>
+        )}
       </ul>
+
       {error && <p className="form-error">{error}</p>}
     </Modal>
   );
@@ -4611,7 +4973,7 @@ function buildAgentBrief(origin: string, token: string) {
 }
 \`\`\`
 
-若 \`/api/bases\` 为空：请用户在「Agent 管理」为你的 Agent 勾选可访问空间。
+若 \`/api/bases\` 为空：请用户在「Agent 管理」中点开你的 Agent「编辑」，勾选可访问的空间。
 
 ## 产品语义 ↔ API
 
