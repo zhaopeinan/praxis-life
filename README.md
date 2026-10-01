@@ -99,6 +99,17 @@ docker compose up -d --build
 
 Persist `./data`. Optional bootstrap vars are commented in `docker-compose.yml`.
 
+### Deploying to Aliyun (`task.zhaopeinan.com`)
+
+That box runs **podman** and has no compose provider, so images are built locally and shipped over SSH instead of pulled:
+
+```bash
+scripts/deploy-aliyun.sh            # build linux/amd64 + deploy + smoke check
+scripts/deploy-aliyun.sh --no-build # reuse the local duowei:latest
+```
+
+The script reads `aliyun.env` (gitignored; four lines: note / host / user / password), tars the live SQLite files on the server before restarting, then recreates the container with the same port, env vars, and `./data` bind mount. Requires `sshpass`.
+
 ### Configuration
 
 | Variable | Purpose |
@@ -226,6 +237,17 @@ docker compose up -d --build
 ```
 
 持久化目录 `./data`。首次管理员可用 `docker-compose.yml` 中注释的引导变量。
+
+### 部署到阿里云（task.zhaopeinan.com）
+
+那台机器用的是 **podman**，没有 compose provider，所以镜像不在服务器上构建，而是本机构建后经 SSH 送过去：
+
+```bash
+scripts/deploy-aliyun.sh            # 构建 linux/amd64 + 部署 + 冒烟检查
+scripts/deploy-aliyun.sh --no-build # 复用本机已有的 duowei:latest
+```
+
+脚本从 `aliyun.env` 读取连接信息（已被 gitignore；四行依次为 备注 / 主机 / 用户 / 密码），重启前会先在服务器上打包当前的 SQLite 文件，然后用同样的端口、环境变量和 `./data` 挂载重建容器。依赖 `sshpass`。
 
 ### 配置项
 
