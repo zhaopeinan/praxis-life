@@ -308,8 +308,8 @@ export class Accounts {
     const now = Date.now();
     const id = `ag_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
     await this.db.execute({
-      sql: `INSERT INTO mcp_agents (id, name, description, contact, status, token_hash, token_prefix, approved_by, last_used_at, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 'pending', NULL, NULL, NULL, NULL, ?, ?)`,
+      sql: `INSERT INTO mcp_agents (id, name, description, contact, status, token_hash, token_plain, token_prefix, approved_by, last_used_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'pending', NULL, NULL, NULL, NULL, NULL, ?, ?)`,
       args: [id, name, (input.description ?? "").trim().slice(0, 500), (input.contact ?? "").trim().slice(0, 120), now, now],
     });
     return this.getMcpAgent(id);
@@ -329,14 +329,15 @@ export class Accounts {
     const id = `ag_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
     const token = randomToken("dwa");
     await this.db.execute({
-      sql: `INSERT INTO mcp_agents (id, name, description, contact, status, token_hash, token_prefix, approved_by, last_used_at, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 'active', ?, ?, ?, NULL, ?, ?)`,
+      sql: `INSERT INTO mcp_agents (id, name, description, contact, status, token_hash, token_plain, token_prefix, approved_by, last_used_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, NULL, ?, ?)`,
       args: [
         id,
         name,
         (input.description ?? "").trim().slice(0, 500),
         (input.contact ?? "").trim().slice(0, 120),
         sha256(token),
+        token,
         token.slice(0, 10),
         actorId,
         now,
@@ -373,8 +374,8 @@ export class Accounts {
     const token = randomToken("dwa");
     const now = Date.now();
     await this.db.execute({
-      sql: `UPDATE mcp_agents SET status = 'active', token_hash = ?, token_prefix = ?, approved_by = ?, updated_at = ? WHERE id = ?`,
-      args: [sha256(token), token.slice(0, 10), actorId, now, agentId],
+      sql: `UPDATE mcp_agents SET status = 'active', token_hash = ?, token_plain = ?, token_prefix = ?, approved_by = ?, updated_at = ? WHERE id = ?`,
+      args: [sha256(token), token, token.slice(0, 10), actorId, now, agentId],
     });
     if (bases) await this.setMcpAgentBases(agentId, bases);
     return { agent: await this.getMcpAgent(agentId), token };
@@ -384,7 +385,7 @@ export class Accounts {
     await this.getMcpAgent(agentId);
     if (status === "rejected") {
       await this.db.execute({
-        sql: `UPDATE mcp_agents SET status = ?, token_hash = NULL, token_prefix = NULL, updated_at = ? WHERE id = ?`,
+        sql: `UPDATE mcp_agents SET status = ?, token_hash = NULL, token_plain = NULL, token_prefix = NULL, updated_at = ? WHERE id = ?`,
         args: [status, Date.now(), agentId],
       });
     } else {
@@ -401,8 +402,8 @@ export class Accounts {
     if (agent.status !== "active") throw new DomainError("仅启用中的 Agent 可轮换令牌");
     const token = randomToken("dwa");
     await this.db.execute({
-      sql: "UPDATE mcp_agents SET token_hash = ?, token_prefix = ?, updated_at = ? WHERE id = ?",
-      args: [sha256(token), token.slice(0, 10), Date.now(), agentId],
+      sql: "UPDATE mcp_agents SET token_hash = ?, token_plain = ?, token_prefix = ?, updated_at = ? WHERE id = ?",
+      args: [sha256(token), token, token.slice(0, 10), Date.now(), agentId],
     });
     return { agent: await this.getMcpAgent(agentId), token };
   }
@@ -462,6 +463,7 @@ export class Accounts {
       description: asString(row.description ?? ""),
       contact: asString(row.contact ?? ""),
       status: asString(row.status) as McpAgentStatus,
+      token: row.token_plain == null ? null : asString(row.token_plain),
       tokenPrefix: row.token_prefix == null ? null : asString(row.token_prefix),
       lastUsedAt: row.last_used_at == null ? null : asNumber(row.last_used_at),
       approvedBy: row.approved_by == null ? null : asString(row.approved_by),

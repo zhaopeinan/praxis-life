@@ -238,6 +238,25 @@ form { display: flex; flex-direction: column; gap: 12px; }
 .agent-base-item { display: flex; gap: 8px; align-items: center; font-size: 13px; }
 .agent-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .agent-list li { align-items: flex-start; }
+.agent-token {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  overflow: visible !important;
+  white-space: normal !important;
+  text-overflow: clip !important;
+}
+.agent-token-value {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--chip, rgba(127, 127, 127, 0.12));
+  word-break: break-all;
+  white-space: normal;
+}
+.agent-token button { padding: 2px 8px; font-size: 12px; }
 .dialog-actions {
   margin-top: 4px;
   padding-top: 14px;

@@ -322,6 +322,8 @@ export type McpAgent = {
   description: string;
   contact: string;
   status: McpAgentStatus;
+  /** 明文令牌，仅管理员接口返回，便于随时复制；旧版本创建的 Agent 为 null，需轮换一次。 */
+  token: string | null;
   tokenPrefix: string | null;
   lastUsedAt: number | null;
   approvedBy: string | null;

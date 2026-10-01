@@ -115,7 +115,7 @@ Without SMTP, OTP codes appear in the login form (**dev only**). Production must
 ### Agents & MCP
 
 1. Admin creates/approves an agent in **Agent 管理**, or the agent calls `POST /api/mcp-agents/register`.
-2. Receive a one-time token `dwa_…` (personal `dw_…` tokens are **not** accepted by MCP).
+2. Get the agent token `dwa_…` — always visible and copyable in **Agent 管理** (personal `dw_…` tokens are **not** accepted by MCP).
 3. Point your client at this repo:
 
 ```json
@@ -243,7 +243,7 @@ docker compose up -d --build
 ### Agent / MCP
 
 1. 管理员在「Agent 管理」创建并启用，或 Agent 调用 `POST /api/mcp-agents/register` 后等待批准。
-2. 获得一次性令牌 `dwa_…`（个人访问令牌 `dw_…` **不能**用于 MCP）。
+2. 获得 Agent 令牌 `dwa_…`，在「Agent 管理」列表里随时可查看与复制（个人访问令牌 `dw_…` **不能**用于 MCP）。
 3. 客户端配置示例：
 
 ```json

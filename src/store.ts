@@ -247,6 +247,7 @@ export class Store {
         contact TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL,
         token_hash TEXT UNIQUE,
+        token_plain TEXT,
         token_prefix TEXT,
         approved_by TEXT,
         last_used_at INTEGER,
@@ -474,6 +475,7 @@ export class Store {
       "ALTER TABLE views ADD COLUMN protection TEXT NOT NULL DEFAULT 'public'",
       "ALTER TABLE views ADD COLUMN created_by TEXT",
       "ALTER TABLE base_settings ADD COLUMN integrations_json TEXT NOT NULL DEFAULT '{}'",
+      "ALTER TABLE mcp_agents ADD COLUMN token_plain TEXT",
     ]) {
       try {
         await this.db.execute(sql);

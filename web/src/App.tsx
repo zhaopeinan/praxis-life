@@ -2136,6 +2136,8 @@ function AgentManageDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: 
   const [agents, setAgents] = useState<McpAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [freshToken, setFreshToken] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [contact, setContact] = useState("");
@@ -2162,6 +2164,17 @@ function AgentManageDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: 
     });
   }
 
+  async function copyToken(agent: McpAgent) {
+    if (!agent.token) return;
+    try {
+      await navigator.clipboard.writeText(agent.token);
+      setCopiedId(agent.id);
+      window.setTimeout(() => setCopiedId((id) => (id === agent.id ? null : id)), 2000);
+    } catch {
+      setError("复制失败，请手动选中令牌文本复制");
+    }
+  }
+
   const statusLabel: Record<McpAgent["status"], string> = {
     pending: "待审批",
     active: "已启用",
@@ -2172,12 +2185,12 @@ function AgentManageDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: 
   return (
     <Modal title="Agent 管理" onClose={onClose} size="wide">
       <p className="fine">
-        外部 AI Agent 须先注册并获批后才能使用 MCP。批准或创建时会生成一次性令牌（<code>dwa_…</code>），配置为环境变量{" "}
+        外部 AI Agent 须先注册并获批后才能使用 MCP。令牌（<code>dwa_…</code>）在列表里随时可查看和复制，配置为环境变量{" "}
         <code>DUOWEI_TOKEN</code>。
       </p>
       {freshToken && (
         <p className="dev-code">
-          请立即复制 Agent 令牌：<code>{freshToken}</code>
+          新令牌（也已保存，可随时在下方列表复制）：<code>{freshToken}</code>
         </p>
       )}
       <form
@@ -2261,6 +2274,25 @@ function AgentManageDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: 
                   : " · 未授权任何表"}
               </span>
               {agent.description && <span>{agent.description}</span>}
+              {agent.token ? (
+                <span className="agent-token">
+                  <code className="agent-token-value">
+                    {revealed[agent.id] ? agent.token : `${agent.token.slice(0, 12)}${"•".repeat(8)}`}
+                  </code>
+                  <button type="button" onClick={() => setRevealed((cur) => ({ ...cur, [agent.id]: !cur[agent.id] }))}>
+                    {revealed[agent.id] ? "隐藏" : "显示"}
+                  </button>
+                  <button type="button" className="secondary" onClick={() => copyToken(agent)}>
+                    {copiedId === agent.id ? "已复制" : "复制令牌"}
+                  </button>
+                </span>
+              ) : (
+                agent.status === "active" && (
+                  <span className="fine">
+                    此 Agent 的令牌由旧版本生成，无法找回。点「轮换令牌」生成新令牌后即可随时查看与复制。
+                  </span>
+                )
+              )}
             </div>
             <div className="agent-actions">
               {agent.status === "pending" && (
@@ -4560,7 +4592,7 @@ function buildAgentBrief(origin: string, token: string) {
 - **API 根地址**：\`${cleanOrigin}\`
 - **鉴权头**：\`Authorization: Bearer ${cleanToken}\`
 - 令牌类型：
-  - \`dwa_…\`：MCP Agent 令牌（管理员在网页「Agent 管理」创建/批准后获得，**只显示一次**）
+  - \`dwa_…\`：MCP Agent 令牌（管理员在网页「Agent 管理」创建/批准后获得，可随时在列表中查看与复制）
   - \`dw_…\`：个人访问令牌（网页「访问令牌」创建；仅 REST）
 - 所有请求 \`Content-Type: application/json\`（有 body 时）
 - 健康检查（无需登录）：\`GET ${cleanOrigin}/api/health\` → \`{"ok":true}\`

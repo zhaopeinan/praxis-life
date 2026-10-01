@@ -1632,6 +1632,14 @@ assert.equal(agentApprove.status, 200);
 assert.ok(agentApprove.data.token.startsWith("dwa_"));
 assert.equal(agentApprove.data.agent.status, "active");
 
+// 令牌持久可查：管理端列表返回明文，便于随时复制
+const agentList = await json("/api/mcp-agents", { cookie: ada2 });
+assert.equal(agentList.status, 200);
+const listedAgent = agentList.data.find((item: { id: string }) => item.id === agentReg.data.id);
+assert.equal(listedAgent.token, agentApprove.data.token);
+const forbiddenAgentList = await json("/api/mcp-agents", { cookie: bobCookie });
+assert.equal(forbiddenAgentList.status, 403);
+
 const agentBases = await json("/api/bases", { token: agentApprove.data.token });
 assert.equal(agentBases.status, 200);
 assert.equal(agentBases.data.length, 1);
@@ -1653,6 +1661,20 @@ assert.equal(agentCreateBase.status, 403);
 
 const agentsList = await json("/api/mcp-agents", { cookie: ada2 });
 assert.ok(agentsList.data.some((a: { id: string }) => a.id === agentReg.data.id));
+
+// 轮换令牌后列表中的明文同步更新，旧令牌立即失效
+const rotated = await json(`/api/mcp-agents/${agentReg.data.id}/rotate-token`, { method: "POST", cookie: ada2 });
+assert.equal(rotated.status, 200);
+assert.notEqual(rotated.data.token, agentApprove.data.token);
+const agentListAfterRotate = await json("/api/mcp-agents", { cookie: ada2 });
+assert.equal(
+  agentListAfterRotate.data.find((item: { id: string }) => item.id === agentReg.data.id).token,
+  rotated.data.token,
+);
+const revokedOldToken = await json("/api/bases", { token: agentApprove.data.token });
+assert.equal(revokedOldToken.status, 401);
+const rotatedTokenWorks = await json("/api/bases", { token: rotated.data.token });
+assert.equal(rotatedTokenWorks.status, 200);
 
 console.log("duowei tests passed");
 
