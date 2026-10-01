@@ -1,6 +1,14 @@
 import type { Store } from "./store.js";
 import type { BaseSummary, FieldDraft } from "./types.js";
 
+/** 本地时区的 YYYY-MM-DD；不能用 toISOString()，否则东八区凌晨会退到「昨天」。 */
+function localYmd(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export const TEMPLATES = [
   {
     id: "requirements",
@@ -174,7 +182,7 @@ async function createTodos(store: Store): Promise<BaseSummary> {
     领域: "科研",
     状态: "待办",
     优先级: "P0",
-    截止日期: new Date().toISOString().slice(0, 10),
+    截止日期: localYmd(new Date()),
   });
   await store.createAutomation(inbox.id, {
     name: "新建待办通知飞书",
