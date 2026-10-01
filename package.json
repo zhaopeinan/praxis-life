@@ -1,8 +1,9 @@
 {
-  "name": "duowei",
+  "name": "praxis-life",
   "private": true,
   "type": "module",
   "version": "0.1.0",
+  "description": "Praxis Life — self-hosted life OS. Multidimensional tables, kanban, calendar, and Agent/MCP on one private data plane.",
   "scripts": {
     "dev": "concurrently -n server,web -c blue,magenta \"npm run dev:server\" \"npm run dev:web\"",
     "dev:server": "tsx watch src/listen.ts",

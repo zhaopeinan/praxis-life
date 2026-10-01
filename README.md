@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/assets/banner.png" alt="知行人生 / Zhixing Rensheng" width="100%" />
+  <img src="docs/assets/banner.png" alt="Praxis Life" width="100%" />
 </p>
 
-<h1 align="center">知行人生 · Zhixing Rensheng</h1>
+<h1 align="center">Praxis Life</h1>
 
 <p align="center">
-  <strong>Self-hosted life OS</strong> — multidimensional tables, kanban, calendar, and Agent/MCP on one private data plane.<br/>
-  自托管人生操作系统：多维表格 · 看板 · 日历，人与 Agent 读写同一份事实。
+  <em>知行人生</em> — know, then act; refine life through practice.<br/>
+  <strong>Self-hosted life OS</strong> for humans and agents on one private data plane.
 </p>
 
 <p align="center">
@@ -23,9 +23,9 @@
 
 ### Why this exists
 
-Most "life tools" either lock your data in a SaaS silo, or give agents a chatbot with no durable structure. **Zhixing Rensheng** is the opposite bet: a **self-hosted bitable** you own, with views humans already understand (grid / kanban / calendar / gallery / form / gantt), plus a first-class **MCP + REST** surface so external agents operate on the *same* records — under ACL, not vibes.
+Most life tools either lock your data in a SaaS silo, or give agents a chatbot with no durable structure. **Praxis Life** takes the opposite bet: a **self-hosted bitable** you own, with views humans already understand (grid / kanban / calendar / gallery / form / gantt), plus a first-class **MCP + REST** surface so external agents operate on the *same* records — under ACL, not vibes.
 
-Tagline we ship with: *Don't wait for perfect. Refine through knowing and doing.*
+*Praxis* is the classical word for uniting knowing and doing — the same spirit as 知行. The product tagline: *Don't wait for perfect. Refine through knowing and doing.*
 
 ### Highlights
 
@@ -52,8 +52,8 @@ Tagline we ship with: *Don't wait for perfect. Refine through knowing and doing.
 ### Quick start (local)
 
 ```bash
-git clone https://github.com/zhaopeinan/zhixing-rensheng.git
-cd zhixing-rensheng
+git clone https://github.com/zhaopeinan/praxis-life.git
+cd praxis-life
 npm install
 npm run dev
 ```
@@ -121,10 +121,10 @@ Without SMTP, OTP codes appear in the login form (**dev only**). Production must
 ```json
 {
   "mcpServers": {
-    "zhixing-rensheng": {
+    "praxis-life": {
       "command": "npx",
       "args": ["tsx", "src/mcp.ts"],
-      "cwd": "/absolute/path/to/zhixing-rensheng",
+      "cwd": "/absolute/path/to/praxis-life",
       "env": { "DUOWEI_TOKEN": "dwa_..." }
     }
   }
@@ -160,9 +160,9 @@ Actively developed open source. Capability map vs. Feishu-style bitable: [`docs/
 
 ### 它解决什么问题
 
-多数人生工具要么把数据锁进 SaaS，要么只给 Agent 一个没有结构的对话框。**知行人生**反过来做：你自托管一份**多维表格数据面**，人类用熟悉的视图工作；外部 Agent 通过 **MCP / REST** 在同一 ACL 下读写同一批记录——事实只有一份。
+多数人生工具要么把数据锁进 SaaS，要么只给 Agent 一个没有结构的对话框。**Praxis Life（知行人生）**反过来做：你自托管一份**多维表格数据面**，人类用熟悉的视图工作；外部 Agent 通过 **MCP / REST** 在同一 ACL 下读写同一批记录——事实只有一份。
 
-产品一句话：**不要为完美而等待，在知行中完善。**
+*Praxis* 即「知行」：把认知落到行动里。产品一句话：**不要为完美而等待，在知行中完善。**
 
 ### 能力摘要
 
@@ -180,8 +180,8 @@ Actively developed open source. Capability map vs. Feishu-style bitable: [`docs/
 ### 本地启动
 
 ```bash
-git clone https://github.com/zhaopeinan/zhixing-rensheng.git
-cd zhixing-rensheng
+git clone https://github.com/zhaopeinan/praxis-life.git
+cd praxis-life
 npm install
 npm run dev
 ```
@@ -249,10 +249,10 @@ docker compose up -d --build
 ```json
 {
   "mcpServers": {
-    "zhixing-rensheng": {
+    "praxis-life": {
       "command": "npx",
       "args": ["tsx", "src/mcp.ts"],
-      "cwd": "/绝对路径/zhixing-rensheng",
+      "cwd": "/绝对路径/praxis-life",
       "env": { "DUOWEI_TOKEN": "dwa_..." }
     }
   }
@@ -283,5 +283,5 @@ npm run build:web
 ---
 
 <p align="center">
-  <sub>知行人生 · Zhixing Rensheng — self-hosted life OS for humans and agents.</sub>
+  <sub>Praxis Life · 知行人生 — self-hosted life OS for humans and agents.</sub>
 </p>
