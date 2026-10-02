@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ChartType, DashboardChart, DashboardConfig, Field, TableSummary } from "../../src/types.js";
 import { api } from "./api";
+import { StageEmpty } from "./StageEmpty";
+import { pickStatusField } from "./statusField";
 import { FancySelect } from "./ui";
 
 type DashRow = { id: string; name: string; config: DashboardConfig };
@@ -15,6 +17,10 @@ const CHART_TYPES: Array<{ id: ChartType; label: string }> = [
 ];
 
 const THEME = ["#0f766e", "#0369a1", "#b45309", "#be123c", "#7c3aed", "#15803d", "#c2410c"];
+
+function uid(prefix: string): string {
+  return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+}
 
 export function DashboardView({
   baseId,
@@ -137,28 +143,77 @@ export function DashboardView({
     }
   }
 
+  /**
+   * 「用我的数据生成一个」：扫一遍数据表，挑第一张有单选字段的表，
+   * 按该字段生成分布 + 数量 + 总数的三张图。省去用户手配图表。
+   */
+  async function quickStart() {
+    setBusy(true);
+    setError(null);
+    try {
+      let target: { tableId: string; tableName: string; field: Field } | null = null;
+      for (const table of tables.slice(0, 8)) {
+        try {
+          const full = await api.getTable(table.id);
+          const field = pickStatusField(full.fields);
+          if (field) {
+            setFieldsByTable((current) => ({ ...current, [full.id]: full.fields }));
+            target = { tableId: full.id, tableName: full.name, field };
+            break;
+          }
+        } catch {
+          /* 单张表读不到就跳过，继续找下一张 */
+        }
+      }
+      if (!target) {
+        setError("这些数据表里都还没有单选字段。先任意加一个「状态」单选字段，再回来一键生成。");
+        return;
+      }
+      const charts: DashboardChart[] = [
+        { id: uid("c"), title: `${target.field.name}分布`, type: "donut", tableId: target.tableId, fieldId: target.field.id },
+        { id: uid("c"), title: `${target.field.name}数量`, type: "bar", tableId: target.tableId, fieldId: target.field.id },
+        { id: uid("c"), title: "记录总数", type: "count", tableId: target.tableId, fieldId: "" },
+      ];
+      const created = (await api.createDashboard(baseId, {
+        name: `${target.tableName} · 概览`,
+        config: { charts },
+      })) as DashRow;
+      await refreshList(created.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="dashboard-shell">
       <header className="dashboard-bar">
-        <div>
-          <h2>仪表盘</h2>
-          <p className="fine">按字段聚合；可用切片器联动过滤柱状 / 折线 / 饼图 / 环图 / 计数</p>
+        <div className="dashboard-heading">
+          <span className="dashboard-kicker">仪表盘</span>
+          <h2>{active?.name ?? "数据概览"}</h2>
+          <p className="fine">按字段聚合记录；切片器可联动过滤柱状 / 折线 / 饼图 / 环图 / 计数。</p>
         </div>
-        <div className="dialog-actions">
-          <button type="button" onClick={() => void createDash()} disabled={busy}>
-            新建
+        <div className="dialog-actions dashboard-actions">
+          <button type="button" className="secondary" onClick={() => void createDash()} disabled={busy}>
+            ＋ 新建仪表盘
           </button>
           {active && !editing && (
-            <button type="button" className="primary" onClick={() => void startEdit()}>
+            <button type="button" className="primary" onClick={() => void startEdit()} disabled={busy}>
               编辑
             </button>
           )}
           {editing && (
-            <button type="button" className="primary" onClick={() => void saveEdit()} disabled={busy}>
-              保存
-            </button>
+            <>
+              <button type="button" className="primary" onClick={() => void saveEdit()} disabled={busy}>
+                保存
+              </button>
+              <button type="button" onClick={() => setEditing(false)} disabled={busy}>
+                取消
+              </button>
+            </>
           )}
-          <button type="button" onClick={onClose}>
+          <button type="button" className="ghost" onClick={onClose}>
             关闭
           </button>
         </div>
@@ -166,23 +221,68 @@ export function DashboardView({
       {error && <p className="form-error">{error}</p>}
       <div className="dashboard-layout">
         <aside className="dashboard-nav">
-          {list.length === 0 && <p className="fine">还没有仪表盘</p>}
+          <p className="dashboard-nav-title">全部仪表盘</p>
+          {list.length === 0 && <p className="dashboard-nav-empty">还没有仪表盘</p>}
           {list.map((item) => (
             <button
               key={item.id}
               type="button"
-              className={item.id === activeId ? "active" : ""}
+              className={`dashboard-nav-item${item.id === activeId ? " active" : ""}`}
               onClick={() => {
                 setEditing(false);
                 setActiveId(item.id);
               }}
             >
-              {item.name}
+              <span className="dashboard-nav-name">{item.name}</span>
+              <span className="dashboard-nav-count">{item.config.charts.length}</span>
             </button>
           ))}
         </aside>
         <section className="dashboard-canvas">
-          {!active && <p className="stage-note">选择或新建仪表盘</p>}
+          {list.length === 0 && (
+            <div className="dashboard-empty">
+              <span className="dashboard-empty-icon" aria-hidden="true">
+                ◔
+              </span>
+              <h3>把散落的记录，汇成一张能看懂的表</h3>
+              <p>
+                仪表盘会按字段统计这个空间里的数据。比如「按状态看进度」「按负责人看负载」，
+                一句话就能配好，不用写公式。
+              </p>
+              <ul className="dashboard-steps">
+                <li>
+                  <em>1</em> 选数据表
+                </li>
+                <li>
+                  <em>2</em> 选字段
+                </li>
+                <li>
+                  <em>3</em> 选图表形状
+                </li>
+              </ul>
+              <div className="dashboard-empty-actions">
+                <button type="button" className="primary" onClick={() => void createDash()} disabled={busy}>
+                  新建空白仪表盘
+                </button>
+                <button type="button" className="secondary" onClick={() => void quickStart()} disabled={busy || tables.length === 0}>
+                  {busy ? "生成中…" : "用我的数据生成一个"}
+                </button>
+              </div>
+            </div>
+          )}
+          {list.length > 0 && !active && (
+            <StageEmpty
+              icon="◔"
+              title="选一个仪表盘查看"
+              description="左侧列出的是当前空间下的全部仪表盘。也可以新建一个，按字段统计记录。"
+              tone="calm"
+              actions={
+                <button type="button" className="primary" onClick={() => void createDash()} disabled={busy}>
+                  ＋ 新建仪表盘
+                </button>
+              }
+            />
+          )}
           {active && editing && (
             <DashboardEditor
               name={draftName}
@@ -196,8 +296,23 @@ export function DashboardView({
               onNeedFields={(tableId) => void ensureFields(tableId)}
             />
           )}
+          {active && !editing && !data && <p className="stage-note">加载中…</p>}
           {active && !editing && data && (
             <>
+              {data.charts.length === 0 && (
+                <div className="dashboard-empty compact">
+                  <span className="dashboard-empty-icon" aria-hidden="true">
+                    ＋
+                  </span>
+                  <h3>「{data.name}」还是空的</h3>
+                  <p>加一个图表，选好数据表和字段就能看到统计结果。</p>
+                  <div className="dashboard-empty-actions">
+                    <button type="button" className="primary" onClick={() => void startEdit()}>
+                      添加图表
+                    </button>
+                  </div>
+                </div>
+              )}
               {data.slicers?.length > 0 && (
                 <div className="slicer-bar">
                   {data.slicers.map((slicer) => (
@@ -230,12 +345,13 @@ export function DashboardView({
                   ))}
                 </div>
               )}
-              <div className="chart-grid">
-                {data.charts.length === 0 && <p className="stage-note">暂无图表，点击编辑添加</p>}
-                {data.charts.map((chart) => (
-                  <ChartCard key={chart.id} chart={chart} />
-                ))}
-              </div>
+              {data.charts.length > 0 && (
+                <div className="chart-grid">
+                  {data.charts.map((chart) => (
+                    <ChartCard key={chart.id} chart={chart} />
+                  ))}
+                </div>
+              )}
             </>
           )}
         </section>
@@ -333,7 +449,7 @@ function DashboardEditor({
           onSlicers([
             ...slicers,
             {
-              id: `s_${Math.random().toString(36).slice(2, 9)}`,
+              id: uid("s"),
               title: "切片器",
               tableId: tables[0]?.id ?? "",
               fieldId: "",
@@ -420,7 +536,7 @@ function DashboardEditor({
           onCharts([
             ...charts,
             {
-              id: `c_${Math.random().toString(36).slice(2, 9)}`,
+              id: uid("c"),
               title: "新图表",
               type: "bar",
               tableId: tables[0]?.id ?? "",
@@ -437,19 +553,24 @@ function DashboardEditor({
 
 function ChartCard({ chart }: { chart: ChartData }) {
   const total = useMemo(() => chart.values.reduce((sum, value) => sum + value, 0), [chart.values]);
+  const empty = chart.type !== "count" && (chart.labels.length === 0 || total === 0);
   return (
     <article className="chart-card">
       <header>
         <h3>{chart.title}</h3>
         <span className="fine">{labelOf(chart.type)}</span>
       </header>
-      {chart.type === "count" ? (
-        <div className="chart-count">{total}</div>
-      ) : chart.type === "bar" || chart.type === "line" ? (
-        <BarOrLine labels={chart.labels} values={chart.values} mode={chart.type} />
-      ) : (
-        <PieOrDonut labels={chart.labels} values={chart.values} donut={chart.type === "donut"} />
-      )}
+      <div className="chart-body">
+        {chart.type === "count" ? (
+          <div className="chart-count">{total}</div>
+        ) : empty ? (
+          <p className="chart-empty">暂无数据</p>
+        ) : chart.type === "bar" || chart.type === "line" ? (
+          <BarOrLine labels={chart.labels} values={chart.values} mode={chart.type} />
+        ) : (
+          <PieOrDonut labels={chart.labels} values={chart.values} donut={chart.type === "donut"} />
+        )}
+      </div>
     </article>
   );
 }

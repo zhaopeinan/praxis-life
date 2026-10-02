@@ -10,6 +10,8 @@ import { Cell, GridView } from "./GridView";
 import { KanbanView } from "./KanbanView";
 import { BottomBar, MobileAgenda, MobileKanban, RecordCardList } from "./mobile";
 import { PublicShareScreen } from "./PublicShareScreen";
+import { StageEmpty } from "./StageEmpty";
+import { DEFAULT_STATUS_FIELD, DEFAULT_STATUS_OPTIONS, pickStatusField } from "./statusField";
 import { DropMenu, FancySelect, useMediaQuery } from "./ui";
 
 const FIELD_TYPES = (Object.keys(FIELD_TYPE_LABELS) as Field["type"][]).map((id) => ({
@@ -63,6 +65,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const [detailRecordId, setDetailRecordId] = useState<string | null>(null);
   const [appMode, setAppMode] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [kanbanPrompt, setKanbanPrompt] = useState(false);
   const [widgetsKey, setWidgetsKey] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   const [mobileSearch, setMobileSearch] = useState(false);
@@ -167,6 +170,82 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     await api.deleteTable(payload.id);
     await refreshBases({ baseId, tableId: remaining?.id ?? null });
     if (!remaining) setPayload(null);
+  }
+
+  /**
+   * 一键转看板。优先级：
+   * 1. 已经有看板视图 → 直接切过去（不重复建）；
+   * 2. 有单选字段 → 挑一个最像「状态」的，按它建看板并切过去；
+   * 3. 一个单选字段都没有 → 弹窗问是否补一个「状态」字段。
+   */
+  async function convertToKanban() {
+    if (!payload || !view) return;
+    setError(null);
+    try {
+      const field = pickStatusField(payload.fields);
+
+      // 当前已经在看板上，只是缺分组字段：直接补上，不再新建视图
+      if (view.type === "kanban") {
+        if (!field) {
+          setKanbanPrompt(true);
+          return;
+        }
+        await patchView(await api.updateView(view.id, { config: { ...view.config, groupFieldId: field.id } }));
+        setNotice(`已按「${field.name}」分组。左右拖动卡片即可改状态。`);
+        return;
+      }
+
+      // 表里已经有看板视图：切过去；若那个看板也没分组，顺手补上
+      const existing = payload.views.find((item) => item.type === "kanban");
+      if (existing) {
+        if (!existing.config.groupFieldId && field) {
+          await api.updateView(existing.id, { config: { ...existing.config, groupFieldId: field.id } });
+          await reloadTable();
+        }
+        setViewId(existing.id);
+        setNotice(`已切到看板视图「${existing.name}」。左右拖动卡片就能改状态。`);
+        return;
+      }
+
+      if (!field) {
+        setKanbanPrompt(true);
+        return;
+      }
+      const created = await api.createView(payload.id, {
+        name: `${field.name}看板`,
+        type: "kanban",
+        groupField: field.name,
+      });
+      await reloadTable();
+      setViewId(created.id);
+      setNotice(`已按「${field.name}」生成看板。左右拖动卡片即可改状态。`);
+    } catch (err) {
+      fail(err);
+    }
+  }
+
+  /** 表里没有单选字段时，补一个「状态」字段再转看板 */
+  async function createStatusFieldAndKanban() {
+    if (!payload) return;
+    setKanbanPrompt(false);
+    setError(null);
+    try {
+      const field = await api.createField(payload.id, {
+        name: DEFAULT_STATUS_FIELD,
+        type: "single_select",
+        options: DEFAULT_STATUS_OPTIONS,
+      });
+      const created = await api.createView(payload.id, {
+        name: "看板",
+        type: "kanban",
+        groupField: field.name,
+      });
+      await reloadTable();
+      setViewId(created.id);
+      setNotice(`已新建「${field.name}」字段并生成看板，选项可随时调整。`);
+    } catch (err) {
+      fail(err);
+    }
   }
 
   function renameCurrentBase(item: BaseSummary) {
@@ -319,6 +398,27 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   }
 
   const groupField = payload?.fields.find((field) => field.id === view?.config.groupFieldId && field.type === "single_select");
+  /** 表里所有能当日期轴的字段，供日历 / 甘特一键配置 */
+  const dateFields = payload?.fields.filter((field) => field.type === "date") ?? [];
+  const dateField = payload?.fields.find((field) => field.id === view?.config.dateFieldId && field.type === "date") ?? null;
+  /** 表里所有能当分组（看板列 / 甘特泳道）的单选字段 */
+  const selectFields = payload?.fields.filter((field) => field.type === "single_select") ?? [];
+  /** 一键转看板时默认挑中的那个「状态类」单选字段 */
+  const kanbanCandidate = payload ? pickStatusField(payload.fields) : null;
+  /** 表里能填进表单的字段（排除系统字段） */
+  const formFields = (payload?.fields ?? []).filter(
+    (field) => !["auto_number", "created_time", "updated_time", "created_by", "formula", "lookup", "button"].includes(field.type),
+  );
+
+  /** 把当前视图的某个配置项改掉（日历/甘特的日期字段、看板分组等） */
+  async function patchViewConfig(patch: Partial<View["config"]>) {
+    if (!view) return;
+    try {
+      patchView(await api.updateView(view.id, { config: { ...view.config, ...patch } }));
+    } catch (err) {
+      fail(err);
+    }
+  }
 
   const searchInput = (
     <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索记录" aria-label="搜索记录" />
@@ -494,6 +594,16 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       {canEdit && (
         <button type="button" className="ghost" onClick={() => setDialog("view")}>
           + 视图
+        </button>
+      )}
+      {canEdit && view.type !== "kanban" && (
+        <button
+          type="button"
+          className="ghost"
+          title="按状态字段分列，左右拖动卡片即可改状态"
+          onClick={() => void convertToKanban()}
+        >
+          转看板
         </button>
       )}
       {canEdit && (
@@ -730,7 +840,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             <button type="button" onClick={() => setNotice(null)} aria-label="关闭提示">×</button>
           </div>
         )}
-        {payload && view && (
+        {payload && view && !showDashboard && (
           <div className="toolbar">
             {!isMobile && (
               <div className="views">
@@ -776,7 +886,21 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         <div className="stage">
           {appMode && base && <AppWidgets key={widgetsKey} baseId={base.id} />}
           {loading && <p className="stage-note">加载中…</p>}
-          {!loading && !payload && <p className="stage-note">选择或新建一张数据表。</p>}
+          {!loading && !payload && (
+            <StageEmpty
+              icon="▥"
+              title="先选一张数据表"
+              description="左侧是当前空间下的清单。选中一张就能看到它的表格、看板或日历视图。"
+              tone="calm"
+              actions={
+                canEdit ? (
+                  <button type="button" className="primary" onClick={() => setDialog("table")}>
+                    ＋ 新建数据表
+                  </button>
+                ) : undefined
+              }
+            />
+          )}
           {payload && view?.type === "grid" &&
             (isMobile ? (
               <RecordCardList
@@ -876,10 +1000,55 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               />
             ))}
           {payload && view?.type === "kanban" && !groupField && (
-            <p className="stage-note">这个看板还没有单选分组字段。先添加一个单选字段，再在上方选择分组。</p>
+            <StageEmpty
+              icon="▦"
+              title="看板还没有分组字段"
+              description="看板按一个单选字段分列。选好之后，左右拖动卡片就会直接改写这个字段的值。"
+              actions={
+                canEdit ? (
+                  <>
+                    {kanbanCandidate && (
+                      <button type="button" className="primary" onClick={() => void patchViewConfig({ groupFieldId: kanbanCandidate.id })}>
+                        按「{kanbanCandidate.name}」分组
+                      </button>
+                    )}
+                    {!kanbanCandidate && (
+                      <button type="button" className="primary" onClick={() => void createStatusFieldAndKanban()}>
+                        新建「{DEFAULT_STATUS_FIELD}」字段并分组
+                      </button>
+                    )}
+                  </>
+                ) : undefined
+              }
+            />
           )}
           {payload && view?.type === "calendar" &&
-            (isMobile ? (
+            (!dateField ? (
+              <StageEmpty
+                icon="▤"
+                title="这个日历还没有日期字段"
+                description="日历会把带日期的记录摆到对应的日子上，拖动记录就能直接改日期。"
+                tone={canEdit ? "warn" : "calm"}
+                actions={
+                  canEdit ? (
+                    <>
+                      {dateFields[0] && (
+                        <button
+                          type="button"
+                          className="primary"
+                          onClick={() => void patchViewConfig({ dateFieldId: dateFields[0].id })}
+                        >
+                          用「{dateFields[0].name}」显示
+                        </button>
+                      )}
+                      <button type="button" className="secondary" onClick={() => setDialog("field")}>
+                        ＋ 新建日期字段
+                      </button>
+                    </>
+                  ) : undefined
+                }
+              />
+            ) : isMobile ? (
               <MobileAgenda
                 fields={visibleFields}
                 records={records}
@@ -898,40 +1067,106 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 onOpen={setDetailRecordId}
               />
             ))}
-          {payload && view?.type === "gantt" && (
-            <GanttView
-              fields={visibleFields}
-              records={records}
-              dateFieldId={view.config.dateFieldId}
-              endDateFieldId={view.config.endDateFieldId}
-              progressFieldId={view.config.progressFieldId}
-              dependencyFieldId={view.config.dependencyFieldId}
-              titleFieldId={view.config.titleFieldId}
-              readOnly={!canEdit || appMode}
-              onChange={onChange}
-              onOpen={setDetailRecordId}
-            />
-          )}
-          {payload && view?.type === "gallery" && (
-            <GalleryView
-              fields={visibleFields}
-              records={records}
-              titleFieldId={view.config.titleFieldId}
-              readOnly={!canEdit || appMode}
-              onOpen={setDetailRecordId}
-              onAdd={() => api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
-            />
-          )}
-          {payload && view?.type === "form" && (
-            <FormView
-              fields={visibleFields}
-              readOnly={!canEdit || appMode}
-              onSubmit={async (values) => {
-                await api.createRecord(payload.id, values);
-                await reloadTable();
-              }}
-            />
-          )}
+          {payload && view?.type === "gantt" &&
+            (!dateField ? (
+              <StageEmpty
+                icon="▭"
+                title="这个甘特图还没有开始日期"
+                description="甘特图用开始/结束日期把记录画成时间条，进度字段决定条内填充多少。"
+                tone={canEdit ? "warn" : "calm"}
+                actions={
+                  canEdit ? (
+                    <>
+                      {dateFields[0] && (
+                        <button
+                          type="button"
+                          className="primary"
+                          onClick={() =>
+                            void patchViewConfig({
+                              dateFieldId: dateFields[0].id,
+                              endDateFieldId: dateFields[1]?.id ?? dateFields[0].id,
+                            })
+                          }
+                        >
+                          用「{dateFields[0].name}」显示
+                        </button>
+                      )}
+                      <button type="button" className="secondary" onClick={() => setDialog("field")}>
+                        ＋ 新建日期字段
+                      </button>
+                    </>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <GanttView
+                fields={visibleFields}
+                records={records}
+                dateFieldId={view.config.dateFieldId}
+                endDateFieldId={view.config.endDateFieldId}
+                progressFieldId={view.config.progressFieldId}
+                dependencyFieldId={view.config.dependencyFieldId}
+                titleFieldId={view.config.titleFieldId}
+                readOnly={!canEdit || appMode}
+                onChange={onChange}
+                onOpen={setDetailRecordId}
+              />
+            ))}
+          {payload && view?.type === "gallery" &&
+            (records.length === 0 ? (
+              <StageEmpty
+                icon="▨"
+                title="画册还是空的"
+                description="每一条记录会变成一张卡片。想先有内容，可以直接添加一条记录。"
+                steps={["挑一个标题字段", "需要时把图片字段作为封面", "填几条记录就有画面了"]}
+                tone="calm"
+                actions={
+                  canEdit ? (
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={() => api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
+                    >
+                      ＋ 添加记录
+                    </button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <GalleryView
+                fields={visibleFields}
+                records={records}
+                titleFieldId={view.config.titleFieldId}
+                readOnly={!canEdit || appMode}
+                onOpen={setDetailRecordId}
+                onAdd={() => api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
+              />
+            ))}
+          {payload && view?.type === "form" &&
+            (formFields.length === 0 ? (
+              <StageEmpty
+                icon="▢"
+                title="这个表单还没有可填写的字段"
+                description="表单只展示能手动填写的字段，公式、创建时间一类的系统字段不会出现在这里。"
+                tone="calm"
+                actions={
+                  canEdit ? (
+                    <button type="button" className="primary" onClick={() => setDialog("field")}>
+                      ＋ 新建字段
+                    </button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <FormView
+                fields={visibleFields}
+                readOnly={!canEdit || appMode}
+                onSubmit={async (values) => {
+                  await api.createRecord(payload.id, values);
+                  await reloadTable();
+                }}
+              />
+            ))}
         </div>
         )}
       </section>
@@ -971,6 +1206,47 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             <div className="dialog-actions">
               <button type="button" className="primary" onClick={() => setDialog("view")}>
                 ＋ 新建视图
+              </button>
+            </div>
+          )}
+        </Modal>
+      )}
+      {kanbanPrompt && payload && (
+        <Modal title="转看板" onClose={() => setKanbanPrompt(false)}>
+          <p className="fine">
+            看板需要一个「单选」字段来分列，比如「状态」。这张表
+            {selectFields.length > 0 ? "有单选字段但还没选中，可以先在上方「看板分组」里挑一个。" : "还没有单选字段。"}
+          </p>
+          {selectFields.length === 0 && (
+            <>
+              <p className="fine">
+                可以直接新建一个「{DEFAULT_STATUS_FIELD}」字段，选项默认是
+                {DEFAULT_STATUS_OPTIONS.join(" / ")}，建完马上就能拖动卡片改状态。
+              </p>
+              <div className="dialog-actions">
+                <button type="button" className="primary" onClick={() => void createStatusFieldAndKanban()}>
+                  新建「{DEFAULT_STATUS_FIELD}」字段并转看板
+                </button>
+                <button type="button" onClick={() => setKanbanPrompt(false)}>
+                  取消
+                </button>
+              </div>
+            </>
+          )}
+          {selectFields.length > 0 && (
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={() => {
+                  setKanbanPrompt(false);
+                  if (kanbanCandidate) void patchViewConfig({ groupFieldId: kanbanCandidate.id });
+                }}
+              >
+                按「{kanbanCandidate?.name}」分组
+              </button>
+              <button type="button" onClick={() => setKanbanPrompt(false)}>
+                取消
               </button>
             </div>
           )}
