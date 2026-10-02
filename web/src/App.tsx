@@ -1114,24 +1114,45 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             ))}
           {payload && view?.type === "gallery" &&
             (records.length === 0 ? (
-              <StageEmpty
-                icon="▨"
-                title="画册还是空的"
-                description="每一条记录会变成一张卡片。想先有内容，可以直接添加一条记录。"
-                steps={["挑一个标题字段", "需要时把图片字段作为封面", "填几条记录就有画面了"]}
-                tone="calm"
-                actions={
-                  canEdit ? (
+              payload.records.length === 0 ? (
+                <StageEmpty
+                  icon="▨"
+                  title="画册还是空的"
+                  description="每一条记录会变成一张卡片。想先有内容，可以直接添加一条记录。"
+                  steps={["挑一个标题字段", "需要时把图片字段作为封面", "填几条记录就有画面了"]}
+                  tone="calm"
+                  actions={
+                    canEdit ? (
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() => api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
+                      >
+                        ＋ 添加记录
+                      </button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <StageEmpty
+                  icon="◎"
+                  title="没有符合条件的卡片"
+                  description="当前搜索或筛选条件下没有记录。清空条件就能看到全部卡片。"
+                  tone="calm"
+                  actions={
                     <button
                       type="button"
-                      className="primary"
-                      onClick={() => api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
+                      className="secondary"
+                      onClick={() => {
+                        setSearch("");
+                        if (view) void patchViewConfig({ filters: [] });
+                      }}
                     >
-                      ＋ 添加记录
+                      清空搜索与筛选
                     </button>
-                  ) : undefined
-                }
-              />
+                  }
+                />
+              )
             ) : (
               <GalleryView
                 fields={visibleFields}
