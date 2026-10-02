@@ -994,6 +994,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 readOnly={!canEdit || appMode}
                 onChange={onChange}
                 onDelete={(recordId) => api.deleteRecord(recordId).then(() => reloadTable()).catch(fail)}
+                onOpenRecord={setDetailRecordId}
                 onAdd={(optionName) =>
                   api.createRecord(payload.id, optionName ? { [groupField.name]: optionName } : {}).then(() => reloadTable()).catch(fail)
                 }

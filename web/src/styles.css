@@ -1527,12 +1527,18 @@ body.col-resizing * { cursor: col-resize !important; }
   padding: 12px;
   box-shadow: var(--shadow-xs);
   cursor: grab;
+  /* 卡片里的内容可能是一长串没空格的路径 / URL，必须允许在任意位置折行，
+     否则会把卡片顶出去（flex 子项的 min-width 默认按最长单词算）。 */
+  min-width: 0;
+  overflow-wrap: anywhere;
   transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .cards article:hover { border-color: var(--line-strong); box-shadow: var(--shadow-sm); }
-.card-top { display: flex; justify-content: space-between; gap: 8px; }
-.card-top h3 { margin: 0; font-size: 13px; font-weight: 620; letter-spacing: -0.01em; }
-.card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; color: var(--ink-3); }
+.card-top { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+.card-top h3 { margin: 0; font-size: 13px; font-weight: 620; letter-spacing: -0.01em; min-width: 0; overflow-wrap: anywhere; }
+.card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; color: var(--ink-3); min-width: 0; }
+.card-meta > span { min-width: 0; overflow-wrap: anywhere; }
+.card-meta > .tag { max-width: 100%; height: auto; min-height: 22px; padding-top: 2px; padding-bottom: 2px; }
 
 .calendar { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .calendar-head { display: flex; align-items: center; justify-content: space-between; }
