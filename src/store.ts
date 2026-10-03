@@ -29,6 +29,11 @@ import {
   type DashboardConfig,
   type DetailPageConfig,
   type DisplayValue,
+  type DocumentDetail,
+  type DocumentKind,
+  type DocumentRecordLink,
+  type DocumentRevision,
+  type DocumentSummary,
   type Field,
   type FieldConfig,
   type FieldDraft,
@@ -37,6 +42,7 @@ import {
   type Notification,
   type PluginHook,
   type PublicRecord,
+  type RecordDocumentLink,
   type RecordQuery,
   type RowHeight,
   type SelectOption,
@@ -63,6 +69,7 @@ import {
   type PublicShareKind,
   type GeoPoint,
   emptyDetailPageConfig,
+  findDocTemplate,
 } from "./types.js";
 
 const SYSTEM_SET = new Set<string>(SYSTEM_FIELD_TYPES);
@@ -204,6 +211,40 @@ export class Store {
       `CREATE INDEX IF NOT EXISTS idx_fields_table ON fields(table_id, position)`,
       `CREATE INDEX IF NOT EXISTS idx_records_table ON records(table_id, created_at)`,
       `CREATE INDEX IF NOT EXISTS idx_views_table ON views(table_id, position)`,
+      `CREATE TABLE IF NOT EXISTS documents (
+        id TEXT PRIMARY KEY,
+        base_id TEXT NOT NULL REFERENCES bases(id) ON DELETE CASCADE,
+        parent_id TEXT REFERENCES documents(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL DEFAULT 'doc',
+        title TEXT NOT NULL,
+        icon TEXT,
+        body_md TEXT NOT NULL DEFAULT '',
+        position INTEGER NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_documents_base ON documents(base_id, position)`,
+      `CREATE INDEX IF NOT EXISTS idx_documents_parent ON documents(parent_id, position)`,
+      `CREATE TABLE IF NOT EXISTS document_revisions (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        body_md TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        user_name TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_document_revisions_doc ON document_revisions(document_id, created_at)`,
+      `CREATE TABLE IF NOT EXISTS document_records (
+        document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        record_id TEXT NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+        table_id TEXT NOT NULL,
+        label TEXT,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (document_id, record_id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_document_records_record ON document_records(record_id)`,
       `CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -2688,6 +2729,390 @@ export class Store {
     return { id: dashboardId, name, config };
   }
 
+  /* ——— 文档（Markdown 长文） ——— */
+
+  async listDocuments(baseId: string, opts?: { q?: string }): Promise<DocumentSummary[]> {
+    await this.requireBase(baseId);
+    const q = opts?.q?.trim();
+    const rows = q
+      ? await this.db.execute({
+          sql: `SELECT id, base_id, parent_id, kind, title, icon, position, created_by, created_at, updated_at,
+                       length(body_md) AS body_length
+                  FROM documents
+                 WHERE base_id = ? AND (title LIKE ? OR body_md LIKE ?)
+                 ORDER BY updated_at DESC`,
+          args: [baseId, `%${q}%`, `%${q}%`],
+        })
+      : await this.db.execute({
+          sql: `SELECT id, base_id, parent_id, kind, title, icon, position, created_by, created_at, updated_at,
+                       length(body_md) AS body_length
+                  FROM documents
+                 WHERE base_id = ?
+                 ORDER BY position ASC, created_at ASC`,
+          args: [baseId],
+        });
+    const childRows = await this.db.execute({
+      sql: "SELECT parent_id, COUNT(*) AS n FROM documents WHERE base_id = ? AND parent_id IS NOT NULL GROUP BY parent_id",
+      args: [baseId],
+    });
+    const linkRows = await this.db.execute({
+      sql: `SELECT dr.document_id AS document_id, COUNT(*) AS n
+              FROM document_records dr
+              JOIN documents d ON d.id = dr.document_id
+             WHERE d.base_id = ?
+             GROUP BY dr.document_id`,
+      args: [baseId],
+    });
+    const childCounts = new Map(childRows.rows.map((row) => [asString(row.parent_id), asNumber(row.n)]));
+    const linkCounts = new Map(linkRows.rows.map((row) => [asString(row.document_id), asNumber(row.n)]));
+    return rows.rows.map((row) => {
+      const id = asString(row.id);
+      return {
+        id,
+        baseId: asString(row.base_id),
+        parentId: row.parent_id == null ? null : asString(row.parent_id),
+        kind: (asString(row.kind) === "folder" ? "folder" : "doc") as DocumentKind,
+        title: asString(row.title),
+        icon: row.icon == null ? null : asString(row.icon),
+        position: asNumber(row.position),
+        createdBy: asString(row.created_by),
+        createdAt: asNumber(row.created_at),
+        updatedAt: asNumber(row.updated_at),
+        bodyLength: asNumber(row.body_length),
+        childCount: childCounts.get(id) ?? 0,
+        linkCount: linkCounts.get(id) ?? 0,
+      };
+    });
+  }
+
+  async locateDocument(documentId: string): Promise<{ baseId: string }> {
+    const doc = await this.requireDocument(documentId);
+    return { baseId: doc.baseId };
+  }
+
+  async getDocument(documentId: string): Promise<DocumentDetail> {
+    const doc = await this.requireDocument(documentId);
+    const linkRows = await this.db.execute({
+      sql: `SELECT dr.document_id, dr.record_id, dr.table_id, dr.label, dr.created_at,
+                   t.name AS table_name, r.values_json AS values_json
+              FROM document_records dr
+              JOIN records r ON r.id = dr.record_id
+              JOIN tables t ON t.id = dr.table_id
+             WHERE dr.document_id = ?
+             ORDER BY dr.created_at ASC`,
+      args: [documentId],
+    });
+    const tableIds = [...new Set(linkRows.rows.map((row) => asString(row.table_id)))];
+    const titleFields = new Map<string, Field | null>();
+    for (const tableId of tableIds) {
+      const fieldRows = await this.db.execute({
+        sql: "SELECT * FROM fields WHERE table_id = ? ORDER BY position ASC",
+        args: [tableId],
+      });
+      const fields: Field[] = fieldRows.rows.map((row) => ({
+        id: asString(row.id),
+        tableId: asString(row.table_id),
+        name: asString(row.name),
+        type: asString(row.type) as FieldType,
+        position: asNumber(row.position),
+        config: parseJson<FieldConfig>(row.config, {}),
+      }));
+      titleFields.set(
+        tableId,
+        fields.find((field) => field.name === "标题") ??
+          fields.find((field) => field.type === "text") ??
+          fields.find((field) => field.type === "long_text") ??
+          null,
+      );
+    }
+    const links: DocumentRecordLink[] = linkRows.rows.map((row) => {
+      const tableId = asString(row.table_id);
+      const field = titleFields.get(tableId) ?? null;
+      const values = parseJson<Record<string, unknown>>(row.values_json, {});
+      const title = field ? displayText(values[field.name] as DisplayValue | undefined) : "";
+      return {
+        documentId,
+        recordId: asString(row.record_id),
+        tableId,
+        label: row.label == null ? null : asString(row.label),
+        createdAt: asNumber(row.created_at),
+        tableName: asString(row.table_name),
+        recordTitle: title || asString(row.record_id).slice(0, 8),
+      };
+    });
+    return {
+      id: doc.id,
+      baseId: doc.baseId,
+      parentId: doc.parentId,
+      kind: doc.kind,
+      title: doc.title,
+      icon: doc.icon,
+      position: doc.position,
+      bodyMd: doc.bodyMd,
+      createdBy: doc.createdBy,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+      links,
+    };
+  }
+
+  async createDocument(
+    baseId: string,
+    input: {
+      title?: string;
+      parentId?: string | null;
+      kind?: DocumentKind;
+      bodyMd?: string;
+      template?: string | null;
+      createdBy: string;
+    },
+  ): Promise<DocumentDetail> {
+    await this.requireBase(baseId);
+    const template = findDocTemplate(input.template);
+    const kind: DocumentKind = input.kind === "folder" ? "folder" : "doc";
+    const now = Date.now();
+    const id = nid("doc");
+    const parentId = input.parentId ?? null;
+    if (parentId) {
+      const parent = await this.requireDocument(parentId);
+      if (parent.baseId !== baseId) throw new DomainError("父文档不在同一个空间");
+      if (parent.kind !== "folder") throw new DomainError("只能建在文件夹下");
+    }
+    const position = await this.nextDocumentPosition(baseId, parentId);
+    await this.db.execute({
+      sql: `INSERT INTO documents (id, base_id, parent_id, kind, title, icon, body_md, position, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        id,
+        baseId,
+        parentId,
+        kind,
+        docTitle(input.title ?? template?.title, kind === "folder" ? "新建文件夹" : "未命名文档"),
+        kind === "folder" ? "📁" : "📄",
+        input.bodyMd ?? template?.bodyMd ?? "",
+        position,
+        input.createdBy,
+        now,
+        now,
+      ],
+    });
+    return this.getDocument(id);
+  }
+
+  async updateDocument(
+    documentId: string,
+    patch: { title?: string; bodyMd?: string; icon?: string | null },
+    actor: { id: string; name: string },
+  ): Promise<DocumentDetail> {
+    const doc = await this.requireDocument(documentId);
+    const now = Date.now();
+    const title = patch.title != null ? docTitle(patch.title, doc.title) : doc.title;
+    const bodyMd = patch.bodyMd != null ? String(patch.bodyMd) : doc.bodyMd;
+    const icon = patch.icon !== undefined ? (patch.icon ? String(patch.icon) : null) : doc.icon;
+    const changed = bodyMd !== doc.bodyMd || title !== doc.title;
+    if (changed) {
+      // 归档「改动前」的内容，恢复历史即把某一版重新落成正文。
+      await this.db.execute({
+        sql: "INSERT INTO document_revisions (id, document_id, title, body_md, user_id, user_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        args: [nid("drev"), documentId, doc.title, doc.bodyMd, actor.id, actor.name, now],
+      });
+      await this.pruneDocumentRevisions(documentId);
+    }
+    await this.db.execute({
+      sql: "UPDATE documents SET title = ?, body_md = ?, icon = ?, updated_at = ? WHERE id = ?",
+      args: [title, bodyMd, icon, now, documentId],
+    });
+    return this.getDocument(documentId);
+  }
+
+  async moveDocument(documentId: string, parentId: string | null, position?: number): Promise<DocumentDetail> {
+    const doc = await this.requireDocument(documentId);
+    if (parentId !== null) {
+      const parent = await this.requireDocument(parentId);
+      if (parent.baseId !== doc.baseId) throw new DomainError("不能跨空间移动文档");
+      if (parent.kind !== "folder") throw new DomainError("只能移动到文件夹下");
+      if (parentId === documentId) throw new DomainError("不能把文档移动到它自己下面");
+      const descendants = await this.documentDescendantIds(documentId);
+      if (descendants.has(parentId)) throw new DomainError("不能把文档移动到它自己的子文档下");
+    }
+    const nextPosition = position ?? (await this.nextDocumentPosition(doc.baseId, parentId));
+    await this.db.execute({
+      sql: "UPDATE documents SET parent_id = ?, position = ?, updated_at = ? WHERE id = ?",
+      args: [parentId, nextPosition, Date.now(), documentId],
+    });
+    return this.getDocument(documentId);
+  }
+
+  async deleteDocument(documentId: string): Promise<void> {
+    await this.requireDocument(documentId);
+    // documents.parent_id 自关联 ON DELETE CASCADE：子文档一并删除
+    await this.db.execute({ sql: "DELETE FROM documents WHERE id = ?", args: [documentId] });
+  }
+
+  async listDocumentRevisions(documentId: string, limit = 50): Promise<DocumentRevision[]> {
+    await this.requireDocument(documentId);
+    const result = await this.db.execute({
+      sql: "SELECT * FROM document_revisions WHERE document_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?",
+      args: [documentId, limit],
+    });
+    return result.rows.map((row) => ({
+      id: asString(row.id),
+      documentId: asString(row.document_id),
+      title: asString(row.title),
+      bodyMd: asString(row.body_md),
+      userId: asString(row.user_id),
+      userName: asString(row.user_name),
+      createdAt: asNumber(row.created_at),
+    }));
+  }
+
+  async restoreDocumentRevision(
+    documentId: string,
+    revisionId: string,
+    actor: { id: string; name: string },
+  ): Promise<DocumentDetail> {
+    const doc = await this.requireDocument(documentId);
+    const result = await this.db.execute({ sql: "SELECT * FROM document_revisions WHERE id = ?", args: [revisionId] });
+    const row = result.rows[0];
+    if (!row || asString(row.document_id) !== documentId) throw new DomainError("找不到该历史版本", 404);
+    const now = Date.now();
+    // 先把当前内容收进历史，避免恢复即丢失。
+    await this.db.execute({
+      sql: "INSERT INTO document_revisions (id, document_id, title, body_md, user_id, user_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      args: [nid("drev"), documentId, doc.title, doc.bodyMd, actor.id, actor.name, now],
+    });
+    await this.pruneDocumentRevisions(documentId);
+    await this.db.execute({
+      sql: "UPDATE documents SET title = ?, body_md = ?, updated_at = ? WHERE id = ?",
+      args: [asString(row.title), asString(row.body_md), now, documentId],
+    });
+    return this.getDocument(documentId);
+  }
+
+  async linkDocumentRecord(documentId: string, recordId: string, label?: string | null): Promise<DocumentDetail> {
+    const doc = await this.requireDocument(documentId);
+    const located = await this.locateRecord(recordId);
+    if (located.baseId !== doc.baseId) throw new DomainError("只能关联同一空间下的记录");
+    await this.db.execute({
+      sql: `INSERT INTO document_records (document_id, record_id, table_id, label, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(document_id, record_id) DO UPDATE SET label = excluded.label`,
+      args: [documentId, recordId, located.tableId, label?.trim() || null, Date.now()],
+    });
+    return this.getDocument(documentId);
+  }
+
+  async unlinkDocumentRecord(documentId: string, recordId: string): Promise<DocumentDetail> {
+    await this.requireDocument(documentId);
+    await this.db.execute({
+      sql: "DELETE FROM document_records WHERE document_id = ? AND record_id = ?",
+      args: [documentId, recordId],
+    });
+    return this.getDocument(documentId);
+  }
+
+  async listRecordDocuments(recordId: string): Promise<RecordDocumentLink[]> {
+    await this.requireRecord(recordId);
+    const result = await this.db.execute({
+      sql: `SELECT d.id, d.base_id, d.title, d.kind, d.icon, d.updated_at, dr.label
+              FROM document_records dr
+              JOIN documents d ON d.id = dr.document_id
+             WHERE dr.record_id = ?
+             ORDER BY d.updated_at DESC`,
+      args: [recordId],
+    });
+    return result.rows.map((row) => ({
+      id: asString(row.id),
+      baseId: asString(row.base_id),
+      title: asString(row.title),
+      kind: (asString(row.kind) === "folder" ? "folder" : "doc") as DocumentKind,
+      icon: row.icon == null ? null : asString(row.icon),
+      label: row.label == null ? null : asString(row.label),
+      updatedAt: asNumber(row.updated_at),
+    }));
+  }
+
+  private async requireDocument(documentId: string): Promise<{
+    id: string;
+    baseId: string;
+    parentId: string | null;
+    kind: DocumentKind;
+    title: string;
+    icon: string | null;
+    bodyMd: string;
+    position: number;
+    createdBy: string;
+    createdAt: number;
+    updatedAt: number;
+  }> {
+    const result = await this.db.execute({ sql: "SELECT * FROM documents WHERE id = ?", args: [documentId] });
+    const row = result.rows[0];
+    if (!row) throw new DomainError("找不到文档", 404);
+    return {
+      id: asString(row.id),
+      baseId: asString(row.base_id),
+      parentId: row.parent_id == null ? null : asString(row.parent_id),
+      kind: (asString(row.kind) === "folder" ? "folder" : "doc") as DocumentKind,
+      title: asString(row.title),
+      icon: row.icon == null ? null : asString(row.icon),
+      bodyMd: asString(row.body_md),
+      position: asNumber(row.position),
+      createdBy: asString(row.created_by),
+      createdAt: asNumber(row.created_at),
+      updatedAt: asNumber(row.updated_at),
+    };
+  }
+
+  private async nextDocumentPosition(baseId: string, parentId: string | null): Promise<number> {
+    const result = parentId
+      ? await this.db.execute({
+          sql: "SELECT COALESCE(MAX(position), -1) AS max_pos FROM documents WHERE base_id = ? AND parent_id = ?",
+          args: [baseId, parentId],
+        })
+      : await this.db.execute({
+          sql: "SELECT COALESCE(MAX(position), -1) AS max_pos FROM documents WHERE base_id = ? AND parent_id IS NULL",
+          args: [baseId],
+        });
+    return asNumber(result.rows[0]?.max_pos ?? -1) + 1;
+  }
+
+  private async documentDescendantIds(documentId: string): Promise<Set<string>> {
+    const result = await this.db.execute({
+      sql: "SELECT id, parent_id FROM documents WHERE base_id = (SELECT base_id FROM documents WHERE id = ?)",
+      args: [documentId],
+    });
+    const byParent = new Map<string, string[]>();
+    for (const row of result.rows) {
+      const parentId = row.parent_id == null ? "" : asString(row.parent_id);
+      const list = byParent.get(parentId) ?? [];
+      list.push(asString(row.id));
+      byParent.set(parentId, list);
+    }
+    const seen = new Set<string>();
+    const queue = [...(byParent.get(documentId) ?? [])];
+    while (queue.length) {
+      const next = queue.shift()!;
+      if (seen.has(next)) continue;
+      seen.add(next);
+      queue.push(...(byParent.get(next) ?? []));
+    }
+    return seen;
+  }
+
+  private async pruneDocumentRevisions(documentId: string, keep = 50): Promise<void> {
+    await this.db.execute({
+      sql: `DELETE FROM document_revisions
+             WHERE document_id = ?
+               AND id NOT IN (
+                 SELECT id FROM document_revisions
+                  WHERE document_id = ?
+                  ORDER BY created_at DESC, rowid DESC
+                  LIMIT ?
+               )`,
+      args: [documentId, documentId, keep],
+    });
+  }
+
   async getBaseSettings(baseId: string): Promise<{ timezone: string; portal: AppPortalConfig; integrations: BaseIntegrations }> {
     await this.requireBase(baseId);
     const result = await this.db.execute({ sql: "SELECT * FROM base_settings WHERE base_id = ?", args: [baseId] });
@@ -4633,6 +5058,13 @@ function cleanName(name: string): string {
   if (!trimmed) throw new DomainError("名称不能为空");
   if (trimmed.length > 80) throw new DomainError("名称不能超过 80 个字符");
   return trimmed;
+}
+
+/** 文档标题：允许为空（回退到默认名），不像表名那样强制非空。 */
+function docTitle(raw: string | null | undefined, fallback = "未命名文档"): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return fallback;
+  return trimmed.length > 120 ? trimmed.slice(0, 120) : trimmed;
 }
 
 function isEmptyDisplay(value: DisplayValue | undefined): boolean {

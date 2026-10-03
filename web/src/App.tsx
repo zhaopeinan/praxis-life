@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { applyQuery } from "../../src/query.js";
-import type { BaseMember, BaseSummary, DisplayValue, Field, McpAgent, PublicRecord, PublicUser, RowAccessRule, TablePayload, View, ViewType } from "../../src/types.js";
-import { FIELD_TYPE_LABELS, VIEW_TYPE_LABELS } from "../../src/types.js";
+import type { BaseMember, BaseSummary, DisplayValue, DocumentSummary, Field, McpAgent, PublicRecord, PublicUser, RecordDocumentLink, RowAccessRule, TablePayload, View, ViewType } from "../../src/types.js";
+import { DOC_TEMPLATES, FIELD_TYPE_LABELS, VIEW_TYPE_LABELS } from "../../src/types.js";
 import { api, type BackupLogDto, type BackupSettingsDto } from "./api";
 import { AuthScreen } from "./AuthScreen";
 import { DashboardView } from "./DashboardView";
+import { DocumentsView, DocumentTree } from "./DocumentsView";
 import { CalendarView, FormView, GalleryView, GanttView } from "./ExtraViews";
 import { Cell, GridView } from "./GridView";
 import { KanbanView } from "./KanbanView";
@@ -55,6 +56,9 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const [baseId, setBaseId] = useState<string | null>(null);
   const [tableId, setTableId] = useState<string | null>(null);
   const [viewId, setViewId] = useState<string | null>(null);
+  const [docId, setDocId] = useState<string | null>(null);
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const [payload, setPayload] = useState<TablePayload | null>(null);
   const [members, setMembers] = useState<BaseMember[]>([]);
   const [search, setSearch] = useState("");
@@ -126,6 +130,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
 
   const base = bases.find((item) => item.id === baseId) ?? null;
   const view = payload?.views.find((item) => item.id === viewId) ?? payload?.views[0] ?? null;
+  const docsMode = Boolean(docsOpen && base);
   const myRole = !base
     ? null
     : user.role === "admin"
@@ -142,6 +147,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     setBaseId(nextBase?.id ?? null);
     setTableId(nextTable?.id ?? null);
     if (prefer?.tableId == null || nextTable?.id !== tableId) setViewId(null);
+    if (prefer?.baseId !== undefined && prefer.baseId !== nextBase?.id) closeDocs();
   }
 
   async function reloadTable(id = tableId) {
@@ -152,6 +158,52 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     const data = await api.getTable(id);
     setPayload(data);
     setViewId((current) => (current && data.views.some((item) => item.id === current) ? current : data.views[0]?.id ?? null));
+  }
+
+  async function reloadDocuments(id = baseId) {
+    if (!id) {
+      setDocuments([]);
+      return;
+    }
+    try {
+      setDocuments(await api.documents(id));
+    } catch (err) {
+      setDocuments([]);
+      setError(message(err));
+    }
+  }
+
+  function openDocument(id: string | null) {
+    setDocsOpen(true);
+    setDocId(id);
+    setViewId(null);
+    setShowDashboard(false);
+    if (id) setNavOpen(false);
+  }
+
+  /** 回到「文档」首页：保留文档树，主区域显示最近更新与新建入口。 */
+  function openDocsHome() {
+    openDocument(null);
+  }
+
+  /** 离开文档页（切清单 / 切空间 / 打开记录时调用）。 */
+  function closeDocs() {
+    setDocsOpen(false);
+    setDocId(null);
+  }
+
+  function openRecordFromDocument(recordId: string, targetTableId: string) {
+    closeDocs();
+    setTableId(targetTableId);
+    setViewId(null);
+    setDetailRecordId(recordId);
+  }
+
+  /** 从记录详情里打开（或新建后打开）文档：先关掉详情，再刷新文档树，最后切到文档页。 */
+  async function openDocumentFromRecord(documentId: string) {
+    closeDetail();
+    if (baseId) await reloadDocuments(baseId);
+    openDocument(documentId);
   }
 
   async function deleteCurrentTable() {
@@ -330,6 +382,28 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       return;
     }
     api.members(baseId).then(setMembers).catch(() => setMembers([]));
+  }, [baseId]);
+
+  useEffect(() => {
+    // 换空间时清掉选中的文档：docId 可能残留指向别个空间的文档。
+    // docsOpen 保持不动，这样从侧边栏点另一个空间的「文档」还能直接落在文档页。
+    setDocId(null);
+    if (!baseId) {
+      setDocuments([]);
+      return;
+    }
+    let cancel = false;
+    api
+      .documents(baseId)
+      .then((list) => {
+        if (!cancel) setDocuments(list);
+      })
+      .catch(() => {
+        if (!cancel) setDocuments([]);
+      });
+    return () => {
+      cancel = true;
+    };
   }, [baseId]);
 
   const visibleFields = useMemo(() => {
@@ -673,6 +747,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                     setBaseId(item.id);
                     setTableId(item.tables[0]?.id ?? null);
                     setViewId(null);
+                    closeDocs();
                     setNavOpen(false);
                   }}
                   onDoubleClick={() => {
@@ -712,6 +787,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                       setBaseId(item.id);
                       setTableId(table.id);
                       setViewId(null);
+                      closeDocs();
                       setSearch("");
                       setNavOpen(false);
                     }}
@@ -750,6 +826,87 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                   )}
                 </div>
               ))}
+              {item.id === baseId && (
+                <div className="side-docs">
+                  <div className="side-docs-head">
+                    <button
+                      type="button"
+                      className={docsMode && !docId ? "side-docs-title on" : "side-docs-title"}
+                      onClick={() => {
+                        if (item.id !== baseId) {
+                          setBaseId(item.id);
+                          setTableId(item.tables[0]?.id ?? null);
+                          setViewId(null);
+                          setSearch("");
+                        }
+                        openDocsHome();
+                      }}
+                    >
+                      文档
+                    </button>
+                    {canEdit && (
+                      <DropMenu label="＋" ariaLabel="新建文档" className="side-docs-add">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const created = await api.createDocument(item.id, {});
+                              await reloadDocuments(item.id);
+                              openDocument(created.id);
+                            } catch (err) {
+                              fail(err);
+                            }
+                          }}
+                        >
+                          空白文档
+                        </button>
+                        {DOC_TEMPLATES.map((template) => (
+                          <button
+                            key={template.id}
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const created = await api.createDocument(item.id, { template: template.id });
+                                await reloadDocuments(item.id);
+                                openDocument(created.id);
+                              } catch (err) {
+                                fail(err);
+                              }
+                            }}
+                          >
+                            {template.name}
+                          </button>
+                        ))}
+                        <hr className="menu-sep" />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const created = await api.createDocument(item.id, { kind: "folder" });
+                              await reloadDocuments(item.id);
+                              openDocument(created.id);
+                            } catch (err) {
+                              fail(err);
+                            }
+                          }}
+                        >
+                          新建文件夹
+                        </button>
+                      </DropMenu>
+                    )}
+                  </div>
+                  <DocumentTree
+                    baseId={item.id}
+                    documents={documents}
+                    selectedId={docId}
+                    onSelect={(id) => openDocument(id)}
+                    canEdit={canEdit}
+                    onChanged={() => reloadDocuments(item.id)}
+                    onError={fail}
+                    onNotice={setNotice}
+                  />
+                </div>
+              )}
             </div>
           ))}
           {bases.length === 0 && <p className="side-empty">还没有空间。可以从模板开始，或新建一个空白空间。</p>}
@@ -768,25 +925,34 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             </button>
           )}
           <div className="top-title">
-            <input
-              value={payload?.name ?? ""}
-              aria-label="清单名称"
-              disabled={!payload || !canEdit}
-              onChange={(event) => setPayload((current) => (current ? { ...current, name: event.target.value } : current))}
-              onBlur={(event) => {
-                if (!payload || event.target.value.trim() === payload.name) return;
-                api.renameTable(payload.id, event.target.value).then(() => refreshBases({ baseId, tableId: payload.id })).catch(fail);
-              }}
-            />
-            {myRole && <span className="role-pill">{roleLabel(myRole)}</span>}
-            {payload && canOwn && !appMode && !isMobile && (
-              <button
-                type="button"
-                className="ghost danger-text"
-                onClick={() => deleteCurrentTable().catch(fail)}
-              >
-                删除清单
-              </button>
+            {docsMode ? (
+              <>
+                <strong className="top-docs-title">文档</strong>
+                {base && <span className="role-pill">{base.name}</span>}
+              </>
+            ) : (
+              <>
+                <input
+                  value={payload?.name ?? ""}
+                  aria-label="清单名称"
+                  disabled={!payload || !canEdit}
+                  onChange={(event) => setPayload((current) => (current ? { ...current, name: event.target.value } : current))}
+                  onBlur={(event) => {
+                    if (!payload || event.target.value.trim() === payload.name) return;
+                    api.renameTable(payload.id, event.target.value).then(() => refreshBases({ baseId, tableId: payload.id })).catch(fail);
+                  }}
+                />
+                {myRole && <span className="role-pill">{roleLabel(myRole)}</span>}
+                {payload && canOwn && !appMode && !isMobile && (
+                  <button
+                    type="button"
+                    className="ghost danger-text"
+                    onClick={() => deleteCurrentTable().catch(fail)}
+                  >
+                    删除清单
+                  </button>
+                )}
+              </>
             )}
           </div>
           {!isMobile && (
@@ -840,7 +1006,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             <button type="button" onClick={() => setNotice(null)} aria-label="关闭提示">×</button>
           </div>
         )}
-        {payload && view && !showDashboard && (
+        {payload && view && !showDashboard && !docsMode && (
           <div className="toolbar">
             {!isMobile && (
               <div className="views">
@@ -880,10 +1046,24 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             )}
           </div>
         )}
-        {showDashboard && base ? (
+        {docsMode && base ? (
+          <div className="stage docs-stage">
+            <DocumentsView
+              baseId={base.id}
+              tables={base.tables}
+              canEdit={canEdit}
+              documents={documents}
+              selectedId={docId}
+              onSelect={openDocument}
+              onReload={() => reloadDocuments(base.id)}
+              onError={fail}
+              onNotice={setNotice}
+              onOpenRecord={openRecordFromDocument}
+            />
+          </div>
+        ) : showDashboard && base ? (
           <DashboardView baseId={base.id} tables={base.tables} onClose={() => setShowDashboard(false)} />
-        ) : (
-        <div className="stage">
+        ) : (        <div className="stage">
           {appMode && base && <AppWidgets key={widgetsKey} baseId={base.id} />}
           {loading && <p className="stage-note">加载中…</p>}
           {!loading && !payload && (
@@ -1397,12 +1577,14 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         <RecordDetailDialog
           recordId={detailRecordId}
           tableId={payload.id}
+          baseId={base?.id ?? null}
           fields={payload.fields}
           record={payload.records.find((item) => item.id === detailRecordId) ?? null}
           canEdit={canEdit && !appMode}
           fullScreen={isMobile}
           onClose={closeDetail}
           onChange={onChange}
+          onOpenDocument={(documentId) => void openDocumentFromRecord(documentId)}
           onDelete={() => {
             api
               .deleteRecord(detailRecordId)
@@ -3485,6 +3667,7 @@ function ImportDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: (c
 function RecordDetailDialog({
   recordId,
   tableId,
+  baseId,
   fields,
   record,
   canEdit,
@@ -3492,9 +3675,11 @@ function RecordDetailDialog({
   onClose,
   onChange,
   onDelete,
+  onOpenDocument,
 }: {
   recordId: string;
   tableId: string;
+  baseId?: string | null;
   fields: Field[];
   record: { id: string; fields: Record<string, unknown> } | null;
   canEdit: boolean;
@@ -3502,6 +3687,7 @@ function RecordDetailDialog({
   onClose: () => void;
   onChange: (recordId: string, fieldName: string, value: unknown) => void;
   onDelete?: () => void;
+  onOpenDocument?: (documentId: string) => void;
 }) {
   const [comments, setComments] = useState<Array<{ id: string; userName: string; body: string; createdAt: number }>>([]);
   const [history, setHistory] = useState<Array<{ id: string; action: string; userName: string | null; createdAt: number }>>([]);
@@ -3509,6 +3695,7 @@ function RecordDetailDialog({
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [docs, setDocs] = useState<RecordDocumentLink[]>([]);
   const [layout, setLayout] = useState<{
     style: "single" | "multi" | "grouped";
     fieldIds: string[];
@@ -3521,6 +3708,7 @@ function RecordDetailDialog({
     setHistory(await api.history(recordId));
     setWatching(await api.watching(recordId));
     setLayout(await api.getDetailPage(tableId));
+    setDocs(await api.recordDocuments(recordId));
   }
   useEffect(() => {
     reload().catch((err) => setError(message(err)));
@@ -3632,6 +3820,59 @@ function RecordDetailDialog({
         <p className="dev-code">
           只读分享令牌：<code>{shareToken}</code>
         </p>
+      )}
+      <h3 className="section-title">相关文档</h3>
+      <ul className="member-list">
+        {docs.map((doc) => (
+          <li key={doc.id}>
+            <div>
+              <strong>
+                {doc.icon || "📄"} {doc.title}
+              </strong>
+              {doc.label && <span>{doc.label}</span>}
+            </div>
+            {onOpenDocument && (
+              <button type="button" onClick={() => onOpenDocument(doc.id)}>
+                打开
+              </button>
+            )}
+          </li>
+        ))}
+        {!docs.length && <li className="doc-hint">还没有关联文档。</li>}
+      </ul>
+      {canEdit && baseId && (
+        <div className="share-add">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const created = await api.createDocument(baseId, { template: "experiment-plan", title: "实验前思考" });
+                await api.linkDocumentRecord(created.id, recordId, "实验前思考");
+                setDocs(await api.recordDocuments(recordId));
+                onOpenDocument?.(created.id);
+              } catch (err) {
+                setError(message(err));
+              }
+            }}
+          >
+            ＋ 实验前思考
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const created = await api.createDocument(baseId, { template: "experiment-review", title: "实验复盘" });
+                await api.linkDocumentRecord(created.id, recordId, "实验复盘");
+                setDocs(await api.recordDocuments(recordId));
+                onOpenDocument?.(created.id);
+              } catch (err) {
+                setError(message(err));
+              }
+            }}
+          >
+            ＋ 实验复盘
+          </button>
+        </div>
       )}
       <h3 className="section-title">评论</h3>
       <ul className="member-list">

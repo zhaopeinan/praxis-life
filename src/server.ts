@@ -572,6 +572,103 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     return c.json(await store.updateDashboard(c.req.param("dashboardId"), body));
   });
 
+  app.get("/api/bases/:baseId/documents", async (c) => {
+    const baseId = c.req.param("baseId");
+    await requireBase(c, baseId, "viewer");
+    const q = c.req.query("q") || undefined;
+    return c.json(await store.listDocuments(baseId, { q }));
+  });
+
+  app.post("/api/bases/:baseId/documents", async (c) => {
+    const baseId = c.req.param("baseId");
+    const user = await requireBase(c, baseId, "editor");
+    const body = z
+      .object({
+        title: z.string().optional(),
+        parentId: z.string().nullable().optional(),
+        kind: z.enum(["doc", "folder"]).optional(),
+        bodyMd: z.string().optional(),
+        template: z.string().nullable().optional(),
+      })
+      .parse(await readBody(c));
+    return c.json(await store.createDocument(baseId, { ...body, createdBy: user.id }), 201);
+  });
+
+  app.get("/api/documents/:documentId", async (c) => {
+    const documentId = c.req.param("documentId");
+    const located = await store.locateDocument(documentId);
+    await requireBase(c, located.baseId, "viewer");
+    return c.json(await store.getDocument(documentId));
+  });
+
+  app.patch("/api/documents/:documentId", async (c) => {
+    const documentId = c.req.param("documentId");
+    const located = await store.locateDocument(documentId);
+    const user = await requireBase(c, located.baseId, "editor");
+    const body = z
+      .object({
+        title: z.string().optional(),
+        bodyMd: z.string().optional(),
+        icon: z.string().nullable().optional(),
+      })
+      .parse(await readBody(c));
+    return c.json(await store.updateDocument(documentId, body, { id: user.id, name: user.name }));
+  });
+
+  app.post("/api/documents/:documentId/move", async (c) => {
+    const documentId = c.req.param("documentId");
+    const located = await store.locateDocument(documentId);
+    await requireBase(c, located.baseId, "editor");
+    const body = z.object({ parentId: z.string().nullable(), position: z.number().optional() }).parse(await readBody(c));
+    return c.json(await store.moveDocument(documentId, body.parentId, body.position));
+  });
+
+  app.delete("/api/documents/:documentId", async (c) => {
+    const documentId = c.req.param("documentId");
+    const located = await store.locateDocument(documentId);
+    await requireBase(c, located.baseId, "editor");
+    await store.deleteDocument(documentId);
+    return c.json({ ok: true });
+  });
+
+  app.get("/api/documents/:documentId/revisions", async (c) => {
+    const documentId = c.req.param("documentId");
+    const located = await store.locateDocument(documentId);
+    await requireBase(c, located.baseId, "viewer");
+    return c.json(await store.listDocumentRevisions(documentId));
+  });
+
+  app.post("/api/documents/:documentId/revisions/:revisionId/restore", async (c) => {
+    const documentId = c.req.param("documentId");
+    const located = await store.locateDocument(documentId);
+    const user = await requireBase(c, located.baseId, "editor");
+    return c.json(
+      await store.restoreDocumentRevision(documentId, c.req.param("revisionId"), { id: user.id, name: user.name }),
+    );
+  });
+
+  app.post("/api/documents/:documentId/records", async (c) => {
+    const documentId = c.req.param("documentId");
+    const located = await store.locateDocument(documentId);
+    await requireBase(c, located.baseId, "editor");
+    const body = z.object({ recordId: z.string(), label: z.string().nullable().optional() }).parse(await readBody(c));
+    return c.json(await store.linkDocumentRecord(documentId, body.recordId, body.label ?? null));
+  });
+
+  app.delete("/api/documents/:documentId/records/:recordId", async (c) => {
+    const documentId = c.req.param("documentId");
+    const located = await store.locateDocument(documentId);
+    await requireBase(c, located.baseId, "editor");
+    return c.json(await store.unlinkDocumentRecord(documentId, c.req.param("recordId")));
+  });
+
+  app.get("/api/records/:recordId/documents", async (c) => {
+    const recordId = c.req.param("recordId");
+    const located = await store.locateRecord(recordId);
+    await requireBase(c, located.baseId, "viewer");
+    return c.json(await store.listRecordDocuments(recordId));
+  });
+
   app.post("/api/bases/:baseId/tables", async (c) => {
     const baseId = c.req.param("baseId");
     await requireBase(c, baseId, "editor");

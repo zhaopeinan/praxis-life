@@ -728,3 +728,172 @@ export const VIEW_TYPE_LABELS: Record<ViewType, string> = {
   form: "表单",
   gantt: "甘特",
 };
+
+/* ——— 文档（Markdown 长文）：实验前思考 / 实验后复盘 ——— */
+
+export type DocumentKind = "doc" | "folder";
+
+/** 列表 / 侧边栏用的文档摘要，不含正文，避免拉全量长文。 */
+export type DocumentSummary = {
+  id: string;
+  baseId: string;
+  parentId: string | null;
+  kind: DocumentKind;
+  title: string;
+  icon: string | null;
+  position: number;
+  createdBy: string;
+  createdAt: number;
+  updatedAt: number;
+  /** 正文字符数，用于列表显示体量。 */
+  bodyLength: number;
+  /** 子节点数量（文件夹用）。 */
+  childCount: number;
+  /** 关联的实验记录条数。 */
+  linkCount: number;
+};
+
+export type DocumentDetail = {
+  id: string;
+  baseId: string;
+  parentId: string | null;
+  kind: DocumentKind;
+  title: string;
+  icon: string | null;
+  position: number;
+  bodyMd: string;
+  createdBy: string;
+  createdAt: number;
+  updatedAt: number;
+  links: DocumentRecordLink[];
+};
+
+/** 文档与实验记录的挂靠关系。label 便于区分「实验前思考」「实验复盘」。 */
+export type DocumentRecordLink = {
+  documentId: string;
+  recordId: string;
+  tableId: string;
+  label: string | null;
+  createdAt: number;
+  /** 便于展示：记录所在清单名。 */
+  tableName?: string;
+  /** 便于展示：记录的标题（首个文本字段）。 */
+  recordTitle?: string;
+};
+
+export type DocumentRevision = {
+  id: string;
+  documentId: string;
+  title: string;
+  bodyMd: string;
+  userId: string;
+  userName: string;
+  createdAt: number;
+};
+
+/** 记录详情页「相关文档」用的轻量条目。 */
+export type RecordDocumentLink = {
+  id: string;
+  baseId: string;
+  title: string;
+  kind: DocumentKind;
+  icon: string | null;
+  label: string | null;
+  updatedAt: number;
+};
+
+export type DocumentTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  title: string;
+  bodyMd: string;
+};
+
+export const DOC_TEMPLATES: DocumentTemplate[] = [
+  {
+    id: "experiment-plan",
+    name: "实验前思考",
+    description: "要回答的问题、假设、变量设计、成功判据与风险。",
+    title: "实验前思考",
+    bodyMd: `# 实验前思考
+
+## 要回答的问题
+
+-
+
+## 假设
+
+-
+
+## 变量与设计
+
+- 自变量：
+- 因变量：
+- 控制变量：
+- 对照与重复：
+
+## 成功 / 失败的判据
+
+-
+
+## 风险与备选方案
+
+-
+`,
+  },
+  {
+    id: "experiment-review",
+    name: "实验后复盘",
+    description: "结论、关键数据、意外与偏差、原因分析、下一步。",
+    title: "实验后复盘",
+    bodyMd: `# 实验复盘
+
+## 结论
+
+-
+
+## 关键数据
+
+-
+
+## 意外与偏差
+
+-
+
+## 原因分析
+
+-
+
+## 下一步
+
+-
+`,
+  },
+  {
+    id: "research-note",
+    name: "研究笔记",
+    description: "自由体：背景、要点、待办。",
+    title: "研究笔记",
+    bodyMd: `# 研究笔记
+
+## 背景
+
+-
+
+## 要点
+
+-
+
+## 待办
+
+- [ ]
+`,
+  },
+];
+
+export function findDocTemplate(id: string | null | undefined): DocumentTemplate | null {
+  if (!id) return null;
+  return DOC_TEMPLATES.find((item) => item.id === id) ?? null;
+}
+

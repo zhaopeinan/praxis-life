@@ -4,10 +4,14 @@ import type {
   BaseMember,
   BaseSummary,
   Comment,
+  DocumentDetail,
+  DocumentRevision,
+  DocumentSummary,
   Field,
   McpAgent,
   PublicRecord,
   PublicUser,
+  RecordDocumentLink,
   TableAcl,
   TablePayload,
   View,
@@ -642,6 +646,34 @@ export const api = {
       body: JSON.stringify({ filename, contentBase64, mime, baseId: opts?.baseId, minRole: opts?.minRole }),
     }),
   deleteUpload: (uploadId: string) => request(`/api/uploads/${uploadId}`, { method: "DELETE" }),
+  documents: (baseId: string, q?: string) =>
+    request<DocumentSummary[]>(`/api/bases/${baseId}/documents${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  createDocument: (
+    baseId: string,
+    body: { title?: string; parentId?: string | null; kind?: "doc" | "folder"; bodyMd?: string; template?: string | null },
+  ) => request<DocumentDetail>(`/api/bases/${baseId}/documents`, { method: "POST", body: JSON.stringify(body) }),
+  getDocument: (documentId: string) => request<DocumentDetail>(`/api/documents/${documentId}`),
+  updateDocument: (documentId: string, patch: { title?: string; bodyMd?: string; icon?: string | null }) =>
+    request<DocumentDetail>(`/api/documents/${documentId}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  moveDocument: (documentId: string, parentId: string | null, position?: number) =>
+    request<DocumentDetail>(`/api/documents/${documentId}/move`, {
+      method: "POST",
+      body: JSON.stringify({ parentId, position }),
+    }),
+  deleteDocument: (documentId: string) => request(`/api/documents/${documentId}`, { method: "DELETE" }),
+  documentRevisions: (documentId: string) =>
+    request<DocumentRevision[]>(`/api/documents/${documentId}/revisions`),
+  restoreDocumentRevision: (documentId: string, revisionId: string) =>
+    request<DocumentDetail>(`/api/documents/${documentId}/revisions/${revisionId}/restore`, { method: "POST" }),
+  linkDocumentRecord: (documentId: string, recordId: string, label?: string | null) =>
+    request<DocumentDetail>(`/api/documents/${documentId}/records`, {
+      method: "POST",
+      body: JSON.stringify({ recordId, label }),
+    }),
+  unlinkDocumentRecord: (documentId: string, recordId: string) =>
+    request<DocumentDetail>(`/api/documents/${documentId}/records/${recordId}`, { method: "DELETE" }),
+  recordDocuments: (recordId: string) =>
+    request<RecordDocumentLink[]>(`/api/records/${recordId}/documents`),
   mcpTools: () =>
     request<{ tools: Array<{ name: string; description: string }>; hint: string }>("/api/mcp/tools"),
   backupStatus: () =>
