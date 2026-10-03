@@ -4,7 +4,7 @@ import { z } from "zod";
 import { accounts, init, store } from "./context.js";
 import { assertBaseRole } from "./access.js";
 import { createTemplate, TEMPLATES, type TemplateId } from "./templates.js";
-import { FIELD_TYPES, FILTER_OPS, type Field, type MemberRole, type PublicUser, type ViewConfig, type ViewType } from "./types.js";
+import { FIELD_TYPES, FILTER_OPS, DOC_TEMPLATES, type Field, type MemberRole, type PublicUser, type ViewConfig, type ViewType } from "./types.js";
 
 const token = process.env.DUOWEI_TOKEN;
 if (!token) {
@@ -52,6 +52,13 @@ async function visibleBases() {
 
 async function allowTable(tableId: string, role: MemberRole) {
   const located = await store.locateTable(tableId);
+  await assertBaseRole(accounts, user, located.baseId, role);
+  return located;
+}
+
+/** 文档挂在 base 下，权限沿用 base 角色，与 REST 的 requireBase 一致。 */
+async function allowDocument(documentId: string, role: MemberRole) {
+  const located = await store.locateDocument(documentId);
   await assertBaseRole(accounts, user, located.baseId, role);
   return located;
 }
@@ -1450,6 +1457,170 @@ server.tool("delete_upload", "删除附件", { uploadId: z.string() }, async ({ 
     await store.deleteUpload(uploadId);
     return { ok: true };
   }),
+);
+
+/* ——— 文档（Markdown 长文）：实验前思考 / 实验后复盘 / 研究笔记 ——— */
+
+server.tool(
+  "list_document_templates",
+  "列出可一键套用的文档模板（实验前思考 / 实验后复盘 / 研究笔记），含模板正文骨架",
+  {},
+  async () =>
+    run(async () =>
+      DOC_TEMPLATES.map((template) => ({
+        id: template.id,
+        name: template.name,
+        description: template.description,
+        title: template.title,
+        bodyMd: template.bodyMd,
+      })),
+    ),
+);
+
+server.tool(
+  "list_documents",
+  "列出某个多维表格下的文档与文件夹（不含正文）。返回项含 parentId 与 kind，可据此还原目录树；bodyLength 是正文字符数，linkCount 是已挂靠的记录数。",
+  { baseId: z.string(), q: z.string().optional().describe("按标题关键词过滤") },
+  async ({ baseId, q }) =>
+    run(async () => {
+      await assertBaseRole(accounts, user, baseId, "viewer");
+      return store.listDocuments(baseId, { q });
+    }),
+);
+
+server.tool(
+  "get_document",
+  "读取一篇文档的完整内容：Markdown 正文（bodyMd）与已挂靠的记录（links）。",
+  { documentId: z.string() },
+  async ({ documentId }) =>
+    run(async () => {
+      await allowDocument(documentId, "viewer");
+      return store.getDocument(documentId);
+    }),
+);
+
+server.tool(
+  "create_document",
+  "在某个多维表格下新建文档或文件夹。template 会带入对应模板的标题与正文骨架（experiment-plan 实验前思考 / experiment-review 实验后复盘 / research-note 研究笔记）；kind 为 folder 时创建文件夹（只能挂在文件夹下）。文档是 Markdown 长文，适合写实验假设、复盘与研究笔记。",
+  {
+    baseId: z.string(),
+    title: z.string().optional().describe("缺省时用模板标题；文件夹默认「新建文件夹」"),
+    parentId: z.string().nullable().optional().describe("父文件夹 id，null 表示放在根目录"),
+    kind: z.enum(["doc", "folder"]).optional(),
+    bodyMd: z.string().optional().describe("直接指定正文，优先于模板"),
+    template: z.enum(["experiment-plan", "experiment-review", "research-note"]).nullable().optional(),
+  },
+  async ({ baseId, title, parentId, kind, bodyMd, template }) =>
+    run(async () => {
+      await assertBaseRole(accounts, user, baseId, "editor");
+      return store.createDocument(baseId, {
+        title,
+        parentId,
+        kind,
+        bodyMd,
+        template,
+        createdBy: user.id,
+      });
+    }),
+);
+
+server.tool(
+  "update_document",
+  "更新文档标题或 Markdown 正文。改动会自动归档一份历史版本（每篇保留最近 50 版），可用 list_document_revisions 查看、restore_document_revision 回滚。传入的 bodyMd 是整篇替换，不是追加。",
+  {
+    documentId: z.string(),
+    title: z.string().optional(),
+    bodyMd: z.string().optional().describe("整篇正文，Markdown 格式"),
+    icon: z.string().nullable().optional(),
+  },
+  async ({ documentId, title, bodyMd, icon }) =>
+    run(async () => {
+      await allowDocument(documentId, "editor");
+      return store.updateDocument(documentId, { title, bodyMd, icon }, { id: user.id, name: user.name });
+    }),
+);
+
+server.tool(
+  "move_document",
+  "移动文档或文件夹到另一个文件夹下（或移到根目录）。不能跨多维表格，也不能移到自己的子节点下。",
+  {
+    documentId: z.string(),
+    parentId: z.string().nullable().describe("目标文件夹 id，null 表示根目录"),
+    position: z.number().optional().describe("同级排序位置，缺省排在末尾"),
+  },
+  async ({ documentId, parentId, position }) =>
+    run(async () => {
+      await allowDocument(documentId, "editor");
+      return store.moveDocument(documentId, parentId, position);
+    }),
+);
+
+server.tool(
+  "delete_document",
+  "删除文档或文件夹（不可恢复，需 editor）。删除文件夹会连同其中的子文档一起删除。",
+  { documentId: z.string() },
+  async ({ documentId }) =>
+    run(async () => {
+      await allowDocument(documentId, "editor");
+      await store.deleteDocument(documentId);
+      return { ok: true };
+    }),
+);
+
+server.tool(
+  "list_document_revisions",
+  "查看某篇文档的历史版本（倒序，默认最近 50 版）。每版含当时的标题与正文。",
+  { documentId: z.string(), limit: z.number().optional().describe("最多返回多少版，默认 50") },
+  async ({ documentId, limit }) =>
+    run(async () => {
+      await allowDocument(documentId, "viewer");
+      return store.listDocumentRevisions(documentId, limit);
+    }),
+);
+
+server.tool(
+  "restore_document_revision",
+  "把文档回滚到某个历史版本（当前内容会先归档成一版，不会丢失）。",
+  { documentId: z.string(), revisionId: z.string() },
+  async ({ documentId, revisionId }) =>
+    run(async () => {
+      await allowDocument(documentId, "editor");
+      return store.restoreDocumentRevision(documentId, revisionId, { id: user.id, name: user.name });
+    }),
+);
+
+server.tool(
+  "link_document_record",
+  "把文档挂靠到一条记录上（例如把「实验复盘」挂到对应的实验记录），记录详情页的「相关文档」会显示它。label 用来区分同一记录上的多篇文档，如「实验前思考」「实验复盘」。",
+  { documentId: z.string(), recordId: z.string(), label: z.string().nullable().optional() },
+  async ({ documentId, recordId, label }) =>
+    run(async () => {
+      await allowDocument(documentId, "editor");
+      return store.linkDocumentRecord(documentId, recordId, label ?? null);
+    }),
+);
+
+server.tool(
+  "unlink_document_record",
+  "解除文档与记录的挂靠关系（不删除文档本身）。",
+  { documentId: z.string(), recordId: z.string() },
+  async ({ documentId, recordId }) =>
+    run(async () => {
+      await allowDocument(documentId, "editor");
+      return store.unlinkDocumentRecord(documentId, recordId);
+    }),
+);
+
+server.tool(
+  "list_record_documents",
+  "查看某条记录关联的文档（记录详情页「相关文档」的同款数据）。",
+  { recordId: z.string() },
+  async ({ recordId }) =>
+    run(async () => {
+      const located = await store.locateRecord(recordId);
+      await assertBaseRole(accounts, user, located.baseId, "viewer");
+      return store.listRecordDocuments(recordId);
+    }),
 );
 
 const transport = new StdioServerTransport();

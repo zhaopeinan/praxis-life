@@ -146,6 +146,8 @@ DUOWEI_TOKEN=dwa_… npx tsx src/mcp.ts
 | record | `recordId` | 来自 `get_table` / `query_records` |
 | field | 多数读写用 **字段名** | `create_record` / `update_record` 的 `fields` 键用字段名 |
 | 筛选 | `query_records` 的 `filters[].field` | 字段名或字段 id 均可（名唯一时） |
+| document | `documentId` | 来自 `list_documents` / `create_document` |
+| folder | `parentId` | 文件夹也是文档记录，`kind: "folder"`，可作 `parentId` |
 
 ### 4.2 单元格值
 
@@ -236,11 +238,21 @@ DUOWEI_TOKEN=dwa_… npx tsx src/mcp.ts
 2. `set_public_share_enabled` / `delete_public_share`  
 3. 单记录链接：`create_record_share`（完整 token 只返回一次）
 
+### 5.6 实验前思考 / 实验后复盘（文档 + 挂靠记录）
+
+1. `list_bases` → `get_table` 找到实验记录所属的表与 `recordId`
+2. `create_document`：`template: "experiment-plan"`，写入「要回答的问题 / 假设 / 变量设计 / 判据」
+3. `link_document_record`：把这篇文档挂到该记录，`label: "实验前思考"`
+4. 实验跑完后 `create_document`：`template: "experiment-review"` 建复盘，`link_document_record` 挂同一条记录，`label: "实验复盘"`
+5. 追加结论时：先 `get_document` 拿全文，拼接后 `update_document` 整篇写回（不是追加）
+6. 复查改了什么：`list_document_revisions`；写坏了 `restore_document_revision` 回滚
+7. 人类在界面里看到的：侧边栏「文档」下的文档树，以及记录详情页的「相关文档」面板
+
 ---
 
 ## 6. 工具目录（按域）
 
-共约 **92** 个工具。名称即 MCP tool name。
+共 **108** 个工具。名称即 MCP tool name。
 
 ### 6.1 身份与发现
 
@@ -266,6 +278,19 @@ DUOWEI_TOKEN=dwa_… npx tsx src/mcp.ts
 | `export_csv` / `import_csv` | CSV | 读/写对应 |
 | `get_detail_page` / `set_detail_page` | 详情页布局 | viewer / editor |
 | `get_base_settings` / `set_base_settings` | 时区/门户 | viewer / owner |
+
+**视图类型与参数对应**（`create_view` 的 `type`）：
+
+| type | 中文 | 必须带的参数 | 说明 |
+|------|------|--------------|------|
+| `grid` | 表格 | — | 默认视图，无需额外参数 |
+| `kanban` | 看板 | `groupField` | 按该单选字段分列；没单选字段时分不了组 |
+| `calendar` | 日历 | `dateField` | 按该日期字段铺到月历 |
+| `gantt` | 甘特 | `dateField` | 同上，需要起止跨度时用带区间的日期 |
+| `gallery` | 画册 | `titleField` | 卡片标题取该字段，适合带附件/封面的表 |
+| `form` | 表单 | — | 对外填单入口，配合 `create_public_share` 分享 |
+
+`create_table` 的 `withKanban: true` 会在建表时自动按第一个单选字段补一个看板视图，等价于建表后自己调一次 `create_view`。
 
 ### 6.3 评论 / 历史 / 关注 / 通知
 
@@ -322,6 +347,43 @@ DUOWEI_TOKEN=dwa_… npx tsx src/mcp.ts
 | `list_marketplace_plugins` / `set_marketplace_plugin` | 市场插件 |
 | `upload_file` / `get_upload_meta` / `delete_upload` | 附件（上传为 base64，≤8MB） |
 
+### 6.9 文档（Markdown 长文）
+
+DuoWei 的「文档」是挂在多维表格下的 **Markdown 长文**，和表数据平级但独立存储：适合写**实验前思考**、**实验后复盘**、**研究笔记**这类没有固定字段结构的长文本。正文支持表格、代码块、数学公式（KaTeX）与 Mermaid 图。
+
+文档也可以**挂靠到记录**上：一条实验记录可以同时挂「实验前思考」和「实验后复盘」两篇，靠 `label` 区分；记录详情页的「相关文档」面板显示的就是这组挂靠关系。
+
+| 工具 | 用途 | 最低角色 |
+|------|------|----------|
+| `list_document_templates` | 三个内置模板的标题与正文骨架 | — |
+| `list_documents` | 列出 base 下的文档与文件夹（不含正文，含 `parentId` / `kind` / `bodyLength` / `linkCount`） | viewer |
+| `get_document` | 读取正文 `bodyMd` 与已挂靠记录 `links` | viewer |
+| `create_document` | 新建文档或文件夹，可套模板 | editor |
+| `update_document` | 改标题或正文（改动自动归档历史版本） | editor |
+| `move_document` | 归到别的文件夹或根目录 | editor |
+| `delete_document` | 删除（文件夹会连同子文档一起删） | editor |
+| `list_document_revisions` | 历史版本（倒序，默认 50 版） | viewer |
+| `restore_document_revision` | 回滚到某一版 | editor |
+| `link_document_record` | 把文档挂到记录上（可带 `label`） | editor |
+| `unlink_document_record` | 解除挂靠 | editor |
+| `list_record_documents` | 某条记录关联的文档 | viewer |
+
+内置模板（`create_document` 的 `template`）：
+
+| template | 名称 | 内容骨架 |
+|----------|------|----------|
+| `experiment-plan` | 实验前思考 | 要回答的问题、假设、变量与设计、成功判据、风险与备选 |
+| `experiment-review` | 实验后复盘 | 结论、关键数据、意外与偏差、原因分析、下一步 |
+| `research-note` | 研究笔记 | 研究笔记的通用骨架 |
+
+**几个容易踩的点：**
+
+- 文档的权限沿用所在 **base 的角色**，没有独立的文档权限；未授权的 base 下的文档工具会直接报「没有权限」。
+- `update_document` 的 `bodyMd` 是**整篇替换**，不是追加。要在原有内容后补一段，得先 `get_document` 拿到全文，拼接后再整篇写回。
+- 每次内容变动都会把**改动前**的版本归档一份（每篇最多保留 50 版），所以改坏了可以用 `list_document_revisions` + `restore_document_revision` 找回。
+- 文件夹本身也是一条文档记录（`kind: "folder"`），只是正文不展示；只有文件夹能作为 `parentId`，文档不能嵌套文档。
+- 跨 base 移动会被拒绝。
+
 ---
 
 ## 7. Agent 行为准则
@@ -343,6 +405,7 @@ DUOWEI_TOKEN=dwa_… npx tsx src/mcp.ts
 - [ ] `list_bases` 能看到目标业务表  
 - [ ] `query_records` 能按字段名筛到数据  
 - [ ] `create_record` + `update_record` 可用字段名写入  
+- [ ] （可选）`list_documents` + `create_document` 能建文档，`link_document_record` 能挂到记录  
 - [ ] （可选）`create_automation` schedule 或审批流程跑通  
 
 ---
@@ -369,6 +432,7 @@ DUOWEI_TOKEN=dwa_… npx tsx src/mcp.ts
 开始时先 whoami → get_limits → list_bases（仅含已授权表格）。
 读写记录一律使用字段名；单选传选项名称；日期用 YYYY-MM-DD。
 改数据前先 get_table / query_records 确认结构。
+写长文（实验前思考、复盘、研究笔记）用 create_document 套模板（experiment-plan / experiment-review / research-note），再用 link_document_record 挂到对应记录；update_document 的正文是整篇替换，不是追加。
 若 list_bases 为空或没有权限，请提示用户去 DuoWei「Agent 管理」授权。
 删除类操作先说明影响再执行。
 ```
