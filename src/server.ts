@@ -448,6 +448,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
 
   app.post("/api/templates/:template", async (c) => {
     const user = await requireUser(c);
+    if (user.kind === "agent") throw new DomainError("Agent 不能创建多维表格，请在管理端授权已有表格", 403);
     const template = c.req.param("template");
     if (!TEMPLATES.some((item) => item.id === template)) throw new DomainError("找不到模板", 404);
     const base = await createTemplate(store, template as TemplateId);

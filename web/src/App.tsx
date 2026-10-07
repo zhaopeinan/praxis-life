@@ -10,7 +10,7 @@ import { CalendarView, FormView, GalleryView, GanttView } from "./ExtraViews";
 import { Cell, GridView } from "./GridView";
 import { KanbanView } from "./KanbanView";
 import { BottomBar, MobileAgenda, MobileKanban, RecordCardList } from "./mobile";
-import { PaneHandle, readFlag, usePaneWidth, writeFlag } from "./paneResize";
+import { PaneHandle, readFlag, readList, usePaneWidth, writeFlag, writeList } from "./paneResize";
 import { PublicShareScreen } from "./PublicShareScreen";
 import { StageEmpty } from "./StageEmpty";
 import { DEFAULT_STATUS_FIELD, DEFAULT_STATUS_OPTIONS, pickStatusField } from "./statusField";
@@ -81,6 +81,8 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const appRef = useRef<HTMLDivElement>(null);
   const [navCollapsed, setNavCollapsed] = useState(() => readFlag("duowei:ui:nav-collapsed"));
   const [docsSideCollapsed, setDocsSideCollapsed] = useState(() => readFlag("duowei:ui:docs-side-collapsed"));
+  // 侧边栏里哪些空间是展开的。默认全部收起，只列空间名，避免一屏塞满清单。
+  const [openBases, setOpenBases] = useState<string[]>(() => readList("duowei:ui:open-bases"));
   const navPane = usePaneWidth({
     storageKey: "duowei:ui:nav-width",
     defaultWidth: 248,
@@ -94,6 +96,11 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
 
   useEffect(() => writeFlag("duowei:ui:nav-collapsed", navCollapsed), [navCollapsed]);
   useEffect(() => writeFlag("duowei:ui:docs-side-collapsed", docsSideCollapsed), [docsSideCollapsed]);
+  useEffect(() => writeList("duowei:ui:open-bases", openBases), [openBases]);
+
+  function toggleBase(id: string) {
+    setOpenBases((list) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]));
+  }
 
   function closeDetail() {
     if (detailPushed.current) {
@@ -808,13 +815,27 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           知行人生
         </div>
         <div className="side-scroll">
-          {bases.map((item) => (
-            <div key={item.id} className={item.id === baseId ? "base open" : "base"}>
-              <div className="base-head">
+          {bases.map((item) => {
+            const isActive = item.id === baseId;
+            const isOpen = openBases.includes(item.id);
+            return (
+            <div key={item.id} className="base">
+              <div className={isActive ? "base-head active" : "base-head"}>
+                <button
+                  type="button"
+                  className="base-toggle"
+                  aria-expanded={isOpen}
+                  aria-label={`${isOpen ? "收起" : "展开"}空间 ${item.name}`}
+                  title={isOpen ? "收起空间" : "展开空间"}
+                  onClick={() => toggleBase(item.id)}
+                >
+                  <span aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
+                </button>
                 <button
                   type="button"
                   className="base-name"
                   onClick={() => {
+                    if (!isOpen) toggleBase(item.id);
                     setBaseId(item.id);
                     setTableId(item.tables[0]?.id ?? null);
                     setViewId(null);
@@ -849,7 +870,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                   </DropMenu>
                 )}
               </div>
-              {item.tables.map((table) => (
+              {isOpen && item.tables.map((table) => (
                 <div key={table.id} className={table.id === tableId ? "table-row on" : "table-row"}>
                   <button
                     type="button"
@@ -897,7 +918,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                   )}
                 </div>
               ))}
-              {item.id === baseId && (
+              {isOpen && item.id === baseId && (
                 <div className="side-docs">
                   <div className="side-docs-head">
                     <button
@@ -981,7 +1002,8 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
           {bases.length === 0 && <p className="side-empty">还没有空间。可以从模板开始，或新建一个空白空间。</p>}
         </div>
         <div className="side-actions">

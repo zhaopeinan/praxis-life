@@ -2856,7 +2856,27 @@ body.col-resizing * { cursor: col-resize !important; }
 
 /* ——— Base row actions (sidebar) ——— */
 .base-head { display: flex; align-items: center; gap: 2px; }
-.base-head .base-name { flex: 1; min-width: 0; width: auto; }
+.base-head .base-name { flex: 1; min-width: 0; width: auto; padding-left: 6px; }
+.base-toggle {
+  flex: none;
+  width: 20px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: var(--r-xs);
+  color: var(--ink-4);
+  font-size: 10px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.base-toggle:hover { background: var(--surface-hover); color: var(--ink-2); }
+.base-head.active .base-toggle { color: var(--ink-3); }
+.base-head.active .base-name { color: var(--accent-ink); }
 .base-menu { flex: none; }
 .base-menu > .drop-menu-trigger {
   border: 0;

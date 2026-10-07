@@ -154,3 +154,23 @@ export function writeFlag(key: string, value: boolean): void {
     // 忽略。
   }
 }
+
+/** 读写一组字符串（例如侧边栏里展开着的空间 id）。 */
+export function readList(key: string): string[] {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeList(key: string, value: string[]): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // 忽略。
+  }
+}
