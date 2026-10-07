@@ -104,7 +104,6 @@ export function GridView({
   onOpenRecord,
   onDuplicate,
   onFilterBy,
-  onShareRecord,
 }: {
   fields: Field[];
   allFields?: Field[];
@@ -128,7 +127,6 @@ export function GridView({
   onOpenRecord?: (recordId: string) => void;
   onDuplicate?: (record: PublicRecord) => void;
   onFilterBy?: (record: PublicRecord, field: Field) => void;
-  onShareRecord?: (record: PublicRecord) => void;
 }) {
   const catalog = allFields ?? fields;
   const fieldKey = fields.map((field) => field.id).join(",");
@@ -187,7 +185,6 @@ export function GridView({
     const raw = record.fields[field.name];
     const filterValue = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
     if (onFilterBy && filterValue) items.push({ label: `按「${field.name}」筛选此值`, onClick: () => onFilterBy(record, field) });
-    if (onShareRecord) items.push({ label: "复制只读分享链接", onClick: () => onShareRecord(record) });
     if (!readOnly) {
       items.push("sep");
       items.push({ label: "删除记录", danger: true, onClick: () => onDelete(record.id) });

@@ -13,6 +13,7 @@ const scheduleMs = Number(process.env.DUOWEI_SCHEDULE_MS ?? 60_000);
 if (scheduleMs > 0) {
   setInterval(() => {
     store.runDueSchedules().catch((error) => console.error("schedule tick failed", error));
+    store.processWorkflowTimeouts().catch((error) => console.error("workflow timeout tick failed", error));
     backup.tick().catch((error) => console.error("backup tick failed", error));
   }, scheduleMs).unref?.();
 }

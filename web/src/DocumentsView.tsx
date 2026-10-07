@@ -14,9 +14,31 @@ import type {
 import { DOC_TEMPLATES } from "../../src/types.js";
 import { api } from "./api";
 import { MarkdownView } from "./markdown";
-import { DropMenu, FancySelect } from "./ui";
+import { PaneHandle, usePaneWidth } from "./paneResize";
+import { DropMenu, FancySelect, useMediaQuery } from "./ui";
 
 type EditorMode = "split" | "edit" | "preview";
+
+const MODE_KEY = "duowei:ui:doc-mode";
+
+/** 默认只看预览：正文主要由 Agent 写入，人类以阅读为主。 */
+function initialMode(): EditorMode {
+  try {
+    const raw = window.localStorage.getItem(MODE_KEY);
+    if (raw === "edit" || raw === "split" || raw === "preview") return raw;
+  } catch {
+    // 读不到就用默认值。
+  }
+  return "preview";
+}
+
+function rememberMode(mode: EditorMode): void {
+  try {
+    window.localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // 忽略。
+  }
+}
 
 const LINK_LABEL_PRESETS = ["实验前思考", "实验复盘", "相关记录"];
 
@@ -285,6 +307,8 @@ export function DocumentsView({
   selectedId,
   onSelect,
   onReload,
+  sideCollapsed,
+  onToggleSide,
   onError,
   onNotice,
   onOpenRecord,
@@ -296,6 +320,8 @@ export function DocumentsView({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onReload: () => void | Promise<void>;
+  sideCollapsed: boolean;
+  onToggleSide: () => void;
   onError: (err: unknown) => void;
   onNotice: (text: string) => void;
   onOpenRecord?: (recordId: string, tableId: string) => void;
@@ -304,7 +330,27 @@ export function DocumentsView({
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [mode, setMode] = useState<EditorMode>("split");
+  const [mode, setMode] = useState<EditorMode>(initialMode);
+  const isMobile = useMediaQuery("(max-width: 860px)");
+  const sideRef = useRef<HTMLElement>(null);
+  const sidePane = usePaneWidth({
+    storageKey: "duowei:ui:docs-side-width",
+    defaultWidth: 236,
+    min: 180,
+    max: 480,
+    cssVar: "--pane-w",
+    varTargetRef: sideRef,
+  });
+
+  function changeMode(next: EditorMode) {
+    setMode(next);
+    rememberMode(next);
+  }
+
+  // 只读用户没有可用的编辑动作，强制回到预览（不写回偏好，避免覆盖本人设置）。
+  useEffect(() => {
+    if (!canEdit && mode !== "preview") setMode("preview");
+  }, [canEdit, mode]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -644,11 +690,20 @@ export function DocumentsView({
 
   return (
     <div className="docs-layout">
-      <aside className="docs-side">
-        <div className="docs-side-head">
-          <strong>文档</strong>
+      {sideCollapsed && (
+        <div className="docs-side-rail">
+          <button
+            type="button"
+            className="rail-btn"
+            aria-label="展开文档列表"
+            aria-expanded={false}
+            title="展开文档列表"
+            onClick={onToggleSide}
+          >
+            »
+          </button>
           {canEdit && (
-            <DropMenu label="＋" ariaLabel="新建文档" className="doc-new">
+            <DropMenu label="＋" ariaLabel="新建文档" className="rail-btn doc-new">
               <button type="button" onClick={() => void createDoc({})}>
                 空白文档
               </button>
@@ -664,6 +719,45 @@ export function DocumentsView({
             </DropMenu>
           )}
         </div>
+      )}
+      {/*
+        收起时保留 DOM（仅用 CSS 隐藏）：宽度记在元素自身的 CSS 变量上，
+        重新展开时才不会回落到默认值。
+      */}
+      <aside className={sideCollapsed ? "docs-side collapsed" : "docs-side"} ref={sideRef}>
+        <div className="docs-side-head">
+          <strong>文档</strong>
+          <div className="docs-side-tools">
+            {canEdit && (
+              <DropMenu label="＋" ariaLabel="新建文档" className="doc-new">
+                <button type="button" onClick={() => void createDoc({})}>
+                  空白文档
+                </button>
+                {DOC_TEMPLATES.map((template) => (
+                  <button key={template.id} type="button" onClick={() => void createDoc({ template: template.id })}>
+                    {template.name}
+                  </button>
+                ))}
+                <hr className="menu-sep" />
+                <button type="button" onClick={() => void createDoc({ kind: "folder" })}>
+                  新建文件夹
+                </button>
+              </DropMenu>
+            )}
+            {!isMobile && (
+              <button
+                type="button"
+                className="side-collapse"
+                aria-label="收起文档列表"
+                aria-expanded
+                title="收起文档列表"
+                onClick={onToggleSide}
+              >
+                «
+              </button>
+            )}
+          </div>
+        </div>
         <div className="docs-side-scroll">
           <DocumentTree
             baseId={baseId}
@@ -676,6 +770,14 @@ export function DocumentsView({
             onNotice={onNotice}
           />
         </div>
+        {!isMobile && (
+          <PaneHandle
+            label="文档列表宽度"
+            onPointerDown={sidePane.startResize}
+            onReset={sidePane.resetWidth}
+            onNudge={sidePane.nudge}
+          />
+        )}
       </aside>
 
       <section className="docs-main">
@@ -695,23 +797,26 @@ export function DocumentsView({
               <span className={dirty ? "docs-status dirty" : "docs-status"}>{statusText}</span>
               {!isFolder && (
                 <div className="docs-mode" role="tablist" aria-label="编辑模式">
-                  {(["edit", "split", "preview"] as EditorMode[]).map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      role="tab"
-                      aria-selected={mode === item}
-                      className={mode === item ? "on" : ""}
-                      onClick={() => setMode(item)}
-                    >
-                      {item === "edit" ? "编辑" : item === "split" ? "分栏" : "预览"}
-                    </button>
-                  ))}
+                  {(canEdit ? (["edit", "split", "preview"] as EditorMode[]) : (["preview"] as EditorMode[])).map(
+                    (item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        role="tab"
+                        aria-selected={mode === item}
+                        className={mode === item ? "on" : ""}
+                        onClick={() => changeMode(item)}
+                      >
+                        {item === "edit" ? "编辑" : item === "split" ? "分栏" : "预览"}
+                      </button>
+                    ),
+                  )}
                 </div>
               )}
               {canEdit && (
                 <div className="docs-actions">
-                  {!isFolder && (
+                  {/* 预览态下没有编辑动作，隐藏以免误导。 */}
+                  {!isFolder && mode !== "preview" && (
                     <>
                       <button type="button" className="secondary" onClick={() => void pickImage()}>
                         插入图片

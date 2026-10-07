@@ -185,8 +185,6 @@ export type ViewConfig = {
   dependencyFieldId: string | null;
   /** conditional fill colors */
   colorRules?: ColorRule[];
-  /** optional field display order for this view */
-  fieldOrder?: string[];
 };
 
 export type ViewType = "grid" | "kanban" | "calendar" | "gallery" | "form" | "gantt";
@@ -685,7 +683,6 @@ export function emptyViewConfig(): ViewConfig {
     progressFieldId: null,
     dependencyFieldId: null,
     colorRules: [],
-    fieldOrder: [],
   };
 }
 

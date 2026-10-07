@@ -28,11 +28,35 @@ MCP 协议与工具完全相同；换环境只需改 **管理端地址**、**仓
 
 | | 本地开发 | 服务器部署 |
 |--|----------|------------|
-| 管理端 / Web | http://127.0.0.1:5174/（`npm run dev`） | 部署后的站点根 URL（如 `http://主机/`） |
-| REST / 注册 | 同源 `/api/…`，或 http://127.0.0.1:8787/api/… | 同源 `/api/…` |
+| 管理端 / Web | http://127.0.0.1:5174/（`npm run dev`） | **http://47.122.123.1/** |
+| REST / 注册 | 同源 `/api/…`，或 http://127.0.0.1:8787/api/… | **http://47.122.123.1/api/…** |
 | 仓库 `cwd` | 本机克隆路径，例如 `/Users/你/…/DuoWei` | 服务器上的代码目录，例如 `/opt/duowei` |
 | Agent 令牌 | 在**本地**「Agent 管理」创建或批准后获得 | 在**该服务器**管理端单独创建；与本地库无关 |
 | 启动 MCP | 见下方本地示例 | 把 `cwd` 换成服务器路径即可 |
+
+**服务器部署一律用 IP 直连地址，不要用域名。** 该主机在国内（阿里云），用域名会被按未备案域名拦截
+（HTTP 403，或 HTTPS 在 TLS 握手阶段被重置），所以 `task.zhaopeinan.com` 一类的域名对 Agent 不可用；
+而用 IP 作 Host 不会被拦。REST 根地址就是上面表格里的 `http://47.122.123.1`。
+
+**服务器 MCP 配置示例（`cwd` 换成服务器上的仓库路径）：**
+
+```json
+{
+  "mcpServers": {
+    "duowei": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp.ts"],
+      "cwd": "/opt/duowei",
+      "env": { "DUOWEI_TOKEN": "dwa_服务器上的令牌" }
+    }
+  }
+}
+```
+
+```bash
+cd /opt/duowei
+DUOWEI_TOKEN=dwa_… npx tsx src/mcp.ts
+```
 
 **本地 MCP 配置示例（Cursor / Claude Desktop 等）：**
 
@@ -195,7 +219,7 @@ DUOWEI_TOKEN=dwa_… npx tsx src/mcp.ts
 1. `create_base_from_template`，`template: "todos"`（个人待办）或 `"research"`（科研管理：论文 / 任务 / 投稿记录）；也可在界面「从模板新建」  
 2. `set_base_settings` 写 `integrations.feishuWebhookUrl`（飞书群自定义机器人）  
 3. `send_feishu` 测通；`send_feishu_digest` 推近到期待办  
-4. `create_calendar_feed` 拿到 `token`，订阅：`{站点}/api/calendar/{token}.ics`（苹果日历 / Google / 飞书日历均可）  
+4. `create_calendar_feed` 拿到 `token`，订阅：`{站点}/api/calendar/{token}.ics`（苹果日历 / Google / 飞书日历均可；服务器部署时 `{站点}` 用 `http://47.122.123.1`）  
 5. 日常：`create_record` / `update_record` 改「状态」「截止日期」；模板已带「新建通知飞书」和「每天 09:00 摘要」
 
 飞书 Webhook 须是 `https://open.feishu.cn/open-apis/bot/v2/hook/…`（或 larksuite.com）。文本可用 `{标题}`、`{截止日期}` 等字段名。

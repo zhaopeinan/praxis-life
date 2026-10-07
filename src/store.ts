@@ -1206,7 +1206,6 @@ export class Store {
           ? patch.config.dependencyFieldId ?? null
           : view.config.dependencyFieldId,
       colorRules: patch.config?.colorRules ?? view.config.colorRules,
-      fieldOrder: patch.config?.fieldOrder ?? view.config.fieldOrder,
     });
     if (merged.filters.length > LIMITS.filtersPerView) {
       throw new DomainError(`每个视图最多 ${LIMITS.filtersPerView} 个筛选条件`);
@@ -5166,7 +5165,6 @@ function normalizeViewConfig(config: Partial<ViewConfig>): ViewConfig {
     progressFieldId: config.progressFieldId ?? null,
     dependencyFieldId: config.dependencyFieldId ?? null,
     colorRules: Array.isArray(config.colorRules) ? config.colorRules : base.colorRules,
-    fieldOrder: Array.isArray(config.fieldOrder) ? config.fieldOrder : base.fieldOrder,
   };
 }
 

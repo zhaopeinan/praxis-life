@@ -83,7 +83,6 @@ const ViewConfigSchema = z.object({
       }),
     )
     .optional(),
-  fieldOrder: z.array(z.string()).optional(),
 });
 
 const DashboardConfigSchema = z.object({

@@ -10,6 +10,7 @@ import { CalendarView, FormView, GalleryView, GanttView } from "./ExtraViews";
 import { Cell, GridView } from "./GridView";
 import { KanbanView } from "./KanbanView";
 import { BottomBar, MobileAgenda, MobileKanban, RecordCardList } from "./mobile";
+import { PaneHandle, readFlag, usePaneWidth, writeFlag } from "./paneResize";
 import { PublicShareScreen } from "./PublicShareScreen";
 import { StageEmpty } from "./StageEmpty";
 import { DEFAULT_STATUS_FIELD, DEFAULT_STATUS_OPTIONS, pickStatusField } from "./statusField";
@@ -74,9 +75,25 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const [navOpen, setNavOpen] = useState(false);
   const [mobileSearch, setMobileSearch] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const isMobile = useMediaQuery("(max-width: 860px)");
+  // 文档页的栏目布局偏好：宽度走 CSS 变量（拖拽时不触发重渲染），收起态走 state。
+  const appRef = useRef<HTMLDivElement>(null);
+  const [navCollapsed, setNavCollapsed] = useState(() => readFlag("duowei:ui:nav-collapsed"));
+  const [docsSideCollapsed, setDocsSideCollapsed] = useState(() => readFlag("duowei:ui:docs-side-collapsed"));
+  const navPane = usePaneWidth({
+    storageKey: "duowei:ui:nav-width",
+    defaultWidth: 248,
+    min: 200,
+    max: 420,
+    cssVar: "--nav-w",
+    varTargetRef: appRef,
+  });
   const detailPushed = useRef(false);
   const dialogPushed = useRef(false);
+
+  useEffect(() => writeFlag("duowei:ui:nav-collapsed", navCollapsed), [navCollapsed]);
+  useEffect(() => writeFlag("duowei:ui:docs-side-collapsed", docsSideCollapsed), [docsSideCollapsed]);
 
   function closeDetail() {
     if (detailPushed.current) {
@@ -128,6 +145,12 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  useEffect(() => {
+    loadNotifications();
+    const timer = window.setInterval(() => void loadNotifications(), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const base = bases.find((item) => item.id === baseId) ?? null;
   const view = payload?.views.find((item) => item.id === viewId) ?? payload?.views[0] ?? null;
   const docsMode = Boolean(docsOpen && base);
@@ -138,6 +161,37 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       : members.find((item) => item.userId === user.id)?.role ?? null;
   const canEdit = myRole === "owner" || myRole === "editor";
   const canOwn = myRole === "owner";
+  const unreadCount = notifications.filter((item) => !item.read).length;
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      // 正在输入时不要抢按键：Markdown 正文里 [ ] 太常见了。
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
+      const mod = event.metaKey || event.ctrlKey;
+
+      if (mod && event.key === "\\") {
+        event.preventDefault();
+        // 有任意一栏打开时全部收起，否则全部恢复。
+        const anyOpen = !navCollapsed || (docsMode && !docsSideCollapsed);
+        setNavCollapsed(anyOpen);
+        if (docsMode) setDocsSideCollapsed(anyOpen);
+        return;
+      }
+      if (!mod && event.key === "[") {
+        event.preventDefault();
+        setNavCollapsed((value) => !value);
+        return;
+      }
+      if (!mod && event.key === "]" && docsMode) {
+        event.preventDefault();
+        setDocsSideCollapsed((value) => !value);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [docsMode, navCollapsed, docsSideCollapsed]);
 
   async function refreshBases(prefer?: { baseId?: string | null; tableId?: string | null }) {
     const list = await api.bases();
@@ -170,6 +224,14 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     } catch (err) {
       setDocuments([]);
       setError(message(err));
+    }
+  }
+
+  async function loadNotifications() {
+    try {
+      setNotifications(await api.notifications());
+    } catch {
+      /* 通知是辅助信息，拉取失败时保持现状 */
     }
   }
 
@@ -612,27 +674,26 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       >
         导出
       </button>
-      <button type="button" onClick={() => setDialog("import")}>
-        导入
-      </button>
       <button type="button" onClick={() => setDialog("automations")}>
         自动化
       </button>
-      <button type="button" onClick={() => setDialog("workflows")}>
-        工作流
-      </button>
-      <button type="button" onClick={() => setDialog("sync")}>
-        同步
-      </button>
-      <button type="button" onClick={() => setDialog("plugins")}>
-        插件
-      </button>
+      <DropMenu label="更多" ariaLabel="更多编辑操作">
+        <button type="button" onClick={() => setDialog("import")}>
+          导入
+        </button>
+        <button type="button" onClick={() => setDialog("workflows")}>
+          工作流
+        </button>
+        <button type="button" onClick={() => setDialog("sync")}>
+          同步
+        </button>
+      </DropMenu>
     </div>
   ) : null;
   const mainCluster = (
     <div className="toolbar-cluster">
       <button type="button" onClick={() => setDialog("assistant")}>
-        AI 助手
+        数据助手
       </button>
       {base && (
         <button type="button" onClick={() => setShowDashboard(true)}>
@@ -640,19 +701,21 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         </button>
       )}
       {canOwn && <button type="button" onClick={() => setDialog("share")}>分享</button>}
-      {canEdit && payload && (
-        <button type="button" onClick={() => setDialog("public-share")}>
-          公开分享
-        </button>
-      )}
-      {canOwn && <button type="button" onClick={() => setDialog("acl")}>权限</button>}
-      {canOwn && <button type="button" onClick={() => setDialog("portal")}>门户</button>}
-      {canEdit && <button type="button" onClick={() => setDialog("calendar-feishu")}>日历 / 飞书</button>}
-      {base && (
-        <button type="button" onClick={() => setAppMode((value) => !value)}>
-          {appMode ? "退出应用" : "应用模式"}
-        </button>
-      )}
+      <DropMenu label="更多" ariaLabel="更多操作">
+        {canEdit && payload && (
+          <button type="button" onClick={() => setDialog("public-share")}>
+            公开分享
+          </button>
+        )}
+        {canOwn && <button type="button" onClick={() => setDialog("acl")}>权限</button>}
+        {canOwn && <button type="button" onClick={() => setDialog("portal")}>门户</button>}
+        {canEdit && <button type="button" onClick={() => setDialog("calendar-feishu")}>日历 / 飞书</button>}
+        {base && (
+          <button type="button" onClick={() => setAppMode((value) => !value)}>
+            {appMode ? "退出应用模式" : "应用模式"}
+          </button>
+        )}
+      </DropMenu>
     </div>
   );
 
@@ -729,9 +792,17 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   ) : null;
 
   return (
-    <div className="app">
+    <div className={navCollapsed ? "app nav-collapsed" : "app"} ref={appRef}>
       {isMobile && navOpen && <div className="nav-backdrop" onClick={() => setNavOpen(false)} />}
       <aside className={isMobile && navOpen ? "sidebar open" : "sidebar"}>
+        {!isMobile && (
+          <PaneHandle
+            label="导航栏宽度"
+            onPointerDown={navPane.startResize}
+            onReset={navPane.resetWidth}
+            onNudge={navPane.nudge}
+          />
+        )}
         <div className="brand">
           <span className="logo" aria-hidden="true" />
           知行人生
@@ -895,16 +966,18 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                       </DropMenu>
                     )}
                   </div>
-                  <DocumentTree
-                    baseId={item.id}
-                    documents={documents}
-                    selectedId={docId}
-                    onSelect={(id) => openDocument(id)}
-                    canEdit={canEdit}
-                    onChanged={() => reloadDocuments(item.id)}
-                    onError={fail}
-                    onNotice={setNotice}
-                  />
+                  {!docsMode && (
+                    <DocumentTree
+                      baseId={item.id}
+                      documents={documents}
+                      selectedId={docId}
+                      onSelect={(id) => openDocument(id)}
+                      canEdit={canEdit}
+                      onChanged={() => reloadDocuments(item.id)}
+                      onError={fail}
+                      onNotice={setNotice}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -922,6 +995,18 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           {isMobile && (
             <button type="button" className="nav-toggle" aria-label="打开导航" onClick={() => setNavOpen(true)}>
               ☰
+            </button>
+          )}
+          {!isMobile && (
+            <button
+              type="button"
+              className="ghost pane-toggle"
+              aria-label={navCollapsed ? "展开导航栏" : "收起导航栏"}
+              aria-expanded={!navCollapsed}
+              title={`${navCollapsed ? "展开" : "收起"}导航栏（Ctrl/⌘ + [）`}
+              onClick={() => setNavCollapsed((value) => !value)}
+            >
+              {navCollapsed ? "»" : "«"}
             </button>
           )}
           <div className="top-title">
@@ -957,6 +1042,9 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           </div>
           {!isMobile && (
             <div className="top-user">
+              <button type="button" className="secondary" onClick={() => setDialog("notifications")}>
+                通知{unreadCount > 0 ? ` ${unreadCount}` : ""}
+              </button>
               <button type="button" className="secondary" onClick={() => setDialog("tokens")}>访问令牌</button>
               <button type="button" className="secondary" onClick={() => setDialog("agent-brief")}>给 Agent</button>
               <button type="button" className="secondary" onClick={() => setDialog("help")}>使用说明</button>
@@ -977,6 +1065,9 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             <div className="top-user">
               <DropMenu ariaLabel="用户与设置">
                 <div className="menu-user">{user.name}</div>
+                <button type="button" onClick={() => setDialog("notifications")}>
+                  通知{unreadCount > 0 ? ` ${unreadCount}` : ""}
+                </button>
                 <button type="button" onClick={() => setDialog("tokens")}>访问令牌</button>
                 <button type="button" onClick={() => setDialog("agent-brief")}>给 Agent</button>
                 <button type="button" onClick={() => setDialog("help")}>使用说明</button>
@@ -994,6 +1085,18 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             </div>
           )}
         </header>
+        {docsMode && navCollapsed && docsSideCollapsed && (
+          <button
+            type="button"
+            className="pane-restore"
+            onClick={() => {
+              setNavCollapsed(false);
+              setDocsSideCollapsed(false);
+            }}
+          >
+            » 展开侧栏
+          </button>
+        )}
         {error && (
           <div className="banner">
             {error}
@@ -1031,7 +1134,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 {mobileSearch || search ? searchInput : null}
                 {filterButton}
                 <button type="button" onClick={() => setDialog("assistant")}>
-                  AI 助手
+                  数据助手
                 </button>
                 <DropMenu ariaLabel="更多操作" panelClassName="toolbar-more">
                   {viewMiscControls}
@@ -1056,6 +1159,8 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               selectedId={docId}
               onSelect={openDocument}
               onReload={() => reloadDocuments(base.id)}
+              sideCollapsed={docsSideCollapsed}
+              onToggleSide={() => setDocsSideCollapsed((value) => !value)}
               onError={fail}
               onNotice={setNotice}
               onOpenRecord={openRecordFromDocument}
@@ -1137,19 +1242,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 if (!value) return;
                 const config = { ...view.config, filters: [...view.config.filters, { fieldId: field.id, op: "eq" as const, value }] };
                 api.updateView(view.id, { config }).then(patchView).catch(fail);
-              }}
-              onShareRecord={(record) => {
-                api
-                  .shareRecord(record.id, 30)
-                  .then(async (created) => {
-                    try {
-                      await navigator.clipboard.writeText(created.token);
-                      setNotice(`只读分享令牌已复制到剪贴板：${created.token}`);
-                    } catch {
-                      setNotice(`只读分享令牌：${created.token}`);
-                    }
-                  })
-                  .catch(fail);
               }}
             />
             ))}
@@ -1548,9 +1640,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       {dialog === "sync" && base && (
         <SyncDialog tables={base.tables} onClose={closeDialog} />
       )}
-      {dialog === "plugins" && (
-        <PluginMarketDialog onClose={closeDialog} />
-      )}
       {dialog === "assistant" && payload && (
         <AssistantPanel tableId={payload.id} tableName={payload.name} onClose={closeDialog} />
       )}
@@ -1650,6 +1739,19 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           tableId={payload.id}
           views={payload.views}
           currentViewId={view.id}
+          onClose={closeDialog}
+        />
+      )}
+      {dialog === "notifications" && (
+        <NotificationsDialog
+          items={notifications}
+          onRead={async (id) => {
+            try {
+              await api.readNotification(id);
+            } finally {
+              await loadNotifications();
+            }
+          }}
           onClose={closeDialog}
         />
       )}
@@ -2550,6 +2652,59 @@ function ShareDialog({
         </button>
         <button type="button" onClick={onClose}>完成</button>
       </div>
+    </Modal>
+  );
+}
+
+type NotificationItem = { id: string; message: string; read: boolean; createdAt: number };
+
+function NotificationsDialog({
+  items,
+  onRead,
+  onClose,
+}: {
+  items: NotificationItem[];
+  onRead: (id: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const unread = items.filter((item) => !item.read).length;
+  return (
+    <Modal title="通知" onClose={onClose}>
+      {items.length === 0 && (
+        <p className="fine">还没有通知。关注某条记录或审批超时催办后，提醒会出现在这里。</p>
+      )}
+      <ul className="member-list">
+        {items.map((item) => (
+          <li key={item.id}>
+            <div>
+              <strong>{item.message}</strong>
+              <span>
+                {item.read ? "已读 · " : ""}
+                {formatWhen(item.createdAt)}
+              </span>
+            </div>
+            {!item.read && (
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy === item.id}
+                onClick={() => {
+                  setBusy(item.id);
+                  onRead(item.id)
+                    .catch((err) => setError(message(err)))
+                    .finally(() => setBusy(null));
+                }}
+              >
+                标为已读
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {unread > 0 && <p className="fine">共 {unread} 条未读</p>}
+      {error && <p className="form-error">{error}</p>}
     </Modal>
   );
 }
@@ -3692,7 +3847,6 @@ function RecordDetailDialog({
   const [comments, setComments] = useState<Array<{ id: string; userName: string; body: string; createdAt: number }>>([]);
   const [history, setHistory] = useState<Array<{ id: string; action: string; userName: string | null; createdAt: number }>>([]);
   const [watching, setWatching] = useState(false);
-  const [shareToken, setShareToken] = useState<string | null>(null);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [docs, setDocs] = useState<RecordDocumentLink[]>([]);
@@ -3800,27 +3954,7 @@ function RecordDetailDialog({
         >
           {watching ? "取消关注" : "关注记录"}
         </button>
-        {canEdit && (
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const created = await api.shareRecord(recordId, 30);
-                setShareToken(created.token);
-              } catch (err) {
-                setError(message(err));
-              }
-            }}
-          >
-            生成分享链接
-          </button>
-        )}
       </div>
-      {shareToken && (
-        <p className="dev-code">
-          只读分享令牌：<code>{shareToken}</code>
-        </p>
-      )}
       <h3 className="section-title">相关文档</h3>
       <ul className="member-list">
         {docs.map((doc) => (
@@ -5282,70 +5416,6 @@ function SyncDialog({
   );
 }
 
-function PluginMarketDialog({ onClose }: { onClose: () => void }) {
-  const [plugins, setPlugins] = useState<
-    Array<{ id: string; name: string; description: string; kind: string; enabled: boolean }>
-  >([]);
-  const [events, setEvents] = useState<Array<{ event: string; tableId: string; recordId?: string; at: number }>>([]);
-  const [webhookUrl, setWebhookUrl] = useState("https://example.com/duowei-hook");
-  const [error, setError] = useState<string | null>(null);
-  async function reload() {
-    const data = await api.marketplace();
-    setPlugins(data.plugins);
-    setEvents(data.recentEvents);
-  }
-  useEffect(() => {
-    reload().catch((err) => setError(message(err)));
-  }, []);
-  return (
-    <Modal title="插件市场" onClose={onClose}>
-      <p className="fine">内置插件可启用/禁用。Webhook 出站与同步事件日志。</p>
-      <label>
-        Webhook URL（启用出站时使用）
-        <input value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} />
-      </label>
-      <ul className="member-list">
-        {plugins.map((plugin) => (
-          <li key={plugin.id}>
-            <div>
-              <strong>{plugin.name}</strong>
-              <span>{plugin.description}</span>
-            </div>
-            <button
-              type="button"
-              className={plugin.enabled ? undefined : "primary"}
-              onClick={() =>
-                api
-                  .setMarketplacePlugin(plugin.id, !plugin.enabled, plugin.kind === "webhook" ? webhookUrl : undefined)
-                  .then(reload)
-                  .catch((err) => setError(message(err)))
-              }
-            >
-              {plugin.enabled ? "禁用" : "启用"}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <h4>最近事件日志</h4>
-      {events.length === 0 && <p className="fine">暂无事件（启用「同步与事件日志」后可见）</p>}
-      <ul className="member-list">
-        {events.slice().reverse().map((ev, idx) => (
-          <li key={`${ev.at}-${idx}`}>
-            <div>
-              <strong>{ev.event}</strong>
-              <span>
-                {ev.tableId.slice(0, 8)}… {ev.recordId ? `/ ${ev.recordId.slice(0, 8)}…` : ""} ·{" "}
-                {new Date(ev.at).toLocaleString()}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {error && <p className="form-error">{error}</p>}
-    </Modal>
-  );
-}
-
 function CalendarFeishuDialog({
   baseId,
   tableId,
@@ -5480,6 +5550,21 @@ function CalendarFeishuDialog({
   );
 }
 
+/**
+ * 部署环境一律走 IP 直连：云厂商（阿里云）会按 Host / TLS SNI 里的未备案域名拦截，
+ * 用 IP 作 Host 不会被拦。Agent 说明里只写 IP 入口，避免 Agent 拿到域名后请求被 403 / RST。
+ */
+const AGENT_IP_ORIGIN = "http://47.122.123.1";
+
+/** 本地开发或已用 IP 直连时沿用当前地址；否则（域名）改写成 IP 入口。 */
+function resolveAgentOrigin(): string {
+  if (typeof window === "undefined") return AGENT_IP_ORIGIN;
+  const current = window.location.origin;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(current)) return current;
+  if (/^https?:\/\/\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(current)) return current;
+  return AGENT_IP_ORIGIN;
+}
+
 function buildAgentBrief(origin: string, token: string) {
   const cleanOrigin = origin.replace(/\/$/, "");
   const cleanToken = token.trim() || "dwa_把令牌粘贴到这里";
@@ -5491,6 +5576,7 @@ function buildAgentBrief(origin: string, token: string) {
 ## 接入信息
 
 - **API 根地址**：\`${cleanOrigin}\`
+- **务必用这个 IP 直连地址**：服务部署在国内云主机，用域名会被云厂商按未备案域名拦截（HTTP 403 / TLS 握手被重置）。不要把它替换成任何域名。
 - **鉴权头**：\`Authorization: Bearer ${cleanToken}\`
 - 令牌类型：
   - \`dwa_…\`：MCP Agent 令牌（管理员在网页「Agent 管理」创建/批准后获得，可随时在列表中查看与复制）
@@ -5573,7 +5659,7 @@ function buildAgentBrief(origin: string, token: string) {
 }
 
 function AgentBriefDialog({ isAdmin, onClose }: { isAdmin: boolean; onClose: () => void }) {
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://task.zhaopeinan.com";
+  const origin = resolveAgentOrigin();
   const [token, setToken] = useState("dwa_把令牌粘贴到这里");
   const [copied, setCopied] = useState(false);
   const brief = useMemo(() => buildAgentBrief(origin, token), [origin, token]);
@@ -5644,7 +5730,7 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
         <li>用表格 / 看板 / 日历整理节奏；筛选、分组、填色在工具栏。</li>
         <li>需要时配置自动化、工作流与仪表盘，或开启分享与权限。</li>
         <li>字段菜单可「更改类型」；按钮动作关联当前记录。</li>
-        <li>「AI 助手」可本地问数；把对接说明交给外部 Agent：点顶栏「给 Agent」一键复制。</li>
+        <li>「数据助手」可本地问数；把对接说明交给外部 Agent：点顶栏「给 Agent」一键复制。</li>
       </ol>
       <h3 className="section-title">按钮类型</h3>
       <p className="fine">
@@ -5774,7 +5860,7 @@ function AssistantPanel({
   }
 
   return (
-    <Modal title={`智能问答 · ${tableName}`} onClose={onClose} size="wide">
+    <Modal title={`数据问答 · ${tableName}`} onClose={onClose} size="wide">
       <p className="fine">
         本地规则问数（非大模型 Agent）：条数、字段、按字段统计、数值求和、上限与按钮说明、MCP 工具。令牌用于启动 MCP：
         <code>DUOWEI_TOKEN=… npx tsx src/mcp.ts</code>
@@ -5948,9 +6034,7 @@ function PortalDialog({
     | { id: string; type: "list"; tableId: string; title: string; limit: number; titleFieldId: string }
     | { id: string; type: "tags"; tableId: string; title: string; fieldId: string }
     | { id: string; type: "image"; tableId: string; title: string; attachmentFieldId: string; limit: number };
-  const [timezone, setTimezone] = useState("Asia/Shanghai");
-  const [title, setTitle] = useState("");
-  const [theme, setTheme] = useState<"light" | "blue" | "green">("light");
+  const portalMetaRef = useRef<{ title?: string; theme?: string }>({});
   const [nav, setNav] = useState<string[]>(tables.map((item) => item.id));
   const [widgets, setWidgets] = useState<WidgetDraft[]>([]);
   const [fieldsByTable, setFieldsByTable] = useState<Record<string, Field[]>>({});
@@ -5967,9 +6051,7 @@ function PortalDialog({
     api
       .getSettings(baseId)
       .then(async (settings) => {
-        setTimezone(settings.timezone);
-        setTitle(settings.portal.title ?? "");
-        setTheme((settings.portal.theme as "light" | "blue" | "green") ?? "light");
+        portalMetaRef.current = { title: settings.portal.title, theme: settings.portal.theme };
         setNav(settings.portal.navTableIds ?? tables.map((item) => item.id));
         const loaded = (settings.portal.widgets ?? []) as WidgetDraft[];
         setWidgets(
@@ -6009,16 +6091,14 @@ function PortalDialog({
   }, [baseId, tables]);
 
   return (
-    <Modal title="门户与时区" onClose={onClose} size="wide">
+    <Modal title="门户" onClose={onClose} size="wide">
       <form
         onSubmit={async (event) => {
           event.preventDefault();
           try {
             await api.updateSettings(baseId, {
-              timezone,
               portal: {
-                title: title || undefined,
-                theme,
+                ...portalMetaRef.current,
                 navTableIds: nav,
                 hideChrome: false,
                 widgets: widgets.map((widget) => {
@@ -6058,35 +6138,6 @@ function PortalDialog({
           }
         }}
       >
-        <label>
-          时区
-          <FancySelect
-            value={timezone}
-            onChange={setTimezone}
-            options={[
-              { value: "Asia/Shanghai", label: "Asia/Shanghai" },
-              { value: "UTC", label: "UTC" },
-              { value: "America/Los_Angeles", label: "America/Los_Angeles" },
-              { value: "Europe/London", label: "Europe/London" },
-            ]}
-          />
-        </label>
-        <label>
-          应用门户标题
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="默认用空间名" />
-        </label>
-        <label>
-          主题
-          <FancySelect
-            value={theme}
-            onChange={(v) => setTheme(v as typeof theme)}
-            options={[
-              { value: "light", label: "浅色" },
-              { value: "blue", label: "蓝色" },
-              { value: "green", label: "绿色" },
-            ]}
-          />
-        </label>
         <div className="acl-fields">
           {tables.map((table) => {
             const checked = nav.includes(table.id);

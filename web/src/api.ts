@@ -78,11 +78,6 @@ export const api = {
     request<{ user: PublicUser }>("/api/auth/bootstrap", { method: "POST", body: JSON.stringify(body) }),
   captcha: () =>
     request<{ captchaId: string; svg: string; devAnswer?: string }>("/api/auth/captcha"),
-  sendCode: (email: string) =>
-    request<{ devCode?: string }>("/api/auth/codes", {
-      method: "POST",
-      body: JSON.stringify({ email, purpose: "login" }),
-    }),
   login: (body: {
     email: string;
     password?: string;
@@ -112,11 +107,6 @@ export const api = {
   updateUser: (userId: string, patch: { name?: string; role?: string; disabled?: boolean; password?: string }) =>
     request<PublicUser>(`/api/users/${userId}`, { method: "PATCH", body: JSON.stringify(patch) }),
   mcpAgents: () => request<McpAgent[]>("/api/mcp-agents"),
-  registerMcpAgent: (body: { name: string; description?: string; contact?: string }) =>
-    request<McpAgent>("/api/mcp-agents/register", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
   createMcpAgent: (body: {
     name: string;
     description?: string;
@@ -412,12 +402,6 @@ export const api = {
   unwatch: (recordId: string) => request(`/api/records/${recordId}/watch`, { method: "DELETE" }),
   watching: async (recordId: string) =>
     (await request<{ watching: boolean }>(`/api/records/${recordId}/watching`)).watching,
-  shareRecord: (recordId: string, expiresInDays?: number) =>
-    request<{ share: { id: string; token: string }; token: string }>(`/api/records/${recordId}/share`, {
-      method: "POST",
-      body: JSON.stringify({ expiresInDays }),
-    }),
-  getShare: (token: string) => request<{ record: PublicRecord; table: TablePayload }>(`/api/share/${token}`),
   listPublicShares: (tableId: string) =>
     request<
       Array<{
@@ -620,26 +604,6 @@ export const api = {
       body: JSON.stringify(body ?? {}),
     }),
   deleteSyncJob: (jobId: string) => request(`/api/sync-jobs/${jobId}`, { method: "DELETE" }),
-  pluginHooks: () => request<Array<{ id: string; name: string; event: string; target: string }>>("/api/plugins/hooks"),
-  createPluginHook: (body: { name: string; event: string; target: string }) =>
-    request("/api/plugins/hooks", { method: "POST", body: JSON.stringify(body) }),
-  marketplace: () =>
-    request<{
-      plugins: Array<{
-        id: string;
-        name: string;
-        description: string;
-        kind: string;
-        enabled: boolean;
-        hookId: string | null;
-      }>;
-      recentEvents: Array<{ event: string; tableId: string; recordId?: string; at: number }>;
-    }>("/api/plugins/marketplace"),
-  setMarketplacePlugin: (pluginId: string, enabled: boolean, webhookUrl?: string) =>
-    request(`/api/plugins/marketplace/${pluginId}`, {
-      method: "POST",
-      body: JSON.stringify({ enabled, webhookUrl }),
-    }),
   upload: (filename: string, contentBase64: string, mime?: string, opts?: { baseId?: string; minRole?: string }) =>
     request<{ id: string; name: string; url: string; mime?: string; size: number }>("/api/uploads", {
       method: "POST",
@@ -674,8 +638,6 @@ export const api = {
     request<DocumentDetail>(`/api/documents/${documentId}/records/${recordId}`, { method: "DELETE" }),
   recordDocuments: (recordId: string) =>
     request<RecordDocumentLink[]>(`/api/records/${recordId}/documents`),
-  mcpTools: () =>
-    request<{ tools: Array<{ name: string; description: string }>; hint: string }>("/api/mcp/tools"),
   backupStatus: () =>
     request<{
       settings: BackupSettingsDto;

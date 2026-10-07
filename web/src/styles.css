@@ -738,8 +738,18 @@ code {
 .app {
   height: 100dvh;
   display: grid;
-  grid-template-columns: 248px 1fr;
+  /* 第一栏宽度由拖拽写入 --nav-w，默认 248px。 */
+  grid-template-columns: var(--nav-w, 248px) 1fr;
   background: var(--bg);
+}
+/* 导航栏收起：第一栏归零并隐藏。
+   注意用 visibility 而不是 display:none——一旦从网格流中移除，
+   第二列的内容会被自动分配到第一列（0px），正文宽度会变成 0。 */
+.app.nav-collapsed { grid-template-columns: 0 1fr; }
+.app.nav-collapsed > .sidebar {
+  visibility: hidden;
+  overflow: hidden;
+  pointer-events: none;
 }
 .sidebar {
   background: color-mix(in srgb, var(--surface) 88%, #ecfeff);
@@ -747,6 +757,7 @@ code {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  position: relative;
 }
 .sidebar .brand {
   padding: 18px 16px 12px;
@@ -1211,6 +1222,60 @@ body.col-resizing {
   user-select: none !important;
 }
 body.col-resizing * { cursor: col-resize !important; }
+
+/* ——— 栏目分隔手柄（导航栏 / 文档列表）——— */
+.pane-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 5;
+  box-shadow: none;
+  border-radius: 0;
+}
+.pane-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: transparent;
+  transition: background var(--dur) var(--ease);
+}
+.pane-resize:hover::after,
+.pane-resize.active::after,
+.pane-resize:focus-visible::after { background: var(--accent); }
+.pane-resize:focus-visible { outline: none; }
+
+/* 顶栏里的收起 / 展开按钮与「全部收起」时的浮动入口。 */
+.pane-toggle {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink-3);
+}
+.pane-restore {
+  align-self: flex-start;
+  margin: 8px 12px 0;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  border-radius: var(--r-sm);
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
+.pane-restore:hover { background: var(--surface-hover); color: var(--ink); }
 .cell-input,
 .cell-input:hover,
 .cell-input:focus,
@@ -2437,6 +2502,9 @@ body.col-resizing * { cursor: col-resize !important; }
 
 @media (max-width: 860px) {
   .auth-shell, .app { grid-template-columns: 1fr; }
+  /* 窄屏第一栏是抽屉，收起态不应把它从网格里抹掉。 */
+  .app.nav-collapsed { grid-template-columns: 1fr; }
+  .app.nav-collapsed > .sidebar { visibility: visible; overflow: visible; pointer-events: auto; }
   .auth-hero {
     min-height: 38dvh;
     padding: 28px 24px 20px;
@@ -2999,13 +3067,66 @@ body.col-resizing * { cursor: col-resize !important; }
 .stage.docs-stage { overflow: hidden; display: flex; }
 .docs-layout { flex: 1; min-width: 0; min-height: 0; display: flex; background: var(--surface); }
 .docs-side {
-  flex: 0 0 236px;
+  /* 宽度由拖拽写入 --pane-w，默认 236px。 */
+  flex: 0 0 var(--pane-w, 236px);
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: color-mix(in srgb, var(--surface) 88%, #ecfeff);
   border-right: 1px solid var(--line);
 }
+.docs-side.collapsed { display: none; }
+
+/* 收起后残留的窄条：只放「展开」和一个新建入口。 */
+.docs-side-rail {
+  flex: 0 0 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  background: color-mix(in srgb, var(--surface) 88%, #ecfeff);
+  border-right: 1px solid var(--line);
+}
+.rail-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  border-radius: var(--r-sm);
+  font-size: 15px;
+  line-height: 1;
+}
+.rail-btn:hover { background: var(--surface-hover); color: var(--accent); }
+.rail-btn.doc-new > .drop-menu-trigger {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--ink-3);
+  font-size: 16px;
+  line-height: 1;
+}
+.rail-btn.doc-new > .drop-menu-trigger:hover { background: var(--surface-hover); color: var(--accent); }
+
+.docs-side-tools { display: flex; align-items: center; gap: 2px; }
+.side-collapse {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  line-height: 1;
+}
+.side-collapse:hover { background: var(--surface-hover); color: var(--accent); }
 .docs-side-head {
   display: flex;
   align-items: center;

@@ -99,9 +99,11 @@ docker compose up -d --build
 
 Persist `./data`. Optional bootstrap vars are commented in `docker-compose.yml`.
 
-### Deploying to Aliyun (`task.zhaopeinan.com`)
+### Deploying to Aliyun (`http://47.122.123.1/`)
 
-That box runs **podman** and has no compose provider, so images are built locally and shipped over SSH instead of pulled:
+That host is in mainland China (Aliyun) and has **no ICP filing**, so reaching it by domain is blocked at the edge: plain HTTP returns a 403 ICP interstitial, and HTTPS is reset during the TLS handshake because Aliyun matches on the Host / TLS SNI value. **Access it by IP instead** — the edge does not intercept requests whose Host is the bare IP. Caddy on that box exposes DuoWei at `http://47.122.123.1/`.
+
+The box runs **podman** and has no compose provider, so images are built locally and shipped over SSH instead of pulled:
 
 ```bash
 scripts/deploy-aliyun.sh            # build linux/amd64 + deploy + smoke check
@@ -116,7 +118,7 @@ The script reads `aliyun.env` (gitignored; four lines: note / host / user / pass
 | --- | --- |
 | `DUOWEI_HOST` / `DUOWEI_PORT` | Bind address (default `127.0.0.1:8787`) |
 | `DUOWEI_WEB_ROOT` | Built SPA directory in production |
-| `DUOWEI_COOKIE_SECURE` | `1` behind HTTPS |
+| `DUOWEI_COOKIE_SECURE` | `1` behind HTTPS; **`0` on the Aliyun IP entry, which is plain HTTP** |
 | `DUOWEI_DEV_CODES` | `0` in prod — never echo OTP in the UI |
 | `DUOWEI_BOOTSTRAP_*` | Seed first admin on empty DB |
 | `SMTP_HOST` `SMTP_PORT` `SMTP_SECURE` `SMTP_USER` `SMTP_PASS` `SMTP_FROM` | Email OTP |
@@ -142,7 +144,7 @@ Without SMTP, OTP codes appear in the login form (**dev only**). Production must
 }
 ```
 
-Field writes use **field names**, not internal ids. Full tool contract: [`docs/MCP_AGENT_GUIDE.md`](./docs/MCP_AGENT_GUIDE.md).
+For the **deployed** instance, use `http://47.122.123.1` as the REST base — not a domain, which the Chinese edge blocks (see the Aliyun section). Field writes use **field names**, not internal ids. Full tool contract: [`docs/MCP_AGENT_GUIDE.md`](./docs/MCP_AGENT_GUIDE.md).
 
 ### Security posture (short)
 
@@ -238,7 +240,12 @@ docker compose up -d --build
 
 持久化目录 `./data`。首次管理员可用 `docker-compose.yml` 中注释的引导变量。
 
-### 部署到阿里云（task.zhaopeinan.com）
+### 部署到阿里云（http://47.122.123.1/）
+
+这台主机在国内（阿里云）且**未备案**，用域名访问会在边缘被拦：HTTP 返回 403 备案拦截页，
+HTTPS 在 TLS 握手阶段被重置（阿里云按 Host / TLS SNI 里的域名匹配）。**请直接用 IP 访问**——
+Host 是裸 IP 的请求不会被拦截。该机的 Caddy 已把 DuoWei 暴露在 `http://47.122.123.1/`，
+容器本身仍只绑 `127.0.0.1:8787`，由 Caddy 反代。
 
 那台机器用的是 **podman**，没有 compose provider，所以镜像不在服务器上构建，而是本机构建后经 SSH 送过去：
 
@@ -255,7 +262,7 @@ scripts/deploy-aliyun.sh --no-build # 复用本机已有的 duowei:latest
 | --- | --- |
 | `DUOWEI_HOST` / `DUOWEI_PORT` | 监听地址（默认 `127.0.0.1:8787`） |
 | `DUOWEI_WEB_ROOT` | 生产环境前端构建目录 |
-| `DUOWEI_COOKIE_SECURE` | HTTPS 下设为 `1` |
+| `DUOWEI_COOKIE_SECURE` | HTTPS 下设为 `1`；**阿里云 IP 入口是明文 HTTP，必须设为 `0`** |
 | `DUOWEI_DEV_CODES` | 生产必须 `0`，禁止在页面回显验证码 |
 | `DUOWEI_BOOTSTRAP_*` | 空库时自动创建管理员 |
 | `SMTP_*` | 邮箱验证码发信 |
@@ -281,7 +288,7 @@ scripts/deploy-aliyun.sh --no-build # 复用本机已有的 duowei:latest
 }
 ```
 
-写记录时使用**字段名**，不要用内部 id。完整协议见 [`docs/MCP_AGENT_GUIDE.md`](./docs/MCP_AGENT_GUIDE.md)。
+**线上实例**的 REST 根地址用 `http://47.122.123.1`，不要用域名（会被国内边缘按未备案域名拦截，见上文阿里云部署）。写记录时使用**字段名**，不要用内部 id。完整协议见 [`docs/MCP_AGENT_GUIDE.md`](./docs/MCP_AGENT_GUIDE.md)。
 
 ### 权限与安全（摘要）
 
