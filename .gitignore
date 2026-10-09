@@ -6,6 +6,7 @@
 .duowei-*.tar
 .env
 .env.*
+.aris/
 aliyun.env
 data
 dist
