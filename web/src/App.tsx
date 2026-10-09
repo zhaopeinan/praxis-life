@@ -68,10 +68,8 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const [dialog, setDialog] = useState<string | null>(null);
   const [optionField, setOptionField] = useState<Field | null>(null);
   const [detailRecordId, setDetailRecordId] = useState<string | null>(null);
-  const [appMode, setAppMode] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [kanbanPrompt, setKanbanPrompt] = useState(false);
-  const [widgetsKey, setWidgetsKey] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   const [mobileSearch, setMobileSearch] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -243,6 +241,8 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   }
 
   function openDocument(id: string | null) {
+    // 进文档页就把左侧导航栏收起来，把宽度让给正文；文档页内切换文档不再动它（用户可能刚手动展开过）。
+    if (!docsOpen) setNavCollapsed(true);
     setDocsOpen(true);
     setDocId(id);
     setViewId(null);
@@ -407,7 +407,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         else if (navOpen) setNavOpen(false);
         return;
       }
-      if (typing || !canEdit || appMode || !payload) return;
+      if (typing || !canEdit || !payload) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") {
         event.preventDefault();
         api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail);
@@ -419,7 +419,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dialog, detailRecordId, showDashboard, navOpen, canEdit, appMode, payload]);
+  }, [dialog, detailRecordId, showDashboard, navOpen, canEdit, payload]);
 
   useEffect(() => {
     if (!tableId) {
@@ -659,44 +659,22 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       />
     </label>
   ) : null;
-  const editCluster = canEdit ? (
-    <div className="toolbar-cluster">
-      <button
-        type="button"
-        onClick={async () => {
-          if (!payload) return;
-          try {
-            const csv = await api.exportCsv(payload.id);
-            const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${payload.name}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-          } catch (err) {
-            fail(err);
-          }
-        }}
-      >
-        导出
-      </button>
-      <button type="button" onClick={() => setDialog("automations")}>
-        自动化
-      </button>
-      <DropMenu label="更多" ariaLabel="更多编辑操作">
-        <button type="button" onClick={() => setDialog("import")}>
-          导入
-        </button>
-        <button type="button" onClick={() => setDialog("workflows")}>
-          工作流
-        </button>
-        <button type="button" onClick={() => setDialog("sync")}>
-          同步
-        </button>
-      </DropMenu>
-    </div>
-  ) : null;
+  // 顶栏只留高频入口；导出 / 导入 / 自动化 / 工作流 / 同步等低频操作统一收进「更多」。
+  const exportCsv = async () => {
+    if (!payload) return;
+    try {
+      const csv = await api.exportCsv(payload.id);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${payload.name}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      fail(err);
+    }
+  };
   const mainCluster = (
     <div className="toolbar-cluster">
       <button type="button" onClick={() => setDialog("assistant")}>
@@ -709,19 +687,34 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       )}
       {canOwn && <button type="button" onClick={() => setDialog("share")}>分享</button>}
       <DropMenu label="更多" ariaLabel="更多操作">
+        {canEdit && (
+          <>
+            <button type="button" onClick={exportCsv}>
+              导出 CSV
+            </button>
+            <button type="button" onClick={() => setDialog("import")}>
+              导入
+            </button>
+            <hr className="menu-sep" />
+            <button type="button" onClick={() => setDialog("automations")}>
+              自动化
+            </button>
+            <button type="button" onClick={() => setDialog("workflows")}>
+              工作流
+            </button>
+            <button type="button" onClick={() => setDialog("sync")}>
+              同步
+            </button>
+          </>
+        )}
+        {canEdit && payload && <hr className="menu-sep" />}
         {canEdit && payload && (
           <button type="button" onClick={() => setDialog("public-share")}>
             公开分享
           </button>
         )}
         {canOwn && <button type="button" onClick={() => setDialog("acl")}>权限</button>}
-        {canOwn && <button type="button" onClick={() => setDialog("portal")}>门户</button>}
         {canEdit && <button type="button" onClick={() => setDialog("calendar-feishu")}>日历 / 飞书</button>}
-        {base && (
-          <button type="button" onClick={() => setAppMode((value) => !value)}>
-            {appMode ? "退出应用模式" : "应用模式"}
-          </button>
-        )}
       </DropMenu>
     </div>
   );
@@ -757,7 +750,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           value={view.protection ?? "public"}
           options={[
             { value: "public", label: "公共视图" },
-            { value: "locked", label: "锁定视图" },
             { value: "personal", label: "个人视图" },
           ]}
           onChange={(value) => {
@@ -768,7 +760,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           }}
         />
       )}
-      {canEdit && !appMode && (
+      {canEdit && (
         <button
           type="button"
           className="ghost danger-text"
@@ -1050,7 +1042,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                   }}
                 />
                 {myRole && <span className="role-pill">{roleLabel(myRole)}</span>}
-                {payload && canOwn && !appMode && !isMobile && (
+                {payload && canOwn && !isMobile && (
                   <button
                     type="button"
                     className="ghost danger-text"
@@ -1096,7 +1088,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("admin")}>用户管理</button>}
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("backup")}>数据备份</button>}
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("agents")}>Agent 管理</button>}
-                {payload && canOwn && !appMode && (
+                {payload && canOwn && (
                   <button type="button" className="danger-text" onClick={() => deleteCurrentTable().catch(fail)}>
                     删除清单
                   </button>
@@ -1146,7 +1138,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 {gridTuning}
                 {kanbanTuning}
                 {dateTuning}
-                {editCluster}
                 {mainCluster}
                 <span className="count">{records.length} 条</span>
               </div>
@@ -1163,7 +1154,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                   {gridTuning}
                   {kanbanTuning}
                   {dateTuning}
-                  {editCluster}
                   {mainCluster}
                 </DropMenu>
                 <span className="count">{records.length} 条</span>
@@ -1191,7 +1181,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         ) : showDashboard && base ? (
           <DashboardView baseId={base.id} tables={base.tables} onClose={() => setShowDashboard(false)} />
         ) : (        <div className="stage">
-          {appMode && base && <AppWidgets key={widgetsKey} baseId={base.id} />}
           {loading && <p className="stage-note">加载中…</p>}
           {!loading && !payload && (
             <StageEmpty
@@ -1214,7 +1203,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 fields={visibleFields}
                 records={records}
                 groups={view.config.groups}
-                readOnly={!canEdit || appMode}
+                readOnly={!canEdit}
                 onOpenRecord={setDetailRecordId}
                 onAdd={() => payload && api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
               />
@@ -1227,7 +1216,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               groups={view.config.groups}
               colorRules={view.config.colorRules}
               rowHeight={view.config.rowHeight}
-              readOnly={!canEdit || appMode}
+              readOnly={!canEdit}
               tableId={payload.id}
               baseId={base?.id}
               onSort={onSort}
@@ -1273,7 +1262,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 fields={visibleFields}
                 records={records}
                 groupField={groupField}
-                readOnly={!canEdit || appMode}
+                readOnly={!canEdit}
                 onChange={onChange}
                 onAdd={(optionName) =>
                   api.createRecord(payload.id, optionName ? { [groupField.name]: optionName } : {}).then(() => reloadTable()).catch(fail)
@@ -1285,7 +1274,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 fields={visibleFields}
                 records={records}
                 groupField={groupField}
-                readOnly={!canEdit || appMode}
+                readOnly={!canEdit}
                 onChange={onChange}
                 onDelete={(recordId) => api.deleteRecord(recordId).then(() => reloadTable()).catch(fail)}
                 onOpenRecord={setDetailRecordId}
@@ -1357,7 +1346,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 records={records}
                 dateFieldId={view.config.dateFieldId}
                 titleFieldId={view.config.titleFieldId}
-                readOnly={!canEdit || appMode}
+                readOnly={!canEdit}
                 onChange={onChange}
                 onOpen={setDetailRecordId}
               />
@@ -1402,7 +1391,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 progressFieldId={view.config.progressFieldId}
                 dependencyFieldId={view.config.dependencyFieldId}
                 titleFieldId={view.config.titleFieldId}
-                readOnly={!canEdit || appMode}
+                readOnly={!canEdit}
                 onChange={onChange}
                 onOpen={setDetailRecordId}
               />
@@ -1453,7 +1442,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 fields={visibleFields}
                 records={records}
                 titleFieldId={view.config.titleFieldId}
-                readOnly={!canEdit || appMode}
+                readOnly={!canEdit}
                 onOpen={setDetailRecordId}
                 onAdd={() => api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
               />
@@ -1476,7 +1465,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             ) : (
               <FormView
                 fields={visibleFields}
-                readOnly={!canEdit || appMode}
+                readOnly={!canEdit}
                 onSubmit={async (values) => {
                   await api.createRecord(payload.id, values);
                   await reloadTable();
@@ -1486,7 +1475,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         </div>
         )}
       </section>
-      {isMobile && !appMode && !showDashboard && payload && view && (
+      {isMobile && !showDashboard && payload && view && (
         <BottomBar
           canAdd={canEdit}
           searchActive={mobileSearch || Boolean(search)}
@@ -1674,16 +1663,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           onClose={closeDialog}
         />
       )}
-      {dialog === "portal" && base && canOwn && (
-        <PortalDialog
-          baseId={base.id}
-          tables={base.tables}
-          onClose={() => {
-            closeDialog();
-            setWidgetsKey((value) => value + 1);
-          }}
-        />
-      )}
       {detailRecordId && payload && (
         <RecordDetailDialog
           recordId={detailRecordId}
@@ -1691,7 +1670,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           baseId={base?.id ?? null}
           fields={payload.fields}
           record={payload.records.find((item) => item.id === detailRecordId) ?? null}
-          canEdit={canEdit && !appMode}
+          canEdit={canEdit}
           fullScreen={isMobile}
           onClose={closeDetail}
           onChange={onChange}
@@ -5958,416 +5937,6 @@ function AssistantPanel({
       )}
       {answer && <pre className="dev-code">{answer}</pre>}
       {error && <p className="form-error">{error}</p>}
-    </Modal>
-  );
-}
-
-function AppWidgets({ baseId }: { baseId: string }) {
-  const [portal, setPortal] = useState<{
-    portal?: { widgets?: Array<{ id: string; type: string; tableId: string; title?: string; fieldId?: string; attachmentFieldId?: string; limit?: number; titleFieldId?: string }> };
-    tables: Array<{ id: string; name: string; fields: Array<{ id: string; name: string; type: string }>; records: Array<{ id: string; fields: Record<string, unknown> }> }>;
-  } | null>(null);
-  useEffect(() => {
-    api.appMode(baseId).then(setPortal).catch(() => setPortal(null));
-  }, [baseId]);
-  if (!portal?.portal?.widgets?.length) return null;
-  return (
-    <div className="app-widgets">
-      {portal.portal.widgets.map((widget) => {
-        const table = portal.tables.find((item) => item.id === widget.tableId);
-        if (!widget || !table) return null;
-        if (widget.type === "list") {
-          const titleField =
-            table.fields.find((field) => field.id === widget.titleFieldId) ??
-            table.fields.find((field) => field.type === "text") ??
-            table.fields[0];
-          return (
-            <article key={widget.id} className="app-widget">
-              <h3>{widget.title || table.name}</h3>
-              <ul>
-                {table.records.slice(0, widget.limit ?? 8).map((record) => (
-                  <li key={record.id}>{String(record.fields[titleField?.name ?? ""] ?? record.id)}</li>
-                ))}
-              </ul>
-            </article>
-          );
-        }
-        if (widget.type === "tags") {
-          const field = table.fields.find((item) => item.id === widget.fieldId);
-          const tags = new Set<string>();
-          if (field) {
-            for (const record of table.records) {
-              const raw = record.fields[field.name];
-              if (Array.isArray(raw)) raw.forEach((item) => tags.add(String(item)));
-              else if (raw != null && raw !== "") tags.add(String(raw));
-            }
-          }
-          return (
-            <article key={widget.id} className="app-widget">
-              <h3>{widget.title || field?.name || "标签"}</h3>
-              <div className="app-tags">
-                {[...tags].slice(0, 24).map((tag) => (
-                  <span key={tag}>{tag}</span>
-                ))}
-              </div>
-            </article>
-          );
-        }
-        if (widget.type === "image") {
-          const field = table.fields.find((item) => item.id === widget.attachmentFieldId);
-          const images: string[] = [];
-          if (field) {
-            for (const record of table.records) {
-              const raw = record.fields[field.name];
-              if (Array.isArray(raw)) {
-                for (const item of raw) {
-                  if (item && typeof item === "object" && "url" in item) images.push(String((item as { url: string }).url));
-                }
-              }
-            }
-          }
-          return (
-            <article key={widget.id} className="app-widget">
-              <h3>{widget.title || "图片"}</h3>
-              <div className="app-tags">
-                {images.slice(0, widget.limit ?? 6).map((url) => (
-                  <img key={url} src={url} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 6 }} />
-                ))}
-              </div>
-            </article>
-          );
-        }
-        return null;
-      })}
-    </div>
-  );
-}
-
-function PortalDialog({
-  baseId,
-  tables,
-  onClose,
-}: {
-  baseId: string;
-  tables: Array<{ id: string; name: string }>;
-  onClose: () => void;
-}) {
-  type WidgetDraft =
-    | { id: string; type: "list"; tableId: string; title: string; limit: number; titleFieldId: string }
-    | { id: string; type: "tags"; tableId: string; title: string; fieldId: string }
-    | { id: string; type: "image"; tableId: string; title: string; attachmentFieldId: string; limit: number };
-  const portalMetaRef = useRef<{ title?: string; theme?: string }>({});
-  const [nav, setNav] = useState<string[]>(tables.map((item) => item.id));
-  const [widgets, setWidgets] = useState<WidgetDraft[]>([]);
-  const [fieldsByTable, setFieldsByTable] = useState<Record<string, Field[]>>({});
-  const [error, setError] = useState<string | null>(null);
-
-  async function ensureFields(tableId: string) {
-    if (!tableId || fieldsByTable[tableId]) return fieldsByTable[tableId] ?? [];
-    const table = await api.getTable(tableId);
-    setFieldsByTable((current) => ({ ...current, [tableId]: table.fields }));
-    return table.fields;
-  }
-
-  useEffect(() => {
-    api
-      .getSettings(baseId)
-      .then(async (settings) => {
-        portalMetaRef.current = { title: settings.portal.title, theme: settings.portal.theme };
-        setNav(settings.portal.navTableIds ?? tables.map((item) => item.id));
-        const loaded = (settings.portal.widgets ?? []) as WidgetDraft[];
-        setWidgets(
-          loaded.map((item, index) => {
-            if (item.type === "tags") {
-              return { id: item.id || `w${index}`, type: "tags", tableId: item.tableId, title: item.title ?? "", fieldId: item.fieldId ?? "" };
-            }
-            if (item.type === "image") {
-              return {
-                id: item.id || `w${index}`,
-                type: "image",
-                tableId: item.tableId,
-                title: item.title ?? "",
-                attachmentFieldId: item.attachmentFieldId ?? "",
-                limit: item.limit ?? 6,
-              };
-            }
-            return {
-              id: item.id || `w${index}`,
-              type: "list",
-              tableId: item.tableId,
-              title: item.title ?? "",
-              limit: item.limit ?? 8,
-              titleFieldId: item.titleFieldId ?? "",
-            };
-          }),
-        );
-        for (const widget of loaded) {
-          try {
-            await ensureFields(widget.tableId);
-          } catch {
-            /* ignore */
-          }
-        }
-      })
-      .catch((err) => setError(message(err)));
-  }, [baseId, tables]);
-
-  return (
-    <Modal title="门户" onClose={onClose} size="wide">
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          try {
-            await api.updateSettings(baseId, {
-              portal: {
-                ...portalMetaRef.current,
-                navTableIds: nav,
-                hideChrome: false,
-                widgets: widgets.map((widget) => {
-                  if (widget.type === "tags") {
-                    return {
-                      id: widget.id,
-                      type: "tags" as const,
-                      tableId: widget.tableId,
-                      title: widget.title || undefined,
-                      fieldId: widget.fieldId,
-                    };
-                  }
-                  if (widget.type === "image") {
-                    return {
-                      id: widget.id,
-                      type: "image" as const,
-                      tableId: widget.tableId,
-                      title: widget.title || undefined,
-                      attachmentFieldId: widget.attachmentFieldId,
-                      limit: widget.limit,
-                    };
-                  }
-                  return {
-                    id: widget.id,
-                    type: "list" as const,
-                    tableId: widget.tableId,
-                    title: widget.title || undefined,
-                    limit: widget.limit,
-                    titleFieldId: widget.titleFieldId || undefined,
-                  };
-                }),
-              },
-            });
-            onClose();
-          } catch (err) {
-            setError(message(err));
-          }
-        }}
-      >
-        <div className="acl-fields">
-          {tables.map((table) => {
-            const checked = nav.includes(table.id);
-            return (
-              <label key={table.id} className="check-line">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(event) =>
-                    setNav((current) =>
-                      event.target.checked ? [...current, table.id] : current.filter((id) => id !== table.id),
-                    )
-                  }
-                />
-                门户显示「{table.name}」
-              </label>
-            );
-          })}
-        </div>
-        <h3 className="section-title">应用组件</h3>
-        <p className="fine">列表 / 标签 / 图片组件会在应用模式下展示。</p>
-        {widgets.map((widget, index) => {
-          const fields = fieldsByTable[widget.tableId] ?? [];
-          return (
-            <div key={widget.id} className="chart-edit-row">
-              <label>
-                类型
-                <FancySelect
-                  value={widget.type}
-                  onChange={(v) => {
-                    const type = v as WidgetDraft["type"];
-                    const tableId = widget.tableId || tables[0]?.id || "";
-                    void ensureFields(tableId);
-                    const next = [...widgets];
-                    if (type === "tags") {
-                      next[index] = { id: widget.id, type: "tags", tableId, title: widget.title, fieldId: "" };
-                    } else if (type === "image") {
-                      next[index] = {
-                        id: widget.id,
-                        type: "image",
-                        tableId,
-                        title: widget.title,
-                        attachmentFieldId: "",
-                        limit: 6,
-                      };
-                    } else {
-                      next[index] = { id: widget.id, type: "list", tableId, title: widget.title, limit: 8, titleFieldId: "" };
-                    }
-                    setWidgets(next);
-                  }}
-                  options={[
-                    { value: "list", label: "列表" },
-                    { value: "tags", label: "标签" },
-                    { value: "image", label: "图片" },
-                  ]}
-                />
-              </label>
-              <label>
-                标题
-                <input
-                  value={widget.title}
-                  onChange={(event) => {
-                    const next = [...widgets];
-                    next[index] = { ...widget, title: event.target.value } as WidgetDraft;
-                    setWidgets(next);
-                  }}
-                />
-              </label>
-              <label>
-                数据表
-                <FancySelect
-                  value={widget.tableId}
-                  placeholder="选择"
-                  onChange={(tableId) => {
-                    void ensureFields(tableId);
-                    const next = [...widgets];
-                    if (widget.type === "tags") next[index] = { ...widget, tableId, fieldId: "" };
-                    else if (widget.type === "image") next[index] = { ...widget, tableId, attachmentFieldId: "" };
-                    else next[index] = { ...widget, tableId, titleFieldId: "" };
-                    setWidgets(next);
-                  }}
-                  options={[
-                    { value: "", label: "选择" },
-                    ...tables.map((table) => ({ value: table.id, label: table.name })),
-                  ]}
-                />
-              </label>
-              {widget.type === "list" && (
-                <>
-                  <label>
-                    标题字段
-                    <FancySelect
-                      value={widget.titleFieldId}
-                      placeholder="自动"
-                      onChange={(titleFieldId) => {
-                        const next = [...widgets];
-                        next[index] = { ...widget, titleFieldId };
-                        setWidgets(next);
-                      }}
-                      options={[
-                        { value: "", label: "自动" },
-                        ...fields.map((field) => ({ value: field.id, label: field.name })),
-                      ]}
-                    />
-                  </label>
-                  <label>
-                    条数
-                    <input
-                      type="number"
-                      min={1}
-                      max={50}
-                      value={widget.limit}
-                      onChange={(event) => {
-                        const next = [...widgets];
-                        next[index] = { ...widget, limit: Number(event.target.value) || 8 };
-                        setWidgets(next);
-                      }}
-                    />
-                  </label>
-                </>
-              )}
-              {widget.type === "tags" && (
-                <label>
-                  标签字段
-                  <FancySelect
-                    value={widget.fieldId}
-                    required
-                    placeholder="选择"
-                    onChange={(fieldId) => {
-                      const next = [...widgets];
-                      next[index] = { ...widget, fieldId };
-                      setWidgets(next);
-                    }}
-                    options={[
-                      { value: "", label: "选择" },
-                      ...fields.map((field) => ({ value: field.id, label: field.name })),
-                    ]}
-                  />
-                </label>
-              )}
-              {widget.type === "image" && (
-                <>
-                  <label>
-                    附件字段
-                    <FancySelect
-                      value={widget.attachmentFieldId}
-                      required
-                      placeholder="选择"
-                      onChange={(attachmentFieldId) => {
-                        const next = [...widgets];
-                        next[index] = { ...widget, attachmentFieldId };
-                        setWidgets(next);
-                      }}
-                      options={[
-                        { value: "", label: "选择" },
-                        ...fields
-                          .filter((field) => field.type === "attachment")
-                          .map((field) => ({ value: field.id, label: field.name })),
-                      ]}
-                    />
-                  </label>
-                  <label>
-                    张数
-                    <input
-                      type="number"
-                      min={1}
-                      max={24}
-                      value={widget.limit}
-                      onChange={(event) => {
-                        const next = [...widgets];
-                        next[index] = { ...widget, limit: Number(event.target.value) || 6 };
-                        setWidgets(next);
-                      }}
-                    />
-                  </label>
-                </>
-              )}
-              <button type="button" onClick={() => setWidgets(widgets.filter((item) => item.id !== widget.id))}>
-                删除
-              </button>
-            </div>
-          );
-        })}
-        <button
-          type="button"
-          className="secondary"
-          onClick={() =>
-            setWidgets([
-              ...widgets,
-              {
-                id: `w_${Math.random().toString(36).slice(2, 9)}`,
-                type: "list",
-                tableId: tables[0]?.id ?? "",
-                title: tables[0]?.name ?? "列表",
-                limit: 8,
-                titleFieldId: "",
-              },
-            ])
-          }
-        >
-          ＋ 添加组件
-        </button>
-        {error && <p className="form-error">{error}</p>}
-        <div className="dialog-actions">
-          <button type="button" onClick={onClose}>取消</button>
-          <button type="submit" className="primary">保存</button>
-        </div>
-      </form>
     </Modal>
   );
 }

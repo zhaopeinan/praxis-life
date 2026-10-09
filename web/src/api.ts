@@ -271,33 +271,6 @@ export const api = {
   updateAutomation: (automationId: string, body: Partial<Automation>) =>
     request<Automation>(`/api/automations/${automationId}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteAutomation: (automationId: string) => request(`/api/automations/${automationId}`, { method: "DELETE" }),
-  appMode: (baseId: string) =>
-    request<{
-      id: string;
-      name: string;
-      mode: "app";
-      portal?: {
-        title?: string;
-        theme?: string;
-        navTableIds?: string[];
-        widgets?: Array<{
-          id: string;
-          type: "list" | "tags" | "image";
-          tableId: string;
-          title?: string;
-          fieldId?: string;
-          attachmentFieldId?: string;
-          limit?: number;
-          titleFieldId?: string;
-        }>;
-      };
-      tables: Array<{
-        id: string;
-        name: string;
-        fields: Array<{ id: string; name: string; type: string }>;
-        records: PublicRecord[];
-      }>;
-    }>(`/api/bases/${baseId}/app`),
   getSettings: (baseId: string) =>
     request<{
       timezone: string;
