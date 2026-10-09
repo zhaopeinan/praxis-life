@@ -65,8 +65,10 @@ if (( REMOTE_BUILD )); then
   step "上传源码 + dist-web，并在服务器上原生构建镜像"
   # 先在服务器上停掉 duowei：一是给 podman build 腾内存（该机器只有 1.7G 且无 swap），
   # 二是备份步骤本来也要停容器。
+  # 刻意不带仓库根的 .dockerignore：它把 dist-web 排除在外（对根 Dockerfile 正确，因为前端是在镜像内构建的），
+  # 而 Dockerfile.remote 正要 COPY dist-web。上下文由下面这份白名单控制，本来也不会带上 node_modules / data / .git。
   tar czf - -C "$ROOT" \
-      .dockerignore Dockerfile.remote package.json package-lock.json tsconfig.json \
+      Dockerfile.remote package.json package-lock.json tsconfig.json \
       src web dist-web \
     | remote "set -e
              rm -rf $REMOTE_SRC_DIR && mkdir -p $REMOTE_SRC_DIR
