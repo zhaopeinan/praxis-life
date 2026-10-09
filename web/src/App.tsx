@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { applyQuery } from "../../src/query.js";
-import type { BaseMember, BaseSummary, DisplayValue, DocumentSummary, Field, McpAgent, PublicRecord, PublicUser, RecordDocumentLink, RowAccessRule, TablePayload, View, ViewType } from "../../src/types.js";
+import type { BaseMember, BaseSummary, DisplayValue, DocumentSummary, Field, McpAgent, PublicRecord, PublicUser, RecordDocumentLink, TablePayload, View, ViewType } from "../../src/types.js";
 import { DOC_TEMPLATES, FIELD_TYPE_LABELS, VIEW_TYPE_LABELS } from "../../src/types.js";
 import { api, type BackupLogDto, type BackupSettingsDto } from "./api";
 import { AuthScreen } from "./AuthScreen";
 import { DashboardView } from "./DashboardView";
 import { DocumentsView, DocumentTree } from "./DocumentsView";
-import { CalendarView, FormView, GalleryView, GanttView } from "./ExtraViews";
+import { CalendarView, GalleryView, GanttView } from "./ExtraViews";
 import { Cell, GridView } from "./GridView";
 import { KanbanView } from "./KanbanView";
 import { BottomBar, MobileAgenda, MobileKanban, RecordCardList } from "./mobile";
 import { PaneHandle, readFlag, readList, usePaneWidth, writeFlag, writeList } from "./paneResize";
-import { PublicShareScreen } from "./PublicShareScreen";
 import { StageEmpty } from "./StageEmpty";
 import { DEFAULT_STATUS_FIELD, DEFAULT_STATUS_OPTIONS, pickStatusField } from "./statusField";
 import { DropMenu, FancySelect, useMediaQuery } from "./ui";
@@ -21,32 +20,32 @@ const FIELD_TYPES = (Object.keys(FIELD_TYPE_LABELS) as Field["type"][]).map((id)
   label: FIELD_TYPE_LABELS[id],
 }));
 
-function parsePublicHash(): string | null {
-  const hash = window.location.hash.replace(/^#/, "");
-  const match = hash.match(/^\/?public\/([^/?#]+)/);
-  return match?.[1] ?? null;
-}
+/**
+ * 新建字段时优先给的常用类型。线上数据里实际被用过的只有文本 / 单选 / 日期 / 多行 /
+ * 关联 / 数字 / 人员 / 进度 这几种；公式、查找引用、条码、签字等收进「更多类型」，
+ * 避免 29 个选项平铺造成选择过载。
+ */
+const COMMON_FIELD_TYPES: ReadonlyArray<Field["type"]> = [
+  "text",
+  "long_text",
+  "number",
+  "single_select",
+  "multi_select",
+  "date",
+  "checkbox",
+  "person",
+  "progress",
+  "link",
+];
 
 export function App() {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [booting, setBooting] = useState(true);
-  const [publicToken, setPublicToken] = useState<string | null>(() => parsePublicHash());
 
   useEffect(() => {
-    const onHash = () => setPublicToken(parsePublicHash());
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
+    api.me().then(setUser).catch(() => setUser(null)).finally(() => setBooting(false));
   }, []);
 
-  useEffect(() => {
-    if (publicToken) {
-      setBooting(false);
-      return;
-    }
-    api.me().then(setUser).catch(() => setUser(null)).finally(() => setBooting(false));
-  }, [publicToken]);
-
-  if (publicToken) return <PublicShareScreen token={publicToken} />;
   if (booting) return <div className="boot">正在打开知行人生…</div>;
   if (!user) return <AuthScreen onUser={setUser} />;
   return <Workspace user={user} onUser={setUser} onLogout={() => setUser(null)} />;
@@ -73,7 +72,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const [navOpen, setNavOpen] = useState(false);
   const [mobileSearch, setMobileSearch] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const isMobile = useMediaQuery("(max-width: 860px)");
   // 文档页的栏目布局偏好：宽度走 CSS 变量（拖拽时不触发重渲染），收起态走 state。
   const appRef = useRef<HTMLDivElement>(null);
@@ -150,12 +148,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  useEffect(() => {
-    loadNotifications();
-    const timer = window.setInterval(() => void loadNotifications(), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
   const base = bases.find((item) => item.id === baseId) ?? null;
   const view = payload?.views.find((item) => item.id === viewId) ?? payload?.views[0] ?? null;
   const docsMode = Boolean(docsOpen && base);
@@ -166,7 +158,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       : members.find((item) => item.userId === user.id)?.role ?? null;
   const canEdit = myRole === "owner" || myRole === "editor";
   const canOwn = myRole === "owner";
-  const unreadCount = notifications.filter((item) => !item.read).length;
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -229,14 +220,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
     } catch (err) {
       setDocuments([]);
       setError(message(err));
-    }
-  }
-
-  async function loadNotifications() {
-    try {
-      setNotifications(await api.notifications());
-    } catch {
-      /* 通知是辅助信息，拉取失败时保持现状 */
     }
   }
 
@@ -548,10 +531,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const selectFields = payload?.fields.filter((field) => field.type === "single_select") ?? [];
   /** 一键转看板时默认挑中的那个「状态类」单选字段 */
   const kanbanCandidate = payload ? pickStatusField(payload.fields) : null;
-  /** 表里能填进表单的字段（排除系统字段） */
-  const formFields = (payload?.fields ?? []).filter(
-    (field) => !["auto_number", "created_time", "updated_time", "created_by", "formula", "lookup", "button"].includes(field.type),
-  );
 
   /** 把当前视图的某个配置项改掉（日历/甘特的日期字段、看板分组等） */
   async function patchViewConfig(patch: Partial<View["config"]>) {
@@ -659,7 +638,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       />
     </label>
   ) : null;
-  // 顶栏只留高频入口；导出 / 导入 / 自动化 / 工作流 / 同步等低频操作统一收进「更多」。
+  // 顶栏只留高频入口；仪表盘、成员分享、导出 / 导入 / 自动化、日历飞书统一收进「更多」。
   const exportCsv = async () => {
     if (!payload) return;
     try {
@@ -680,13 +659,14 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       <button type="button" onClick={() => setDialog("assistant")}>
         数据助手
       </button>
-      {base && (
-        <button type="button" onClick={() => setShowDashboard(true)}>
-          仪表盘
-        </button>
-      )}
-      {canOwn && <button type="button" onClick={() => setDialog("share")}>分享</button>}
       <DropMenu label="更多" ariaLabel="更多操作">
+        {base && (
+          <button type="button" onClick={() => setShowDashboard(true)}>
+            仪表盘
+          </button>
+        )}
+        {canOwn && <button type="button" onClick={() => setDialog("share")}>分享给成员</button>}
+        {base && canEdit && <hr className="menu-sep" />}
         {canEdit && (
           <>
             <button type="button" onClick={exportCsv}>
@@ -695,26 +675,15 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             <button type="button" onClick={() => setDialog("import")}>
               导入
             </button>
-            <hr className="menu-sep" />
             <button type="button" onClick={() => setDialog("automations")}>
               自动化
-            </button>
-            <button type="button" onClick={() => setDialog("workflows")}>
-              工作流
-            </button>
-            <button type="button" onClick={() => setDialog("sync")}>
-              同步
             </button>
           </>
         )}
         {canEdit && payload && <hr className="menu-sep" />}
         {canEdit && payload && (
-          <button type="button" onClick={() => setDialog("public-share")}>
-            公开分享
-          </button>
+          <button type="button" onClick={() => setDialog("calendar-feishu")}>日历 / 飞书</button>
         )}
-        {canOwn && <button type="button" onClick={() => setDialog("acl")}>权限</button>}
-        {canEdit && <button type="button" onClick={() => setDialog("calendar-feishu")}>日历 / 飞书</button>}
       </DropMenu>
     </div>
   );
@@ -1056,9 +1025,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           </div>
           {!isMobile && (
             <div className="top-user">
-              <button type="button" className="secondary" onClick={() => setDialog("notifications")}>
-                通知{unreadCount > 0 ? ` ${unreadCount}` : ""}
-              </button>
               <button type="button" className="secondary" onClick={() => setDialog("tokens")}>访问令牌</button>
               <button type="button" className="secondary" onClick={() => setDialog("agent-brief")}>给 Agent</button>
               <button type="button" className="secondary" onClick={() => setDialog("help")}>使用说明</button>
@@ -1079,9 +1045,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             <div className="top-user">
               <DropMenu ariaLabel="用户与设置">
                 <div className="menu-user">{user.name}</div>
-                <button type="button" onClick={() => setDialog("notifications")}>
-                  通知{unreadCount > 0 ? ` ${unreadCount}` : ""}
-                </button>
                 <button type="button" onClick={() => setDialog("tokens")}>访问令牌</button>
                 <button type="button" onClick={() => setDialog("agent-brief")}>给 Agent</button>
                 <button type="button" onClick={() => setDialog("help")}>使用说明</button>
@@ -1447,31 +1410,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 onAdd={() => api.createRecord(payload.id, {}).then(() => reloadTable()).catch(fail)}
               />
             ))}
-          {payload && view?.type === "form" &&
-            (formFields.length === 0 ? (
-              <StageEmpty
-                icon="▢"
-                title="这个表单还没有可填写的字段"
-                description="表单只展示能手动填写的字段，公式、创建时间一类的系统字段不会出现在这里。"
-                tone="calm"
-                actions={
-                  canEdit ? (
-                    <button type="button" className="primary" onClick={() => setDialog("field")}>
-                      ＋ 新建字段
-                    </button>
-                  ) : undefined
-                }
-              />
-            ) : (
-              <FormView
-                fields={visibleFields}
-                readOnly={!canEdit}
-                onSubmit={async (values) => {
-                  await api.createRecord(payload.id, values);
-                  await reloadTable();
-                }}
-              />
-            ))}
         </div>
         )}
       </section>
@@ -1631,26 +1569,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       {dialog === "automations" && payload && (
         <AutomationDialog tableId={payload.id} fields={payload.fields} onClose={closeDialog} />
       )}
-      {dialog === "acl" && payload && canOwn && (
-        <AclDialog
-          tableId={payload.id}
-          fields={payload.fields}
-          members={members}
-          records={payload.records}
-          onClose={closeDialog}
-        />
-      )}
-      {dialog === "workflows" && payload && (
-        <WorkflowDialog
-          tableId={payload.id}
-          fields={payload.fields}
-          baseId={base?.id}
-          onClose={closeDialog}
-        />
-      )}
-      {dialog === "sync" && base && (
-        <SyncDialog tables={base.tables} onClose={closeDialog} />
-      )}
       {dialog === "assistant" && payload && (
         <AssistantPanel tableId={payload.id} tableName={payload.name} onClose={closeDialog} />
       )}
@@ -1733,27 +1651,6 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             closeDialog();
             await refreshBases();
           }}
-        />
-      )}
-      {dialog === "public-share" && payload && view && (
-        <PublicShareDialog
-          tableId={payload.id}
-          views={payload.views}
-          currentViewId={view.id}
-          onClose={closeDialog}
-        />
-      )}
-      {dialog === "notifications" && (
-        <NotificationsDialog
-          items={notifications}
-          onRead={async (id) => {
-            try {
-              await api.readNotification(id);
-            } finally {
-              await loadNotifications();
-            }
-          }}
-          onClose={closeDialog}
         />
       )}
       {dialog === "tokens" && <TokenDialog onClose={closeDialog} />}
@@ -1881,8 +1778,12 @@ function FieldDialog({
   const [currency, setCurrency] = useState("CNY");
   const [prefix, setPrefix] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showAllTypes, setShowAllTypes] = useState(false);
   const selectable = type === "single_select" || type === "multi_select";
   const linkFields = (fields ?? []).filter((field) => field.type === "link" || field.type === "duplex_link");
+  const typeOptions = showAllTypes
+    ? FIELD_TYPES
+    : FIELD_TYPES.filter((item) => COMMON_FIELD_TYPES.includes(item.id) || item.id === type);
   return (
     <Modal title="添加字段" onClose={onClose}>
       <form
@@ -1928,9 +1829,17 @@ function FieldDialog({
             value={type}
             required
             onChange={(next) => setType(next as Field["type"])}
-            options={FIELD_TYPES.map((item) => ({ value: item.id, label: item.label }))}
+            options={typeOptions.map((item) => ({ value: item.id, label: item.label }))}
           />
         </label>
+        {!showAllTypes && (
+          <p className="fine">
+            先给常用类型。{" "}
+            <button type="button" className="text-button" onClick={() => setShowAllTypes(true)}>
+              显示公式、查找引用等更多类型
+            </button>
+          </p>
+        )}
         {selectable && (
           <label>
             选项，每行一个
@@ -2153,139 +2062,6 @@ function OptionsDialog({
   );
 }
 
-function PublicShareDialog({
-  tableId,
-  views,
-  currentViewId,
-  onClose,
-}: {
-  tableId: string;
-  views: View[];
-  currentViewId: string;
-  onClose: () => void;
-}) {
-  const [kind, setKind] = useState<"view" | "form">("view");
-  const [viewId, setViewId] = useState(currentViewId);
-  const [list, setList] = useState<
-    Array<{
-      id: string;
-      kind: "view" | "form";
-      token: string;
-      enabled: boolean;
-      viewId: string | null;
-      createdAt: number;
-    }>
-  >([]);
-  const [createdToken, setCreatedToken] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function refresh() {
-    setList(await api.listPublicShares(tableId));
-  }
-
-  useEffect(() => {
-    refresh().catch((err) => setError(message(err)));
-  }, [tableId]);
-
-  const formViews = views.filter((item) => item.type === "form");
-
-  return (
-    <Modal title="公开分享" onClose={onClose} size="wide">
-      <p className="fine">生成无需登录即可访问的视图或表单链接（hash：`#/public/令牌`）。</p>
-      <form
-        className="share-add"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          try {
-            const result = await api.createPublicShare(tableId, {
-              kind,
-              viewId: kind === "view" ? viewId : formViews[0]?.id ?? viewId,
-            });
-            setCreatedToken(result.token);
-            await refresh();
-          } catch (err) {
-            setError(message(err));
-          }
-        }}
-      >
-        <FancySelect
-          value={kind}
-          compact
-          onChange={(v) => setKind(v as "view" | "form")}
-          options={[
-            { value: "view", label: "独立分享视图" },
-            { value: "form", label: "公开表单" },
-          ]}
-        />
-        {kind === "view" && (
-          <FancySelect
-            value={viewId}
-            compact
-            onChange={setViewId}
-            options={views.map((item) => ({
-              value: item.id,
-              label: `${item.name}（${VIEW_TYPE_LABELS[item.type]}）`,
-            }))}
-          />
-        )}
-        <button type="submit" className="primary">
-          创建链接
-        </button>
-      </form>
-      {createdToken && (
-        <p className="fine">
-          完整链接：<code>{`${window.location.origin}${window.location.pathname}#/public/${createdToken}`}</code>
-        </p>
-      )}
-      <ul className="member-list">
-        {list.map((item) => (
-          <li key={item.id}>
-            <div>
-              <strong>{item.kind === "form" ? "公开表单" : "分享视图"}</strong>
-              <span>
-                {item.token}… · {item.enabled ? "启用" : "已关闭"}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await api.setPublicShareEnabled(item.id, !item.enabled);
-                  await refresh();
-                } catch (err) {
-                  setError(message(err));
-                }
-              }}
-            >
-              {item.enabled ? "关闭" : "启用"}
-            </button>
-            <button
-              type="button"
-              className="danger"
-              onClick={async () => {
-                try {
-                  await api.deletePublicShare(item.id);
-                  await refresh();
-                } catch (err) {
-                  setError(message(err));
-                }
-              }}
-            >
-              删除
-            </button>
-          </li>
-        ))}
-      </ul>
-      {error && <p className="form-error">{error}</p>}
-      <div className="dialog-actions">
-        <button type="button" onClick={onClose}>
-          关闭
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
 function ViewDialog({
   fields,
   onClose,
@@ -2306,11 +2082,17 @@ function ViewDialog({
 }) {
   const [name, setName] = useState("看板");
   const [type, setType] = useState<ViewType>("kanban");
+  const [showMoreTypes, setShowMoreTypes] = useState(false);
   const selects = fields.filter((field) => field.type === "single_select");
   const dates = fields.filter((field) => field.type === "date");
   const titles = fields.filter((field) => field.type === "text" || field.type === "long_text");
   const progresses = fields.filter((field) => field.type === "progress" || field.type === "number");
   const links = fields.filter((field) => field.type === "link" || field.type === "duplex_link");
+  /** 新建视图默认只给三类高频视图，画册 / 甘特收进「更多」；表单视图已随公开分享一并下线。 */
+  const typeIds: ViewType[] = showMoreTypes
+    ? ["grid", "kanban", "calendar", "gallery", "gantt"]
+    : ["grid", "kanban", "calendar"];
+  const typeOptions = typeIds.map((id) => ({ value: id, label: VIEW_TYPE_LABELS[id] }));
   const [groupField, setGroupField] = useState(selects[0]?.name ?? "");
   const [dateField, setDateField] = useState(dates[0]?.name ?? "");
   const [endDateField, setEndDateField] = useState(dates[1]?.name ?? dates[0]?.name ?? "");
@@ -2332,7 +2114,7 @@ function ViewDialog({
               endDateField: type === "gantt" ? endDateField || undefined : undefined,
               progressField: type === "gantt" ? progressField || undefined : undefined,
               dependencyField: type === "gantt" ? dependencyField || undefined : undefined,
-              titleField: type === "gallery" || type === "form" || type === "gantt" ? titleField || undefined : undefined,
+              titleField: type === "gallery" || type === "gantt" ? titleField || undefined : undefined,
             });
             onClose();
           } catch (err) {
@@ -2353,12 +2135,17 @@ function ViewDialog({
               setType(next);
               setName(VIEW_TYPE_LABELS[next]);
             }}
-            options={(Object.keys(VIEW_TYPE_LABELS) as ViewType[]).map((id) => ({
-              value: id,
-              label: VIEW_TYPE_LABELS[id],
-            }))}
+            options={typeOptions}
           />
         </label>
+        {!showMoreTypes && (
+          <p className="fine">
+            默认只列表格 / 看板 / 日历。{" "}
+            <button type="button" className="text-button" onClick={() => setShowMoreTypes(true)}>
+              显示画册、甘特等更多类型
+            </button>
+          </p>
+        )}
         {(type === "kanban" || type === "gantt") && (
           <label>
             分组字段
@@ -2416,7 +2203,7 @@ function ViewDialog({
             </label>
           </>
         )}
-        {(type === "gallery" || type === "form" || type === "gantt") && (
+        {(type === "gallery" || type === "gantt") && (
           <label>
             标题字段
             <FancySelect
@@ -2653,59 +2440,6 @@ function ShareDialog({
         </button>
         <button type="button" onClick={onClose}>完成</button>
       </div>
-    </Modal>
-  );
-}
-
-type NotificationItem = { id: string; message: string; read: boolean; createdAt: number };
-
-function NotificationsDialog({
-  items,
-  onRead,
-  onClose,
-}: {
-  items: NotificationItem[];
-  onRead: (id: string) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const unread = items.filter((item) => !item.read).length;
-  return (
-    <Modal title="通知" onClose={onClose}>
-      {items.length === 0 && (
-        <p className="fine">还没有通知。关注某条记录或审批超时催办后，提醒会出现在这里。</p>
-      )}
-      <ul className="member-list">
-        {items.map((item) => (
-          <li key={item.id}>
-            <div>
-              <strong>{item.message}</strong>
-              <span>
-                {item.read ? "已读 · " : ""}
-                {formatWhen(item.createdAt)}
-              </span>
-            </div>
-            {!item.read && (
-              <button
-                type="button"
-                className="secondary"
-                disabled={busy === item.id}
-                onClick={() => {
-                  setBusy(item.id);
-                  onRead(item.id)
-                    .catch((err) => setError(message(err)))
-                    .finally(() => setBusy(null));
-                }}
-              >
-                标为已读
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-      {unread > 0 && <p className="fine">共 {unread} 条未读</p>}
-      {error && <p className="form-error">{error}</p>}
     </Modal>
   );
 }
@@ -3847,7 +3581,6 @@ function RecordDetailDialog({
 }) {
   const [comments, setComments] = useState<Array<{ id: string; userName: string; body: string; createdAt: number }>>([]);
   const [history, setHistory] = useState<Array<{ id: string; action: string; userName: string | null; createdAt: number }>>([]);
-  const [watching, setWatching] = useState(false);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [docs, setDocs] = useState<RecordDocumentLink[]>([]);
@@ -3861,7 +3594,6 @@ function RecordDetailDialog({
   async function reload() {
     setComments(await api.comments(recordId));
     setHistory(await api.history(recordId));
-    setWatching(await api.watching(recordId));
     setLayout(await api.getDetailPage(tableId));
     setDocs(await api.recordDocuments(recordId));
   }
@@ -3941,20 +3673,6 @@ function RecordDetailDialog({
             删除记录
           </button>
         )}
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              if (watching) await api.unwatch(recordId);
-              else await api.watch(recordId);
-              setWatching(!watching);
-            } catch (err) {
-              setError(message(err));
-            }
-          }}
-        >
-          {watching ? "取消关注" : "关注记录"}
-        </button>
       </div>
       <h3 className="section-title">相关文档</h3>
       <ul className="member-list">
@@ -4515,908 +4233,6 @@ function AutomationDialog({
   );
 }
 
-function AclDialog({
-  tableId,
-  fields,
-  members,
-  records,
-  onClose,
-}: {
-  tableId: string;
-  fields: Field[];
-  members: BaseMember[];
-  records: Array<{ id: string; fields: Record<string, unknown> }>;
-  onClose: () => void;
-}) {
-  const [userId, setUserId] = useState(members[0]?.userId ?? "");
-  const [denied, setDenied] = useState<string[]>([]);
-  const [allowedRows, setAllowedRows] = useState<string[]>([]);
-  const [rowMode, setRowMode] = useState<"all" | "allow_ids" | "created_by" | "person_in" | "field_equals" | "field_in">("all");
-  const [personFieldId, setPersonFieldId] = useState(fields.find((field) => field.type === "person")?.id ?? "");
-  const [equalsFieldId, setEqualsFieldId] = useState(fields[0]?.id ?? "");
-  const [equalsValue, setEqualsValue] = useState("");
-  const [inFieldId, setInFieldId] = useState(fields[0]?.id ?? "");
-  const [inValues, setInValues] = useState("");
-  const [preview, setPreview] = useState<{ total: number; visible: number; hiddenFieldIds: string[] } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const personFields = fields.filter((field) => field.type === "person");
-
-  useEffect(() => {
-    api
-      .getAcl(tableId)
-      .then((acl) => {
-        setDenied(acl.columnDeny?.[userId] ?? []);
-        const rule = acl.rowRules?.[userId];
-        const rows = acl.rowAllow?.[userId] ?? [];
-        if (rule?.type === "allow_ids") {
-          setRowMode("allow_ids");
-          setAllowedRows(rule.recordIds);
-        } else if (rule?.type === "created_by") {
-          setRowMode("created_by");
-          setAllowedRows([]);
-        } else if (rule?.type === "person_in") {
-          setRowMode("person_in");
-          setPersonFieldId(rule.fieldId);
-          setAllowedRows([]);
-        } else if (rule?.type === "field_equals") {
-          setRowMode("field_equals");
-          setEqualsFieldId(rule.fieldId);
-          setEqualsValue(rule.value);
-          setAllowedRows([]);
-        } else if (rule?.type === "field_in") {
-          setRowMode("field_in");
-          setInFieldId(rule.fieldId);
-          setInValues(rule.values.join(", "));
-          setAllowedRows([]);
-        } else if (rows.length) {
-          setRowMode("allow_ids");
-          setAllowedRows(rows);
-        } else {
-          setRowMode("all");
-          setAllowedRows([]);
-        }
-        setPreview(null);
-      })
-      .catch((err) => setError(message(err)));
-  }, [tableId, userId]);
-
-  function buildRule(): RowAccessRule {
-    if (rowMode === "allow_ids") return { type: "allow_ids", recordIds: allowedRows };
-    if (rowMode === "created_by") return { type: "created_by" };
-    if (rowMode === "person_in") return { type: "person_in", fieldId: personFieldId };
-    if (rowMode === "field_equals") return { type: "field_equals", fieldId: equalsFieldId, value: equalsValue };
-    if (rowMode === "field_in") {
-      return {
-        type: "field_in",
-        fieldId: inFieldId,
-        values: inValues
-          .split(/[,，]/)
-          .map((item) => item.trim())
-          .filter(Boolean),
-      };
-    }
-    return { type: "all" };
-  }
-
-  return (
-    <Modal title="行列权限" onClose={onClose} size="wide">
-      <p className="fine">按成员配置隐藏列，以及条件行权限（创建人 / 人员字段 / 字段等于 / 字段属于集合 / 白名单）。</p>
-      <label>
-        成员
-        <FancySelect
-          value={userId}
-          onChange={setUserId}
-          options={members.map((member) => ({ value: member.userId, label: member.name }))}
-        />
-      </label>
-      <h3 className="section-title">列权限</h3>
-      <div className="acl-fields">
-        {fields.map((field) => {
-          const checked = denied.includes(field.id);
-          return (
-            <label key={field.id} className="check-line">
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={(event) =>
-                  setDenied((current) =>
-                    event.target.checked ? [...current, field.id] : current.filter((id) => id !== field.id),
-                  )
-                }
-              />
-              隐藏「{field.name}」
-            </label>
-          );
-        })}
-      </div>
-      <h3 className="section-title">行权限</h3>
-      <label>
-        可见范围
-        <FancySelect
-          value={rowMode}
-          onChange={(v) => {
-            setRowMode(v as typeof rowMode);
-            setPreview(null);
-          }}
-          options={[
-            { value: "all", label: "全部行" },
-            { value: "created_by", label: "仅自己创建的行" },
-            { value: "person_in", label: "人员字段包含自己" },
-            { value: "field_equals", label: "字段等于指定值" },
-            { value: "field_in", label: "字段属于集合" },
-            { value: "allow_ids", label: "仅白名单" },
-          ]}
-        />
-      </label>
-      {rowMode === "person_in" && (
-        <label>
-          人员字段
-          <FancySelect
-            value={personFieldId}
-            onChange={setPersonFieldId}
-            options={personFields.map((field) => ({ value: field.id, label: field.name }))}
-          />
-        </label>
-      )}
-      {rowMode === "field_equals" && (
-        <>
-          <label>
-            字段
-            <FancySelect
-              value={equalsFieldId}
-              onChange={setEqualsFieldId}
-              options={fields.map((field) => ({ value: field.id, label: field.name }))}
-            />
-          </label>
-          <label>
-            等于
-            <input value={equalsValue} onChange={(event) => setEqualsValue(event.target.value)} placeholder="匹配值" />
-          </label>
-        </>
-      )}
-      {rowMode === "field_in" && (
-        <>
-          <label>
-            字段
-            <FancySelect
-              value={inFieldId}
-              onChange={setInFieldId}
-              options={fields.map((field) => ({ value: field.id, label: field.name }))}
-            />
-          </label>
-          <label>
-            允许值（逗号分隔）
-            <input
-              value={inValues}
-              onChange={(event) => setInValues(event.target.value)}
-              placeholder="进行中, 规划中"
-              required
-            />
-          </label>
-        </>
-      )}
-      {rowMode === "allow_ids" && (
-        <div className="acl-fields">
-          {records.map((record) => {
-            const label = String(Object.values(record.fields)[0] ?? record.id);
-            const checked = allowedRows.includes(record.id);
-            return (
-              <label key={record.id} className="check-line">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(event) =>
-                    setAllowedRows((current) =>
-                      event.target.checked ? [...current, record.id] : current.filter((id) => id !== record.id),
-                    )
-                  }
-                />
-                {label}
-              </label>
-            );
-          })}
-        </div>
-      )}
-      {preview && (
-        <p className="fine">
-          预览：共 {preview.total} 行，该成员可见 {preview.visible} 行；隐藏列 {preview.hiddenFieldIds.length} 个。
-        </p>
-      )}
-      {error && <p className="form-error">{error}</p>}
-      <div className="dialog-actions">
-        <button type="button" onClick={onClose}>取消</button>
-        <button
-          type="button"
-          className="secondary"
-          onClick={async () => {
-            try {
-              const acl = await api.getAcl(tableId);
-              await api.setAcl(tableId, {
-                rowAllow: {
-                  ...(acl.rowAllow ?? {}),
-                  [userId]: rowMode === "allow_ids" ? allowedRows : [],
-                },
-                columnDeny: { ...(acl.columnDeny ?? {}), [userId]: denied },
-                rowRules: { ...(acl.rowRules ?? {}), [userId]: buildRule() },
-              });
-              setPreview(await api.previewAcl(tableId, userId));
-            } catch (err) {
-              setError(message(err));
-            }
-          }}
-        >
-          预览效果
-        </button>
-        <button
-          type="button"
-          className="primary"
-          onClick={async () => {
-            try {
-              const acl = await api.getAcl(tableId);
-              await api.setAcl(tableId, {
-                rowAllow: {
-                  ...(acl.rowAllow ?? {}),
-                  [userId]: rowMode === "allow_ids" ? allowedRows : [],
-                },
-                columnDeny: { ...(acl.columnDeny ?? {}), [userId]: denied },
-                rowRules: { ...(acl.rowRules ?? {}), [userId]: buildRule() },
-              });
-              onClose();
-            } catch (err) {
-              setError(message(err));
-            }
-          }}
-        >
-          保存
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-function WorkflowDialog({
-  tableId,
-  fields,
-  onClose,
-  baseId,
-}: {
-  tableId: string;
-  fields: Field[];
-  onClose: () => void;
-  baseId?: string;
-}) {
-  const [items, setItems] = useState<Array<{ id: string; name: string; enabled: boolean }>>([]);
-  const [runs, setRuns] = useState<
-    Array<{
-      id: string;
-      recordId: string;
-      status: string;
-      pendingNodeIndex: number;
-      nodeLabel: string | null;
-      approvers: string[];
-      strategy: string;
-      votes: Array<{ userName: string; decision: string; comment: string | null }>;
-      votedApprovers?: string[];
-      pendingApprovers?: string[];
-      comment: string | null;
-      timedOut: boolean;
-      timeoutAt: number | null;
-      createdAt: number;
-    }>
-  >([]);
-  const [sla, setSla] = useState<{
-    pendingCount: number;
-    timedOutCount: number;
-    dueSoonCount: number;
-    timedOut: Array<{ id: string; recordId: string; nodeLabel: string | null }>;
-    dueSoon: Array<{ id: string; recordId: string; nodeLabel: string | null; timeoutAt: number | null }>;
-  } | null>(null);
-  const [name, setName] = useState("多级审批写入");
-  const [fieldId, setFieldId] = useState(fields[0]?.id ?? "");
-  const [value, setValue] = useState("已通过");
-  const [approvers1, setApprovers1] = useState("");
-  const [approvers2, setApprovers2] = useState("");
-  const [strategy, setStrategy] = useState<"any" | "all">("any");
-  const [timeoutHours, setTimeoutHours] = useState("0");
-  const [withApproval, setWithApproval] = useState(true);
-  const [multiLevel, setMultiLevel] = useState(true);
-  const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
-  const [timelineRunId, setTimelineRunId] = useState<string | null>(null);
-  const [timeline, setTimeline] = useState<
-    Array<{ action: string; actorUserName: string; onBehalfOfUserName: string | null; detail: string | null; createdAt: number }>
-  >([]);
-  const [proxyName, setProxyName] = useState("");
-  const [proxyBaseOnly, setProxyBaseOnly] = useState(true);
-  const [proxyWorkflowOnly, setProxyWorkflowOnly] = useState(false);
-  const [proxyHours, setProxyHours] = useState("");
-  const [proxies, setProxies] = useState<
-    Array<{ id: string; proxyUserName: string; baseId: string | null; workflowId: string | null; expiresAt: number | null }>
-  >([]);
-  const [auditAction, setAuditAction] = useState("");
-  const [auditActor, setAuditActor] = useState("");
-  const [auditRecordId, setAuditRecordId] = useState("");
-  const [auditHits, setAuditHits] = useState<
-    Array<{ action: string; actorUserName: string; recordId: string | null; detail: string | null; createdAt: number }>
-  >([]);
-  const [error, setError] = useState<string | null>(null);
-  async function reload() {
-    setItems(await api.workflows(tableId));
-    const pending = await api.workflowRuns({ tableId, status: "pending" });
-    const timed = await api.workflowRuns({ tableId, status: "timed_out" });
-    setRuns([...pending, ...timed]);
-    setSla(await api.workflowSla({ tableId, withinHours: 48 }));
-    const proxy = await api.getApprovalProxy();
-    setProxies(proxy.proxies);
-  }
-  async function loadTimeline(runId: string) {
-    setTimelineRunId(runId);
-    setTimeline(await api.workflowAudit({ runId }));
-  }
-  async function searchAudit() {
-    setAuditHits(
-      await api.workflowAudit({
-        tableId,
-        baseId,
-        action: auditAction || undefined,
-        actor: auditActor || undefined,
-        recordId: auditRecordId || undefined,
-      }),
-    );
-  }
-  useEffect(() => {
-    reload().catch((err) => setError(message(err)));
-  }, [tableId]);
-  return (
-    <Modal title="工作流" onClose={onClose} size="wide">
-      <p className="fine">多级审批、加签强制会签、代理范围/有效期、审计检索与导出。</p>
-      <div className="proxy-box">
-        <strong>代理审批</strong>
-        <label>
-          代理人（邮箱或唯一用户名）
-          <input value={proxyName} onChange={(e) => setProxyName(e.target.value)} placeholder="bob@team.test" />
-        </label>
-        <label className="check-line">
-          <input type="checkbox" checked={proxyBaseOnly} onChange={(e) => setProxyBaseOnly(e.target.checked)} />
-          仅限当前空间
-        </label>
-        <label className="check-line">
-          <input type="checkbox" checked={proxyWorkflowOnly} onChange={(e) => setProxyWorkflowOnly(e.target.checked)} />
-          仅限选中工作流（保存时用列表第一项启用流；可稍后改）
-        </label>
-        <label>
-          有效期小时（空=不过期）
-          <input value={proxyHours} onChange={(e) => setProxyHours(e.target.value)} type="number" min={0} />
-        </label>
-        <div className="row-actions">
-          <button
-            type="button"
-            className="primary tiny-btn"
-            onClick={() =>
-              api
-                .setApprovalProxy(proxyName, {
-                  baseId: proxyBaseOnly ? baseId : undefined,
-                  workflowId: proxyWorkflowOnly ? items.find((i) => i.enabled)?.id : undefined,
-                  expiresInHours: proxyHours ? Number(proxyHours) : undefined,
-                })
-                .then(reload)
-                .catch((err) => setError(message(err)))
-            }
-          >
-            添加代理规则
-          </button>
-          <button type="button" className="tiny-btn" onClick={() => api.clearApprovalProxy().then(reload).catch((err) => setError(message(err)))}>
-            清除全部
-          </button>
-        </div>
-        <ul className="member-list">
-          {proxies.map((p) => (
-            <li key={p.id}>
-              <div>
-                <strong>{p.proxyUserName}</strong>
-                <span className="fine">
-                  {p.baseId ? "限 base" : "全 base"} · {p.workflowId ? "限工作流" : "全工作流"} ·{" "}
-                  {p.expiresAt ? `至 ${new Date(p.expiresAt).toLocaleString()}` : "不过期"}
-                </span>
-              </div>
-              <button type="button" className="tiny-btn" onClick={() => api.clearApprovalProxy(p.id).then(reload).catch((err) => setError(message(err)))}>
-                删除
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="proxy-box">
-        <strong>审计检索 / 导出</strong>
-        <label>
-          action
-          <input value={auditAction} onChange={(e) => setAuditAction(e.target.value)} placeholder="approve / transfer / …" />
-        </label>
-        <label>
-          actor
-          <input value={auditActor} onChange={(e) => setAuditActor(e.target.value)} placeholder="Ada" />
-        </label>
-        <label>
-          recordId
-          <input value={auditRecordId} onChange={(e) => setAuditRecordId(e.target.value)} />
-        </label>
-        <div className="row-actions">
-          <button type="button" className="primary tiny-btn" onClick={() => searchAudit().catch((err) => setError(message(err)))}>
-            检索
-          </button>
-          <a
-            className="tiny-btn"
-            href={api.exportWorkflowAuditCsvUrl({
-              tableId,
-              baseId,
-              action: auditAction || undefined,
-              actor: auditActor || undefined,
-              recordId: auditRecordId || undefined,
-            })}
-            download
-          >
-            下载 CSV
-          </a>
-        </div>
-        {auditHits.length > 0 && (
-          <ul className="timeline-list">
-            {auditHits.slice(0, 20).map((ev, idx) => (
-              <li key={`${ev.createdAt}-${idx}`}>
-                <time>{new Date(ev.createdAt).toLocaleString()}</time>
-                <strong>{ev.action}</strong>
-                <span>
-                  {ev.actorUserName}
-                  {ev.recordId ? ` · ${ev.recordId.slice(0, 8)}…` : ""}
-                  {ev.detail ? ` — ${ev.detail}` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          try {
-            const hours = Number(timeoutHours) || 0;
-            const nodes: unknown[] = [{ id: "n1", type: "trigger", trigger: { type: "record_created" } }];
-            if (withApproval) {
-              nodes.push({
-                id: "ap1",
-                type: "approval",
-                approvers: approvers1.split(/[,，]/).map((s) => s.trim()).filter(Boolean),
-                label: "一级审批",
-                strategy,
-                timeoutHours: hours > 0 ? hours : undefined,
-                forceAllAfterAddSign: true,
-              });
-              if (multiLevel) {
-                nodes.push({
-                  id: "ap2",
-                  type: "approval",
-                  approvers: approvers2.split(/[,，]/).map((s) => s.trim()).filter(Boolean),
-                  label: "二级审批",
-                  strategy: "any",
-                  timeoutHours: hours > 0 ? hours : undefined,
-                  forceAllAfterAddSign: true,
-                });
-              }
-              nodes.push({ id: "act", type: "action", action: { type: "set_field", fieldId, value } });
-            } else {
-              nodes.push({
-                id: "n2",
-                type: "condition",
-                conditions: [{ fieldId, op: "is_empty" }],
-                conjunction: "and",
-              });
-              nodes.push({ id: "n3", type: "action", action: { type: "set_field", fieldId, value } });
-            }
-            await api.createWorkflow(tableId, { name, nodes });
-            await reload();
-          } catch (err) {
-            setError(message(err));
-          }
-        }}
-      >
-        <label>
-          名称
-          <input value={name} onChange={(event) => setName(event.target.value)} required />
-        </label>
-        <label className="check-line">
-          <input type="checkbox" checked={withApproval} onChange={(event) => setWithApproval(event.target.checked)} />
-          含人工审批
-        </label>
-        {withApproval && (
-          <>
-            <label className="check-line">
-              <input type="checkbox" checked={multiLevel} onChange={(event) => setMultiLevel(event.target.checked)} />
-              两级审批串联
-            </label>
-            <label>
-              一级策略
-              <FancySelect
-                value={strategy}
-                onChange={(v) => setStrategy(v as "any" | "all")}
-                options={[
-                  { value: "any", label: "任一通过" },
-                  { value: "all", label: "全部通过" },
-                ]}
-              />
-            </label>
-            <label>
-              一级审批人
-              <input value={approvers1} onChange={(event) => setApprovers1(event.target.value)} placeholder="空=任意" />
-            </label>
-            {multiLevel && (
-              <label>
-                二级审批人
-                <input value={approvers2} onChange={(event) => setApprovers2(event.target.value)} placeholder="空=任意" />
-              </label>
-            )}
-            <label>
-              超时小时（0=不超时）
-              <input value={timeoutHours} onChange={(event) => setTimeoutHours(event.target.value)} type="number" min={0} />
-            </label>
-          </>
-        )}
-        <label>
-          通过后写入字段
-          <FancySelect
-            value={fieldId}
-            onChange={setFieldId}
-            options={fields.map((field) => ({ value: field.id, label: field.name }))}
-          />
-        </label>
-        <label>
-          写入值
-          <input value={value} onChange={(event) => setValue(event.target.value)} />
-        </label>
-        <button type="submit" className="primary">创建工作流</button>
-      </form>
-      <h4>SLA 简报</h4>
-      {sla && (
-        <p className="fine sla-brief">
-          待批 {sla.pendingCount} · 已超时 {sla.timedOutCount} · 48h 内到期 {sla.dueSoonCount}
-          {sla.dueSoon.length > 0 &&
-            `（即将：${sla.dueSoon
-              .slice(0, 3)
-              .map((r) => r.nodeLabel || r.recordId.slice(0, 6))
-              .join("、")}）`}
-        </p>
-      )}
-      <h4>待审批 / 已超时</h4>
-      {runs.length === 0 && <p className="fine">暂无待处理审批</p>}
-      <ul className="member-list">
-        {runs.map((run) => {
-          const voted = run.votedApprovers ?? run.votes.map((v) => v.userName);
-          const pendingPeople = run.pendingApprovers ?? [];
-          return (
-            <li key={run.id} className="pending-run">
-              <div>
-                <strong>
-                  {run.nodeLabel || `节点 #${run.pendingNodeIndex}`} · 记录 {run.recordId.slice(0, 8)}…
-                </strong>
-                <span>
-                  {run.status === "timed_out" || run.timedOut ? "已超时" : "待审批"} · 策略{" "}
-                  {run.strategy === "all" ? "全部通过" : "任一通过"}
-                </span>
-                <div className="cosign-progress">
-                  <span className="tag voted">已投 {voted.length ? voted.join("、") : "—"}</span>
-                  <span className="tag pending">
-                    未投 {pendingPeople.length ? pendingPeople.join("、") : run.approvers.length ? "—" : "任意编辑者"}
-                  </span>
-                </div>
-              </div>
-              <label>
-                审批意见
-                <input
-                  value={commentDraft[run.id] ?? ""}
-                  onChange={(event) => setCommentDraft((prev) => ({ ...prev, [run.id]: event.target.value }))}
-                  placeholder="简短意见"
-                />
-              </label>
-              <div className="row-actions">
-                <button
-                  type="button"
-                  className="primary tiny-btn"
-                  onClick={() =>
-                    api
-                      .decideWorkflowRun(run.id, "approve", commentDraft[run.id])
-                      .then(reload)
-                      .catch((err) => setError(message(err)))
-                  }
-                >
-                  通过
-                </button>
-                <button
-                  type="button"
-                  className="tiny-btn"
-                  onClick={() =>
-                    api
-                      .decideWorkflowRun(run.id, "reject", commentDraft[run.id] || "驳回")
-                      .then(reload)
-                      .catch((err) => setError(message(err)))
-                  }
-                >
-                  驳回
-                </button>
-                <button
-                  type="button"
-                  className="tiny-btn"
-                  onClick={() => {
-                    const who = window.prompt("转交给（逗号分隔）", "Bob");
-                    if (!who) return;
-                    api
-                      .transferWorkflowRun(
-                        run.id,
-                        who.split(/[,，]/).map((s) => s.trim()).filter(Boolean),
-                        commentDraft[run.id],
-                      )
-                      .then(reload)
-                      .catch((err) => setError(message(err)));
-                  }}
-                >
-                  转交
-                </button>
-                <button
-                  type="button"
-                  className="tiny-btn"
-                  onClick={() => {
-                    const who = window.prompt("加签（逗号分隔）", "Carol");
-                    if (!who) return;
-                    api
-                      .addSignWorkflowRun(
-                        run.id,
-                        who.split(/[,，]/).map((s) => s.trim()).filter(Boolean),
-                        commentDraft[run.id],
-                      )
-                      .then(reload)
-                      .catch((err) => setError(message(err)));
-                  }}
-                >
-                  加签
-                </button>
-                <button
-                  type="button"
-                  className="tiny-btn"
-                  onClick={() => loadTimeline(run.id).catch((err) => setError(message(err)))}
-                >
-                  时间线
-                </button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      {timelineRunId && (
-        <>
-          <h4>运行时间线 · {timelineRunId.slice(0, 10)}…</h4>
-          <ul className="timeline-list">
-            {timeline.map((ev, idx) => (
-              <li key={`${ev.createdAt}-${idx}`}>
-                <time>{new Date(ev.createdAt).toLocaleString()}</time>
-                <strong>{ev.action}</strong>
-                <span>
-                  {ev.actorUserName}
-                  {ev.onBehalfOfUserName ? `（代 ${ev.onBehalfOfUserName}）` : ""}
-                  {ev.detail ? ` — ${ev.detail}` : ""}
-                </span>
-              </li>
-            ))}
-            {timeline.length === 0 && <li className="fine">暂无审计事件</li>}
-          </ul>
-        </>
-      )}
-      <h4>工作流列表</h4>
-      <ul className="member-list">
-        {items.map((item) => (
-          <li key={item.id}>
-            <div>
-              <strong>{item.name}</strong>
-              <span>{item.enabled ? "已启用" : "已停用"}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                api.updateWorkflow(item.id, { enabled: !item.enabled }).then(reload).catch((err) => setError(message(err)))
-              }
-            >
-              {item.enabled ? "停用" : "启用"}
-            </button>
-            <button type="button" onClick={() => api.deleteWorkflow(item.id).then(reload).catch((err) => setError(message(err)))}>
-              删除
-            </button>
-          </li>
-        ))}
-      </ul>
-      {error && <p className="form-error">{error}</p>}
-    </Modal>
-  );
-}
-
-function SyncDialog({
-  tables,
-  onClose,
-}: {
-  tables: Array<{ id: string; name: string }>;
-  onClose: () => void;
-}) {
-  const [jobs, setJobs] = useState<
-    Array<{
-      id: string;
-      name: string;
-      sourceTableId: string;
-      targetTableId: string;
-      mode: string;
-      conflict: string;
-      lastResult: { synced: number; created: number; updated: number; skipped: number; conflict: string } | null;
-    }>
-  >([]);
-  const [name, setName] = useState("跨表同步");
-  const [sourceId, setSourceId] = useState(tables[0]?.id ?? "");
-  const [targetId, setTargetId] = useState(tables[1]?.id ?? tables[0]?.id ?? "");
-  const [mode, setMode] = useState<"full" | "incremental">("incremental");
-  const [conflict, setConflict] = useState<"skip_if_target_nonempty" | "overwrite">("skip_if_target_nonempty");
-  const [fieldMapText, setFieldMapText] = useState("标题=名称");
-  const [matchField, setMatchField] = useState("标题");
-  const [error, setError] = useState<string | null>(null);
-  async function reload() {
-    setJobs(await api.syncJobs());
-  }
-  useEffect(() => {
-    reload().catch((err) => setError(message(err)));
-  }, []);
-
-  function parseFieldMap(text: string): Record<string, string> {
-    const map: Record<string, string> = {};
-    for (const part of text.split(/[,，\n]/)) {
-      const trimmed = part.trim();
-      if (!trimmed) continue;
-      const [src, dst] = trimmed.split(/[=:：]/).map((item) => item.trim());
-      if (src && dst) map[src] = dst;
-    }
-    return map;
-  }
-
-  return (
-    <Modal title="跨表同步" onClose={onClose} size="wide">
-      <p className="fine">配置字段映射与匹配键；展示上次同步结果与冲突跳过条数，可改策略后重跑。</p>
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          try {
-            const fieldMap = parseFieldMap(fieldMapText);
-            if (!Object.keys(fieldMap).length) throw new Error("请至少配置一条字段映射，如 标题=名称");
-            await api.createSyncJob({
-              name,
-              sourceTableId: sourceId,
-              targetTableId: targetId,
-              fieldMap,
-              matchField: matchField.trim() || Object.keys(fieldMap)[0],
-              mode,
-              conflict,
-            });
-            await reload();
-          } catch (err) {
-            setError(message(err));
-          }
-        }}
-      >
-        <label>
-          名称
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
-        </label>
-        <label>
-          源表
-          <FancySelect
-            value={sourceId}
-            onChange={setSourceId}
-            options={tables.map((t) => ({ value: t.id, label: t.name }))}
-          />
-        </label>
-        <label>
-          目标表
-          <FancySelect
-            value={targetId}
-            onChange={setTargetId}
-            options={tables.map((t) => ({ value: t.id, label: t.name }))}
-          />
-        </label>
-        <label>
-          字段映射（源=目标，逗号分隔）
-          <input
-            value={fieldMapText}
-            onChange={(e) => setFieldMapText(e.target.value)}
-            placeholder="标题=名称, 状态=状态"
-            required
-          />
-        </label>
-        <label>
-          匹配字段（源表字段名）
-          <input value={matchField} onChange={(e) => setMatchField(e.target.value)} placeholder="标题" required />
-        </label>
-        <label>
-          模式
-          <FancySelect
-            value={mode}
-            onChange={(v) => setMode(v as typeof mode)}
-            options={[
-              { value: "incremental", label: "增量" },
-              { value: "full", label: "全量" },
-            ]}
-          />
-        </label>
-        <label>
-          冲突策略
-          <FancySelect
-            value={conflict}
-            onChange={(v) => setConflict(v as typeof conflict)}
-            options={[
-              { value: "skip_if_target_nonempty", label: "目标非空则跳过" },
-              { value: "overwrite", label: "覆盖" },
-            ]}
-          />
-        </label>
-        <button type="submit" className="primary">创建任务</button>
-      </form>
-      <ul className="member-list">
-        {jobs.map((job) => (
-          <li key={job.id} className="pending-run">
-            <div>
-              <strong>{job.name}</strong>
-              <span>
-                {job.mode} · {job.conflict === "overwrite" ? "覆盖" : "跳过非空"}
-              </span>
-              {job.lastResult && (
-                <span className="fine">
-                  上次：同步 {job.lastResult.synced}（新建 {job.lastResult.created} / 更新 {job.lastResult.updated}）· 冲突/跳过{" "}
-                  {job.lastResult.skipped}
-                </span>
-              )}
-            </div>
-            <label>
-              重跑策略
-              <FancySelect
-                compact
-                value={job.conflict}
-                onChange={(v) =>
-                  api
-                    .updateSyncJob(job.id, { conflict: v })
-                    .then(reload)
-                    .catch((err) => setError(message(err)))
-                }
-                options={[
-                  { value: "skip_if_target_nonempty", label: "目标非空则跳过" },
-                  { value: "overwrite", label: "覆盖" },
-                ]}
-              />
-            </label>
-            <div className="row-actions">
-              <button
-                type="button"
-                className="primary tiny-btn"
-                onClick={() =>
-                  api
-                    .runSyncJob(job.id, {
-                      conflict: job.conflict as "skip_if_target_nonempty" | "overwrite",
-                    })
-                    .then(reload)
-                    .catch((err) => setError(message(err)))
-                }
-              >
-                重跑
-              </button>
-              <button type="button" className="tiny-btn" onClick={() => api.deleteSyncJob(job.id).then(reload).catch((err) => setError(message(err)))}>
-                删除
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {error && <p className="form-error">{error}</p>}
-    </Modal>
-  );
-}
-
 function CalendarFeishuDialog({
   baseId,
   tableId,
@@ -5729,7 +4545,7 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
         <li>在「日历 / 飞书」填写飞书机器人 Webhook，并把 ICS 订到系统日历或飞书日历。</li>
         <li>从模板或空白新建「空间」，再添加清单与字段。</li>
         <li>用表格 / 看板 / 日历整理节奏；筛选、分组、填色在工具栏。</li>
-        <li>需要时配置自动化、工作流与仪表盘，或开启分享与权限。</li>
+        <li>需要时在「更多」里配置仪表盘、自动化与日历 / 飞书。</li>
         <li>字段菜单可「更改类型」；按钮动作关联当前记录。</li>
         <li>「数据助手」可本地问数；把对接说明交给外部 Agent：点顶栏「给 Agent」一键复制。</li>
       </ol>

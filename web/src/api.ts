@@ -12,23 +12,10 @@ import type {
   PublicRecord,
   PublicUser,
   RecordDocumentLink,
-  TableAcl,
   TablePayload,
   View,
   ViewType,
 } from "../../src/types.js";
-
-type WorkflowAuditRow = {
-  id: string;
-  runId: string;
-  tableId: string;
-  recordId: string | null;
-  action: string;
-  actorUserName: string;
-  onBehalfOfUserName: string | null;
-  detail: string | null;
-  createdAt: number;
-};
 
 export type BackupSettingsDto = {
   enabled: boolean;
@@ -244,19 +231,6 @@ export const api = {
     request<Array<{ id: string; action: string; userName: string | null; patch: Record<string, unknown>; createdAt: number }>>(
       `/api/records/${recordId}/history`,
     ),
-  getAcl: (tableId: string) => request<TableAcl>(`/api/tables/${tableId}/acl`),
-  setAcl: (
-    tableId: string,
-    body: {
-      rowAllow?: Record<string, string[]>;
-      columnDeny?: Record<string, string[]>;
-      rowRules?: TableAcl["rowRules"];
-    },
-  ) => request<TableAcl>(`/api/tables/${tableId}/acl`, { method: "PUT", body: JSON.stringify(body) }),
-  previewAcl: (tableId: string, userId: string) =>
-    request<{ total: number; visible: number; hiddenFieldIds: string[]; sampleIds: string[] }>(
-      `/api/tables/${tableId}/acl/preview?userId=${encodeURIComponent(userId)}`,
-    ),
   automations: (tableId: string) => request<Automation[]>(`/api/tables/${tableId}/automations`),
   createAutomation: (
     tableId: string,
@@ -371,212 +345,8 @@ export const api = {
       columns?: 1 | 2 | 3;
     },
   ) => request(`/api/tables/${tableId}/detail-page`, { method: "PUT", body: JSON.stringify(body) }),
-  watch: (recordId: string) => request(`/api/records/${recordId}/watch`, { method: "POST" }),
-  unwatch: (recordId: string) => request(`/api/records/${recordId}/watch`, { method: "DELETE" }),
-  watching: async (recordId: string) =>
-    (await request<{ watching: boolean }>(`/api/records/${recordId}/watching`)).watching,
-  listPublicShares: (tableId: string) =>
-    request<
-      Array<{
-        id: string;
-        kind: "view" | "form";
-        tableId: string;
-        viewId: string | null;
-        token: string;
-        enabled: boolean;
-        createdAt: number;
-        expiresAt: number | null;
-      }>
-    >(`/api/tables/${tableId}/public-shares`),
-  createPublicShare: (
-    tableId: string,
-    body: { kind: "view" | "form"; viewId?: string | null; expiresInDays?: number },
-  ) =>
-    request<{ share: { id: string; token: string; kind: string }; token: string }>(
-      `/api/tables/${tableId}/public-shares`,
-      { method: "POST", body: JSON.stringify(body) },
-    ),
-  setPublicShareEnabled: (shareId: string, enabled: boolean) =>
-    request(`/api/public-shares/${shareId}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
-  deletePublicShare: (shareId: string) => request(`/api/public-shares/${shareId}`, { method: "DELETE" }),
-  getPublicShare: (token: string) =>
-    request<{
-      kind: "view" | "form";
-      viewId: string | null;
-      table: { id: string; name: string; fields: Field[]; records: PublicRecord[] };
-    }>(`/api/public/${token}`),
-  submitPublicForm: (token: string, fields: Record<string, unknown>) =>
-    request<{ record: PublicRecord }>(`/api/public/${token}/submit`, {
-      method: "POST",
-      body: JSON.stringify({ fields }),
-    }),
   clickButton: (recordId: string, fieldId: string) =>
     request<{ ok: true; detail?: string }>(`/api/records/${recordId}/buttons/${fieldId}`, { method: "POST" }),
-  notifications: () =>
-    request<Array<{ id: string; message: string; read: boolean; createdAt: number }>>("/api/notifications"),
-  readNotification: (id: string) => request(`/api/notifications/${id}/read`, { method: "POST" }),
-  workflows: (tableId: string) => request<Array<{ id: string; name: string; enabled: boolean; nodes: unknown[] }>>(`/api/tables/${tableId}/workflows`),
-  createWorkflow: (tableId: string, body: { name: string; nodes: unknown[]; enabled?: boolean }) =>
-    request(`/api/tables/${tableId}/workflows`, { method: "POST", body: JSON.stringify(body) }),
-  updateWorkflow: (workflowId: string, body: { name?: string; enabled?: boolean; nodes?: unknown[] }) =>
-    request(`/api/workflows/${workflowId}`, { method: "PATCH", body: JSON.stringify(body) }),
-  deleteWorkflow: (workflowId: string) => request(`/api/workflows/${workflowId}`, { method: "DELETE" }),
-  workflowRuns: (params?: { tableId?: string; status?: string }) => {
-    const q = new URLSearchParams();
-    if (params?.tableId) q.set("tableId", params.tableId);
-    if (params?.status) q.set("status", params.status);
-    const suffix = q.toString() ? `?${q}` : "";
-    return request<
-      Array<{
-        id: string;
-        workflowId: string;
-        tableId: string;
-        recordId: string;
-        status: string;
-        pendingNodeIndex: number;
-        nodeLabel: string | null;
-        approvers: string[];
-        strategy: string;
-        votes: Array<{ userName: string; decision: string; comment: string | null; at: number }>;
-        votedApprovers?: string[];
-        pendingApprovers?: string[];
-        decidedBy: string | null;
-        comment: string | null;
-        timeoutAt: number | null;
-        timedOut: boolean;
-        createdAt: number;
-      }>
-    >(`/api/workflow-runs${suffix}`);
-  },
-  decideWorkflowRun: (runId: string, decision: "approve" | "reject", comment?: string) =>
-    request(`/api/workflow-runs/${runId}/decide`, { method: "POST", body: JSON.stringify({ decision, comment }) }),
-  transferWorkflowRun: (runId: string, approvers: string[], comment?: string) =>
-    request(`/api/workflow-runs/${runId}/transfer`, { method: "POST", body: JSON.stringify({ approvers, comment }) }),
-  addSignWorkflowRun: (runId: string, approvers: string[], comment?: string) =>
-    request(`/api/workflow-runs/${runId}/add-sign`, { method: "POST", body: JSON.stringify({ approvers, comment }) }),
-  workflowAudit: (params?: {
-    runId?: string;
-    tableId?: string;
-    baseId?: string;
-    action?: string;
-    actor?: string;
-    recordId?: string;
-    from?: number;
-    to?: number;
-  }) => {
-    if (params?.runId) return request<Array<WorkflowAuditRow>>(`/api/workflow-runs/${params.runId}/audit`);
-    const q = new URLSearchParams();
-    if (params?.tableId) q.set("tableId", params.tableId);
-    if (params?.baseId) q.set("baseId", params.baseId);
-    if (params?.action) q.set("action", params.action);
-    if (params?.actor) q.set("actor", params.actor);
-    if (params?.recordId) q.set("recordId", params.recordId);
-    if (params?.from != null) q.set("from", String(params.from));
-    if (params?.to != null) q.set("to", String(params.to));
-    const suffix = q.toString() ? `?${q}` : "";
-    return request<Array<WorkflowAuditRow>>(`/api/workflow-audit${suffix}`);
-  },
-  exportWorkflowAuditCsvUrl: (params?: {
-    tableId?: string;
-    baseId?: string;
-    action?: string;
-    actor?: string;
-    recordId?: string;
-    from?: number;
-    to?: number;
-  }) => {
-    const q = new URLSearchParams();
-    if (params?.tableId) q.set("tableId", params.tableId);
-    if (params?.baseId) q.set("baseId", params.baseId);
-    if (params?.action) q.set("action", params.action);
-    if (params?.actor) q.set("actor", params.actor);
-    if (params?.recordId) q.set("recordId", params.recordId);
-    if (params?.from != null) q.set("from", String(params.from));
-    if (params?.to != null) q.set("to", String(params.to));
-    const suffix = q.toString() ? `?${q}` : "";
-    return `/api/workflow-audit/export.csv${suffix}`;
-  },
-  getApprovalProxy: () =>
-    request<{
-      proxies: Array<{
-        id: string;
-        proxyUserName: string;
-        baseId: string | null;
-        workflowId: string | null;
-        expiresAt: number | null;
-      }>;
-      proxy: { id: string; proxyUserName: string } | null;
-    }>("/api/approval-proxy"),
-  setApprovalProxy: (
-    proxy: string,
-    opts?: { baseId?: string; workflowId?: string; expiresInHours?: number; expiresAt?: number },
-  ) =>
-    request("/api/approval-proxy", {
-      method: "PUT",
-      body: JSON.stringify({
-        proxy,
-        baseId: opts?.baseId,
-        workflowId: opts?.workflowId,
-        expiresInHours: opts?.expiresInHours,
-        expiresAt: opts?.expiresAt,
-      }),
-    }),
-  clearApprovalProxy: (id?: string) =>
-    request(`/api/approval-proxy${id ? `?id=${encodeURIComponent(id)}` : ""}`, { method: "DELETE" }),
-  workflowSla: (params?: { tableId?: string; withinHours?: number }) => {
-    const q = new URLSearchParams();
-    if (params?.tableId) q.set("tableId", params.tableId);
-    if (params?.withinHours != null) q.set("withinHours", String(params.withinHours));
-    const suffix = q.toString() ? `?${q}` : "";
-    return request<{
-      pendingCount: number;
-      timedOutCount: number;
-      dueSoonCount: number;
-      withinHours: number;
-      timedOut: Array<{ id: string; recordId: string; nodeLabel: string | null; timeoutAt: number | null }>;
-      dueSoon: Array<{ id: string; recordId: string; nodeLabel: string | null; timeoutAt: number | null }>;
-    }>(`/api/workflow-runs/sla${suffix}`);
-  },
-  processWorkflowTimeouts: () =>
-    request<{ reminded: number }>("/api/workflow-runs/process-timeouts", { method: "POST", body: "{}" }),
-  syncJobs: () =>
-    request<
-      Array<{
-        id: string;
-        name: string;
-        sourceTableId: string;
-        targetTableId: string;
-        mode: string;
-        conflict: string;
-        lastRunAt: number | null;
-        lastResult: {
-          at: number;
-          synced: number;
-          created: number;
-          updated: number;
-          skipped: number;
-          conflict: string;
-          mode: string;
-        } | null;
-      }>
-    >("/api/sync-jobs"),
-  createSyncJob: (body: {
-    name: string;
-    sourceTableId: string;
-    targetTableId: string;
-    fieldMap: Record<string, string>;
-    matchField?: string;
-    mode?: "full" | "incremental";
-    conflict?: "skip_if_target_nonempty" | "overwrite";
-  }) => request("/api/sync-jobs", { method: "POST", body: JSON.stringify(body) }),
-  updateSyncJob: (jobId: string, body: { conflict?: string; mode?: string; enabled?: boolean }) =>
-    request(`/api/sync-jobs/${jobId}`, { method: "PATCH", body: JSON.stringify(body) }),
-  runSyncJob: (jobId: string, body?: { conflict?: "skip_if_target_nonempty" | "overwrite" }) =>
-    request<{ synced: number; created: number; updated: number; skipped: number }>(`/api/sync-jobs/${jobId}/run`, {
-      method: "POST",
-      body: JSON.stringify(body ?? {}),
-    }),
-  deleteSyncJob: (jobId: string) => request(`/api/sync-jobs/${jobId}`, { method: "DELETE" }),
   upload: (filename: string, contentBase64: string, mime?: string, opts?: { baseId?: string; minRole?: string }) =>
     request<{ id: string; name: string; url: string; mime?: string; size: number }>("/api/uploads", {
       method: "POST",
