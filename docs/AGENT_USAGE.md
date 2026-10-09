@@ -17,18 +17,23 @@
 ## 每次会话开场（必做）
 
 1. `GET http://47.122.123.1/api/auth/me` — 确认身份
-2. `GET http://47.122.123.1/api/bases` — 列出可见「空间」及其「清单」（tables）
-3. 选定 `baseId` 后：`GET http://47.122.123.1/api/bases/{baseId}` 了解空间下的清单
-4. 选定 `tableId` 后：`GET http://47.122.123.1/api/tables/{tableId}` 了解字段与记录
-5. 需要筛选：`POST http://47.122.123.1/api/tables/{tableId}/query`，body 示例：
+2. `GET http://47.122.123.1/api/bases` — 列出可见「空间」，每个空间**已经带上它下面的「清单」**：`tables: [{ id, name }]`。没有 `GET /api/bases/{baseId}` 这个接口，需要空间里的表就读这一步的返回
+3. 选定 `tableId` 后：`GET http://47.122.123.1/api/tables/{tableId}` — 字段（`fields[].id` / `name` / `type`）与记录
+4. 需要筛选：`POST http://47.122.123.1/api/tables/{tableId}/query`，body 示例：
 
 ```json
 {
-  "filters": [{ "field": "状态", "op": "eq", "value": "进行中" }],
+  "filters": [{ "fieldId": "fld_xxx", "op": "eq", "value": "进行中" }],
   "conjunction": "and",
+  "sorts": [{ "fieldId": "fld_yyy", "direction": "desc" }],
   "limit": 50
 }
 ```
+
+- **筛选 / 排序用字段 id（`fieldId`）**，取自第 3 步 `fields[].id`；写记录时才用字段名（见下）
+- 可用运算符：`eq` `neq` `contains` `not_contains` `gt` `gte` `lt` `lte` `is_empty` `is_not_empty`
+
+5. （可选）空间内的文档：`GET http://47.122.123.1/api/bases/{baseId}/documents`，可加 `?q=关键词`
 
 **若 `/api/bases` 为空**：请用户在「Agent 管理」中点开你的 Agent「编辑」，勾选可访问的空间。
 
@@ -39,7 +44,7 @@
 | 空间 | base（`baseId`） | 顶层容器，包含多个清单 |
 | 清单 / 数据表 | table（`tableId`） | 空间内的数据表 |
 | 记录 | record（`recordId`） | 表内的一行数据 |
-| 字段 | field | 读写记录时用**字段名**作 JSON 键，不要用内部 field id |
+| 字段 | field | 写记录时用**字段名**作 JSON 键；筛选 / 排序用 `fields[].id`（`fieldId`） |
 | 视图 | view | 同一张表的不同展现方式（表格/看板/日历/甘特等） |
 | 文档 | document | 空间内的 Markdown 文档 |
 
@@ -59,8 +64,9 @@
 - **单选字段**：传选项**名称**（如 `"进行中"`），不是选项内部 id
 - **多选字段**：字符串数组，如 `["标签 1", "标签 2"]`
 - **日期字段**：`YYYY-MM-DD` 格式
-- **公式 / 按钮 / 系统字段**（如 `created_time`）：不要直接 update
-- 筛选运算符：`eq` `neq` `contains` `not_contains` `gt` `gte` `lt` `lte` `is_empty` `is_not_empty`
+- **只读字段，写入会被忽略或直接报错**：`formula`（公式）、`lookup`（引用）、`button`（按钮）、`auto_number`、`created_time`、`updated_time`、`created_by`；创建记录时这些字段被静默忽略，更新记录时会报「系统字段，不可直接修改」
+- 删除记录：`DELETE /api/records/{recordId}`
+- 写记录用**字段名**作 JSON 键；筛选 / 排序用 `fieldId`，两者不要混
 
 ## 常用能力
 
@@ -82,11 +88,36 @@ POST http://47.122.123.1/api/templates/{id}
 POST http://47.122.123.1/api/bases/{baseId}/tables
 ```
 
+body：`{ "name": "本周任务", "fields": [{ "name": "标题", "type": "text" }, { "name": "状态", "type": "single_select", "options": ["待开始", "进行中", "已完成"] }], "withKanban": true }`
+（`fields` 可省略，`options` 也可以用 `{ "name": "进行中", "color": "blue" }`）
+
 ### 新建字段
 
 ```bash
 POST http://47.122.123.1/api/tables/{tableId}/fields
 ```
+
+body：`{ "name": "负责人", "type": "person" }`；`type` 取字段类型表里的值（如 `text` / `number` / `date` / `single_select` / `multi_select` / `person` / `attachment` / `formula`）
+
+### 新建视图
+
+```bash
+POST http://47.122.123.1/api/tables/{tableId}/views
+```
+
+body：`{ "name": "看板", "type": "kanban", "groupField": "状态" }` —— 这里传**字段名**（`groupField` / `dateField` / `titleField` / `endDateField` / `progressField`），服务端会解析成对应字段
+
+### 文档（Markdown 长文）
+
+```bash
+GET   http://47.122.123.1/api/bases/{baseId}/documents      # 列表；加 ?q=关键词 搜索标题与正文
+POST  http://47.122.123.1/api/bases/{baseId}/documents      # 新建：{ "title": "…", "bodyMd": "# …" }（kind 可选 "doc" / "folder"）
+GET   http://47.122.123.1/api/documents/{documentId}        # 详情：bodyMd 正文 + links[] 关联记录
+PATCH http://47.122.123.1/api/documents/{documentId}        # 更新：{ "title"?, "bodyMd"?, "icon"? }
+```
+
+- 文档与记录的关联不在正文里做标记，而是接口返回的 `links[]`，每项含 `recordId` / `tableId` / `label` / `recordTitle`
+- 新增关联：`POST http://47.122.123.1/api/documents/{documentId}/records`，body `{ "recordId": "…" }`
 
 ### 评论
 
@@ -104,33 +135,38 @@ GET http://47.122.123.1/api/tables/{tableId}/export.csv
 
 ### 飞书集成
 
-在空间设置里配置 webhook 后，可用相关 integrations 接口测试连接或发送摘要。
+在空间设置里配置飞书机器人 Webhook 后：
+
+- `POST http://47.122.123.1/api/bases/{baseId}/feishu-test` — 测试连接（可传 `{ "text": "…", "webhookUrl": "…" }` 覆盖默认配置）
+- `POST http://47.122.123.1/api/tables/{tableId}/feishu-digest` — 发送摘要（可传 `{ "daysAhead": 7, "dateField": "截止日期", "excludeStatuses": ["已完成"] }`）
 
 ## 推荐工作流示例
 
 ### 查并进行中的待办并勾掉一条
 
 1. `GET /api/bases` → 找到「个人待办」空间下的待办表 `tableId`
-2. `POST /api/tables/{tableId}/query`，筛选 `状态 eq 进行中`（或表内实际选项名）
-3. `PATCH /api/records/{recordId}`，`{ "fields": { "状态": "已完成" } }`
+2. `GET /api/tables/{tableId}` → 取「状态」字段的 `fields[].id`
+3. `POST /api/tables/{tableId}/query`，`{ "filters": [{ "fieldId": "<状态字段 id>", "op": "eq", "value": "进行中" }] }`（值用表内实际选项名）
+4. `PATCH /api/records/{recordId}`，`{ "fields": { "状态": "已完成" } }`
 
 ### 从模板开一套科研管理
 
 1. `POST /api/templates/research`
-2. `GET /api/bases` 确认新空间
-3. 按字段名往「论文」「任务」「投稿记录」写记录
+2. `GET /api/bases` 确认新空间，拿到「论文」「任务」「投稿记录」三张表的 `tableId`
+3. 按字段名往三张表写记录；「任务」的「所属论文」是关联字段，值要传论文记录的 `recordId` 数组，如 `[{ "fields": { "标题": "精读 baseline", "所属论文": ["rec_xxx"] } }]`
 
 ### 在文档中查找并打开关联记录
 
-1. `GET /api/bases` 找到目标空间
-2. `GET /api/documents?baseId={baseId}` 列出文档
-3. 读取文档内容，找到 `record:` 或 `table:` 标记
-4. `GET /api/tables/{tableId}` 获取记录详情
+1. `GET /api/bases` 找到目标空间（`baseId`）
+2. `GET /api/bases/{baseId}/documents`（可加 `?q=关键词`）找到目标文档 `documentId`
+3. `GET /api/documents/{documentId}` → 读 `bodyMd` 正文与 `links[]`（关联记录带 `recordId` / `tableId` / `recordTitle`）
+4. `GET /api/tables/{tableId}` 或用 `POST /api/tables/{tableId}/query` 取记录的当前值
 5. 如需编辑：`PATCH /api/records/{recordId}`
 
 ## 权限提醒
 
 - Agent 只能看到管理员授权给它的空间
+- 看某空间的协作者：`GET /api/bases/{baseId}/members`（返回 `userId` / `name` / `email` / `role`）
 - 删空间 / 部分管理接口需要更高角色；失败时阅读返回 JSON 的 `error` 字段，不要重试硬闯
 - 不要把令牌写进公开仓库或聊天记录；用户若只给了占位符，先请用户粘贴真实 `dwa_` / `dw_` 令牌
 
@@ -149,9 +185,11 @@ GET http://47.122.123.1/api/tables/{tableId}/export.csv
 
 | 错误 | 原因 | 处理方式 |
 |------|------|----------|
-| `403 Forbidden` | 令牌无效或空间未授权 | 检查令牌前缀（dwa_ / dw_），确认 Agent 已授权该空间 |
-| `404 Not Found` | baseId / tableId / recordId 不存在 | 重新 `GET /api/bases` 获取正确 ID |
-| `Agent 不能创建多维表格` | 使用了 Agent 令牌创建空间 | 改用个人令牌（dw_）或在网页端手动创建 |
+| `401 Unauthorized` | 没带令牌或令牌无效 | 检查 `Authorization: Bearer <令牌>` 头；令牌前缀应为 `dwa_` / `dw_` |
+| `403 Forbidden` | 已登录但没权限（空间未授权给该 Agent） | 请用户在「Agent 管理」里点开该 Agent「编辑」，勾选这个空间 |
+| `400 Bad Request` | 请求体不合法：字段名写错、筛选用了字段名而不是 `fieldId`、日期格式不对、漏了 `fields` 外层… | 读返回 JSON 的 `error` 字段按提示改 |
+| `404 Not Found` | baseId / tableId / recordId 不存在，或不在可见范围内 | 重新 `GET /api/bases` 或 `GET /api/tables/{tableId}` 取正确 ID |
+| `Agent 不能创建多维表格，请在管理端授权已有表格` | 用 Agent 令牌建空间 / 用模板建空间 | 改用个人令牌（dw_）或在网页端手动创建 |
 | `Connection reset by peer` | 用了域名而非 IP | 改用 `http://47.122.123.1` 裸 IP 访问 |
 
 ## 视图类型说明
@@ -159,24 +197,27 @@ GET http://47.122.123.1/api/tables/{tableId}/export.csv
 | 视图类型 | type | 配置要点 |
 |----------|------|----------|
 | 表格 | `grid` | 支持分组、筛选、排序、填色规则 |
-| 看板 | `kanban` | 需要一个单选字段作为 `groupFieldId` |
-| 日历 | `calendar` | 需要一个日期字段作为 `dateFieldId` |
-| 甘特图 | `gantt` | 需要开始/结束日期字段，可选进度字段 |
-| 画册 | `gallery` | 需要标题字段和封面字段 |
+| 看板 | `kanban` | 需要一个单选字段分组（建视图时传 `groupField`，存为 `groupFieldId`） |
+| 日历 | `calendar` | 需要一个日期字段（建视图时传 `dateField`，存为 `dateFieldId`） |
+| 甘特图 | `gantt` | 需要开始日期字段（`dateField`），可选结束日期 / 进度字段（`endDateField` / `progressField`） |
+| 画册 | `gallery` | 需要标题字段（`titleField`），其余字段在卡片上展示 |
 | 表单 | `form` | 只展示可填写字段，用于快速录入 |
 
 ## 字段类型说明
 
 | 字段类型 | type | 写入格式 |
 |----------|------|----------|
-| 文本 | `text` | 字符串 |
-| 数字 | `number` | 数字 |
+| 文本 | `text` / `long_text` | 字符串 |
+| 数字 | `number` / `currency` / `rating` / `progress` | 数字（`rating` 0–上限，`progress` 0–100） |
 | 日期 | `date` | `"YYYY-MM-DD"` |
 | 单选 | `single_select` | 选项名称字符串 |
 | 多选 | `multi_select` | 选项名称数组 |
 | 复选框 | `checkbox` | `true` / `false` |
-| 人员 | `user` | 用户 ID（从 `GET /api/bases/{baseId}/members` 获取） |
-| 关联 | `link` | 关联记录 ID 数组 |
-| 附件 | `attachment` | 先上传到 `/api/upload`，用返回的 `fileId` |
-| 公式 | `formula` | 只读，不要写入 |
-| 按钮 | `button` | 用 `POST /api/records/{recordId}/fields/{fieldId}/click` 触发 |
+| 邮箱 / 电话 / 链接 | `email` / `phone` / `url` | 字符串（前两者会校验格式） |
+| 人员 / 群组 | `person` / `group` | **姓名**，单个字符串或用逗号分隔 / 数组（不是 user id） |
+| 关联 | `link` | 关联记录的 `recordId` 数组（记录须属于该字段绑定的那张表） |
+| 附件 | `attachment` | `[{ "name": "文件名", "url": "/api/uploads/<uploadId>" }]`；先 `POST /api/uploads`（body `{ "filename", "contentBase64", "mime" }`），用返回的 `id` 拼 URL |
+| 公式 / 引用 | `formula` / `lookup` | 只读，不要写入 |
+| 按钮 | `button` | 只读；触发用 `POST /api/records/{recordId}/buttons/{fieldId}` |
+| 系统字段 | `auto_number` / `created_time` / `updated_time` / `created_by` | 只读，不要写入 |
+| 其他 | `barcode` / `geolocation` / `signature` / `duplex_link` 等 | 新建字段时可用；写入格式先 `GET /api/tables/{tableId}` 看字段配置 |
