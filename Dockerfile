@@ -1,4 +1,7 @@
-FROM node:22-bookworm-slim AS build
+# 目标机是阿里云 x86_64 服务器，平台在 FROM 上显式声明（而不是靠命令行的 --platform）：
+# 命令行的 --platform 会让 CLI 内置的 legacy builder 在模拟执行时丢掉中间镜像的平台信息而构建失败，
+# 写在 FROM 上则 buildx 与 legacy builder 都能正确产出 linux/amd64 镜像。
+FROM --platform=linux/amd64 node:22-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm config set registry https://registry.npmmirror.com \
@@ -6,7 +9,7 @@ RUN npm config set registry https://registry.npmmirror.com \
 COPY . .
 RUN npm run build:web
 
-FROM node:22-bookworm-slim
+FROM --platform=linux/amd64 node:22-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production \
     DUOWEI_HOST=0.0.0.0 \

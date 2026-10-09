@@ -2,13 +2,17 @@
 #
 # 部署到阿里云（http://47.122.123.1/，用 IP 直连绕开未备案域名拦截）。
 #
-# 服务器上是 podman（不是 docker，也没有 compose provider），所以流程是：
+# 服务器上是 podman（不是 docker，也没有 compose provider），默认流程是：
 #   本机 build linux/amd64 镜像 → save 压缩后经 ssh 管道 podman load
 #   → 备份 SQLite → 用同样的启动参数重建容器 → 冒烟检查
 #
 # 用法：
-#   scripts/deploy-aliyun.sh            # 构建 + 部署
-#   scripts/deploy-aliyun.sh --no-build # 复用本机已有的 duowei:latest
+#   scripts/deploy-aliyun.sh              # 本机构建 + 部署
+#   scripts/deploy-aliyun.sh --no-build   # 复用本机已有的 duowei:latest
+#   scripts/deploy-aliyun.sh --remote-build
+#       不在本机建镜像：本机只 `npm run build:web`，然后把源码 + dist-web 传上去，
+#       在服务器（本来就是 x86_64）上原生 podman build。没有跨架构模拟，快很多；
+#       本机装不了 buildx / 跑不了 amd64 模拟时也用这个。
 #
 # 连接信息从仓库根的 aliyun.env 读取（该文件已被 .gitignore 忽略），四行依次为：
 #   备注 / 主机 / 用户 / 密码
@@ -22,12 +26,20 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT/aliyun.env"
 
 IMAGE="duowei:latest"
+# 本机 docker 侧的标签；服务器 podman 侧统一用这个全名，两条构建路径（本机 load / 服务器 build）
+# 都收敛到同一个标签，避免 podman 把新镜像存成 localhost/… 而 run 时又用到旧的 docker.io/library/…。
+RUN_IMAGE="docker.io/library/duowei:latest"
 CONTAINER="duowei"
 REMOTE_DATA_DIR="/opt/duowei/data"
+REMOTE_SRC_DIR="/opt/duowei-src"
+# 国内服务器直连 Docker Hub 不通，基础镜像走镜像加速站。
+NODE_BASE="${DUOWEI_NODE_BASE:-docker.m.daocloud.io/library/node:22-bookworm-slim}"
 PUBLIC_URL="${DUOWEI_PUBLIC_URL:-http://47.122.123.1/}"
 
 BUILD=1
+REMOTE_BUILD=0
 [[ "${1:-}" == "--no-build" ]] && BUILD=0
+[[ "${1:-}" == "--remote-build" ]] && REMOTE_BUILD=1
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "缺少 $ENV_FILE（需要 主机/用户/密码 三行）" >&2
@@ -46,13 +58,49 @@ remote() { sshpass -e ssh "${SSH_OPTS[@]}" "$SSH_USER@$HOST" "$@"; }
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 
-if (( BUILD )); then
-  step "构建 linux/amd64 镜像（服务器是 x86_64，本机多半是 arm64）"
-  docker build --platform linux/amd64 --provenance=false --sbom=false -t "$IMAGE" "$ROOT"
+if (( REMOTE_BUILD )); then
+  step "本机构建前端产物（原生 arm64，产物与平台无关）"
+  (cd "$ROOT" && npm run build:web)
+
+  step "上传源码 + dist-web，并在服务器上原生构建镜像"
+  # 先在服务器上停掉 duowei：一是给 podman build 腾内存（该机器只有 1.7G 且无 swap），
+  # 二是备份步骤本来也要停容器。
+  tar czf - -C "$ROOT" \
+      .dockerignore Dockerfile.remote package.json package-lock.json tsconfig.json \
+      src web dist-web \
+    | remote "set -e
+             rm -rf $REMOTE_SRC_DIR && mkdir -p $REMOTE_SRC_DIR
+             tar xzf - -C $REMOTE_SRC_DIR
+             cd $REMOTE_SRC_DIR
+             podman stop $CONTAINER >/dev/null 2>&1 || true
+             podman build --build-arg NODE_BASE=$NODE_BASE -f Dockerfile.remote -t $RUN_IMAGE .
+             podman image inspect $RUN_IMAGE --format '构建完成：{{.Os}}/{{.Architecture}}'"
+elif (( BUILD )); then
+  step "构建 linux/amd64 镜像（服务器是 x86_64，本机多半是 arm64；平台已在 Dockerfile 的 FROM 上声明）"
+  # buildx 是独立插件进程，在受限/沙箱环境里可能连不上 docker socket（报 permission denied），
+  # 此时回退到 CLI 内置的 legacy builder。注意 `docker buildx ls` 即便连不上 daemon 也返回 0，
+  # 所以只能先真跑再回退。
+  if ! docker build --provenance=false --sbom=false -t "$IMAGE" "$ROOT"; then
+    echo "提示：buildx 构建失败，回退到 DOCKER_BUILDKIT=0（走模拟执行，较慢）" >&2
+    DOCKER_BUILDKIT=0 docker build -t "$IMAGE" "$ROOT"
+  fi
+
+  # legacy builder 在 arm64 上会忽略 FROM 里的平台声明，静默产出 arm64 镜像。宁可在这里失败，
+  # 也不要把跑不起来的镜像推上服务器。
+  ARCH="$(docker image inspect "$IMAGE" --format '{{.Os}}/{{.Architecture}}')"
+  if [[ "$ARCH" != "linux/amd64" ]]; then
+    echo "构建产物的平台是 $ARCH，不是 linux/amd64，服务器（x86_64）跑不了。" >&2
+    echo "改用：scripts/deploy-aliyun.sh --remote-build" >&2
+    exit 1
+  fi
 fi
 
-step "传输镜像到服务器并 podman load"
-docker save "$IMAGE" | gzip -1 | remote 'gunzip -c | podman load'
+if (( REMOTE_BUILD )); then
+  step "跳过镜像传输（镜像已在服务器上构建）"
+else
+  step "传输镜像到服务器并 podman load"
+  docker save "$IMAGE" | gzip -1 | remote 'gunzip -c | podman load'
+fi
 
 step "备份线上 SQLite（停容器后一并打包 db / wal / shm）"
 remote "podman stop $CONTAINER >/dev/null 2>&1 || true
@@ -95,7 +143,7 @@ remote "podman rm $CONTAINER >/dev/null 2>&1 || true
           -e DUOWEI_WEB_ROOT=/app/dist-web \
           -e DUOWEI_DEV_CODES=0 \
           -e DUOWEI_COOKIE_SECURE=0 \
-          docker.io/library/$IMAGE >/dev/null
+          $RUN_IMAGE >/dev/null
         sleep 6
         podman ps --format '{{.Names}} | {{.Image}} | {{.Status}} | {{.Ports}}' | grep $CONTAINER
         podman logs --tail 5 $CONTAINER"

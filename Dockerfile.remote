@@ -1,0 +1,31 @@
+# 服务器侧原生构建用（x86_64 目标机自己 build，省掉本机跨架构模拟）。
+#
+# 与根目录 Dockerfile 的区别：前端产物 dist-web 已在本机 `npm run build:web` 构建好并随源码一起
+# 传上来，这里只装运行时依赖再拷贝文件，因此不需要 build 阶段、也不需要在本机或服务器上装 vite。
+#
+# 基础镜像用 ARG 暴露，是因为国内服务器直连 Docker Hub 不通，需要走镜像加速站：
+#   podman build --build-arg NODE_BASE=docker.m.daocloud.io/library/node:22-bookworm-slim ...
+ARG NODE_BASE=node:22-bookworm-slim
+FROM ${NODE_BASE}
+
+WORKDIR /app
+ENV NODE_ENV=production \
+    DUOWEI_HOST=0.0.0.0 \
+    DUOWEI_PORT=8787 \
+    DUOWEI_WEB_ROOT=/app/dist-web \
+    DUOWEI_DEV_CODES=0 \
+    DUOWEI_COOKIE_SECURE=0
+
+COPY package.json package-lock.json ./
+RUN npm config set registry https://registry.npmmirror.com \
+  && npm ci --omit=dev
+
+COPY dist-web ./dist-web
+COPY src ./src
+COPY tsconfig.json ./
+RUN mkdir -p /app/data \
+  && test -x node_modules/.bin/tsx
+
+VOLUME ["/app/data"]
+EXPOSE 8787
+CMD ["./node_modules/.bin/tsx", "src/listen.ts"]
