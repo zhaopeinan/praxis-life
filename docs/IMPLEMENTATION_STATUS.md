@@ -37,6 +37,11 @@
 5. **智能问答**：`POST /api/assistant/query` 服务端规则引擎；助手面板快捷问法  
 6. **站内 LLM 智能体**（`AGENT_SCOPE.md` P0）：智能体配置 + OpenAI 兼容运行时 + 工具集（查表/查记录/建记录/改记录/评论，按触发者身份鉴权）+ 表内对话 / 定时自动化 `run_agent` / 手动试跑三个入口 + 运行日志与失败重试；前端「智能体管理」弹窗与助手面板对话
 
+## 数据出口（自有增强，非飞书对标）
+
+- **空间级导出**：`GET /api/bases/:baseId/export.zip`——一个 zip 包住整个空间：`tables/*.json`（字段、视图、全部记录）、`tables/*.csv`（表格快照）、`documents/*.md`（文档正文）、`attachments/*`（记录与文档引用到的附件原件），外加 `manifest.json`（清单与统计）与 `README.md`（包结构说明）。前端入口：表格顶栏「更多 → 导出整个空间（Zip）」。单表超 5000 条与附件缺失都会写进 manifest，不静默截断。
+- **单表 CSV**：`GET /api/tables/:tableId/export.csv`（既有能力）。
+
 ## Out-of-scope / 后续基础设施
 
 - 付费能力、商业套餐  

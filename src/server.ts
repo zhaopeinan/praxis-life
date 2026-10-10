@@ -9,6 +9,7 @@ import { Accounts } from "./accounts.js";
 import { assertBaseRole } from "./access.js";
 import { configureAgentRuntime } from "./agent-runtime.js";
 import { BackupService } from "./backup.js";
+import { buildBaseExport } from "./export.js";
 import { DomainError, type Store } from "./store.js";
 import { createTemplate, TEMPLATES, type TemplateId } from "./templates.js";
 import {
@@ -832,6 +833,18 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     const user = await requireBase(c, located.baseId, "editor");
     const body = z.object({ csv: z.string() }).parse(await readBody(c));
     return c.json(await store.importCsv(located.tableId, body.csv, { userId: user.id, userName: user.name }));
+  });
+
+  app.get("/api/bases/:baseId/export.zip", async (c) => {
+    const baseId = c.req.param("baseId");
+    await requireBase(c, baseId, "viewer");
+    const { filename, buffer } = await buildBaseExport(store, baseId);
+    return new Response(buffer, {
+      headers: {
+        "content-type": "application/zip",
+        "content-disposition": `attachment; filename="space-export.zip"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      },
+    });
   });
 
   app.get("/api/tables/:tableId/acl", async (c) => {

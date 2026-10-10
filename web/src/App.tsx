@@ -654,6 +654,24 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       fail(err);
     }
   };
+  // 整个空间打包成一个 Zip（表 JSON/CSV、文档 Markdown、附件原文件），大空间要等一会儿。
+  const exportBaseZip = async () => {
+    if (!base) return;
+    try {
+      setNotice("正在打包整个空间（记录、文档与附件），稍候…");
+      const { filename, blob } = await api.exportBaseZip(base.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      setNotice(`已导出 ${filename}（${(blob.size / 1024 / 1024).toFixed(1)} MB）`);
+    } catch (err) {
+      setNotice(null);
+      fail(err);
+    }
+  };
   const mainCluster = (
     <div className="toolbar-cluster">
       <button type="button" onClick={() => setDialog("assistant")}>
@@ -679,6 +697,11 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               自动化
             </button>
           </>
+        )}
+        {base && (
+          <button type="button" onClick={exportBaseZip} title="把本空间打包成 Zip：表数据、文档与附件">
+            导出整个空间（Zip）
+          </button>
         )}
         {canEdit && payload && <hr className="menu-sep" />}
         {canEdit && payload && (
@@ -5173,6 +5196,7 @@ function buildAgentBrief(origin: string, token: string) {
 - 新建字段：\`POST ${cleanOrigin}/api/tables/{tableId}/fields\`
 - 评论：\`POST ${cleanOrigin}/api/records/{recordId}/comments\`
 - 导出 CSV：\`GET ${cleanOrigin}/api/tables/{tableId}/export.csv\`（同样带 Bearer）
+- 导出整个空间（Zip）：\`GET ${cleanOrigin}/api/bases/{baseId}/export.zip\`（表 JSON/CSV + 文档 Markdown + 附件原件）
 - 飞书：在空间设置里配置 webhook 后，可用相关 integrations 接口测通/发摘要
 
 ## 推荐工作流示例

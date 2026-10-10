@@ -133,6 +133,14 @@ GET http://47.122.123.1/api/tables/{tableId}/export.csv
 
 （同样需要带 `Authorization: Bearer <令牌>`）
 
+### 导出整个空间（Zip）
+
+```bash
+GET http://47.122.123.1/api/bases/{baseId}/export.zip
+```
+
+（同样需要带 `Authorization: Bearer <令牌>`）一个 zip 包住整个空间：每张表的 `tables/*.json`（字段、视图、全部记录）与 `tables/*.csv`（表格快照）、文档正文 `documents/*.md`、记录与文档引用到的附件原件 `attachments/`，外加 `manifest.json`（清单与统计）与 `README.md`（包结构说明）。附件缺失或单表超过 5000 条会写进 manifest 的 `missingAttachments` / `truncated` 字段。
+
 ### 飞书集成
 
 在空间设置里配置飞书机器人 Webhook 后：

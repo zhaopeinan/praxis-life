@@ -265,6 +265,16 @@ export const api = {
     }
     return response.text();
   },
+  exportBaseZip: async (baseId: string) => {
+    const response = await fetch(`/api/bases/${baseId}/export.zip`, { credentials: "include" });
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new ApiError(data.error || "导出失败", response.status);
+    }
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+    return { filename: encoded ? decodeURIComponent(encoded) : "space-export.zip", blob: await response.blob() };
+  },
   importCsv: (tableId: string, csv: string) =>
     request<{ imported: number }>(`/api/tables/${tableId}/import.csv`, {
       method: "POST",
