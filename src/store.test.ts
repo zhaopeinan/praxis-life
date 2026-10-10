@@ -1676,5 +1676,81 @@ assert.equal(revokedOldToken.status, 401);
 const rotatedTokenWorks = await json("/api/bases", { token: rotated.data.token });
 assert.equal(rotatedTokenWorks.status, 200);
 
+// ——— 自动化运行记录：跳过也要留痕，且不写假的"成功" ———
+// 先清空飞书 Webhook，模拟"配置缺失"的真实场景
+const clearedHook = await json(`/api/bases/${todos.data.id}/settings`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ integrations: { feishuWebhookUrl: "" } }),
+});
+assert.equal(clearedHook.status, 200);
+assert.equal(clearedHook.data.integrations.feishuWebhookUrl ?? null, null);
+
+const feishuTestNoWebhook = await json(`/api/bases/${todos.data.id}/feishu-test`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({}),
+});
+assert.equal(feishuTestNoWebhook.status, 400);
+assert.match(feishuTestNoWebhook.data.error, /飞书机器人/);
+
+const observedCreate = await json(`/api/tables/${todoTable.id}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "自动化观测测试", 领域: "科研", 状态: "待办", 优先级: "P1" } }),
+});
+assert.equal(observedCreate.status, 201);
+
+const todoAutosAfter = await json(`/api/tables/${todoTable.id}/automations`, { cookie: ada2 });
+const feishuAuto = todoAutosAfter.data.find(
+  (item: { actions: Array<{ type: string }> }) => item.actions[0]?.type === "feishu_bot",
+);
+assert.ok(feishuAuto);
+assert.equal(feishuAuto.lastStatus, "skipped");
+assert.equal(feishuAuto.lastRunAt, 0); // 没有真正发出就不算成功
+assert.ok(feishuAuto.lastAttemptAt > 0); // 但确实尝试过
+assert.match(feishuAuto.lastDetail, /未配置飞书机器人/);
+
+const observedRuns = await json(`/api/tables/${todoTable.id}/automation-runs`, { cookie: ada2 });
+const skippedRun = observedRuns.data.find((item: { automationId: string }) => item.automationId === feishuAuto.id);
+assert.ok(skippedRun);
+assert.equal(skippedRun.status, "skipped");
+assert.equal(skippedRun.trigger, "record_created");
+
+// 手动试跑：只发对外消息，不改数据；未配置 Webhook 时不会真的发请求
+const runFetch = globalThis.fetch;
+const runCalls: string[] = [];
+globalThis.fetch = (async (input: RequestInfo | URL) => {
+  runCalls.push(String(input));
+  return new Response(JSON.stringify({ code: 0, msg: "success" }), { status: 200 });
+}) as typeof fetch;
+const manualRun = await json(`/api/automations/${feishuAuto.id}/run`, { method: "POST", cookie: ada2 });
+assert.equal(manualRun.status, 200);
+assert.equal(manualRun.data.run.status, "skipped");
+assert.equal(runCalls.length, 0);
+const runsAfterManual = await json(`/api/tables/${todoTable.id}/automation-runs`, { cookie: ada2 });
+assert.ok(runsAfterManual.data.some((item: { trigger: string }) => item.trigger === "manual"));
+
+// 配上 Webhook 后应真的发出，并把 last_run_at 推进到成功时间
+const savedHookAgain = await json(`/api/bases/${todos.data.id}/settings`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ integrations: { feishuWebhookUrl: "https://open.feishu.cn/open-apis/bot/v2/hook/test-token" } }),
+});
+assert.equal(savedHookAgain.status, 200);
+const observedCreate2 = await json(`/api/tables/${todoTable.id}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "自动化成功路径", 状态: "待办" } }),
+});
+assert.equal(observedCreate2.status, 201);
+const todoAutosOk = await json(`/api/tables/${todoTable.id}/automations`, { cookie: ada2 });
+const feishuAutoOk = todoAutosOk.data.find((item: { id: string }) => item.id === feishuAuto.id);
+assert.equal(feishuAutoOk.lastStatus, "ok");
+assert.ok(feishuAutoOk.lastRunAt > 0);
+assert.match(feishuAutoOk.lastDetail, /已发出/);
+assert.ok(runCalls.length >= 1);
+globalThis.fetch = runFetch;
+
 console.log("duowei tests passed");
 

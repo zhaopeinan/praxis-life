@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { applyQuery } from "../../src/query.js";
-import type { BaseMember, BaseSummary, DisplayValue, DocumentSummary, Field, McpAgent, PublicRecord, PublicUser, RecordDocumentLink, TablePayload, View, ViewType } from "../../src/types.js";
+import type { Automation, AutomationRun, BaseMember, BaseSummary, DisplayValue, DocumentSummary, Field, McpAgent, PublicRecord, PublicUser, RecordDocumentLink, TablePayload, View, ViewType } from "../../src/types.js";
 import { DOC_TEMPLATES, FIELD_TYPE_LABELS, VIEW_TYPE_LABELS } from "../../src/types.js";
 import { api, type BackupLogDto, type BackupSettingsDto } from "./api";
 import { AuthScreen } from "./AuthScreen";
@@ -1567,7 +1567,13 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
         />
       )}
       {dialog === "automations" && payload && (
-        <AutomationDialog tableId={payload.id} fields={payload.fields} onClose={closeDialog} />
+        <AutomationDialog
+          tableId={payload.id}
+          baseId={base?.id ?? null}
+          canOwn={canOwn}
+          fields={payload.fields}
+          onClose={closeDialog}
+        />
       )}
       {dialog === "assistant" && payload && (
         <AssistantPanel tableId={payload.id} tableName={payload.name} onClose={closeDialog} />
@@ -4004,16 +4010,22 @@ function ColorRulesDialog({
 
 function AutomationDialog({
   tableId,
+  baseId,
+  canOwn,
   fields,
   onClose,
 }: {
   tableId: string;
+  baseId: string | null;
+  canOwn: boolean;
   fields: Field[];
   onClose: () => void;
 }) {
-  const [items, setItems] = useState<
-    Array<{ id: string; name: string; enabled: boolean; trigger: { type: string }; actions: Array<{ type: string }> }>
-  >([]);
+  const [items, setItems] = useState<Automation[]>([]);
+  const [runs, setRuns] = useState<AutomationRun[]>([]);
+  const [savedWebhook, setSavedWebhook] = useState("");
+  const [webhookDraft, setWebhookDraft] = useState("");
+  const [openRuns, setOpenRuns] = useState<string | null>(null);
   const [name, setName] = useState("新建时设为待办");
   const [triggerType, setTriggerType] = useState<"record_created" | "webhook" | "button" | "schedule">("record_created");
   const [fieldId, setFieldId] = useState(fields.find((field) => field.type === "single_select")?.id ?? fields[0]?.id ?? "");
@@ -4028,18 +4040,96 @@ function AutomationDialog({
   const [emailSubject, setEmailSubject] = useState("知行人生通知");
   const [emailText, setEmailText] = useState("记录 {recordId} 触发了自动化");
   const [feishuText, setFeishuText] = useState("【知行人生】{标题} · {状态} · 截止 {截止日期}");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const feishuNeeded = items.some((item) => item.actions.some((action) => action.type === "feishu_bot" || action.type === "feishu_digest"));
+  const webhookReady = Boolean(savedWebhook);
   async function reload() {
-    setItems(await api.automations(tableId));
+    const [list, history] = await Promise.all([api.automations(tableId), api.automationRuns(tableId)]);
+    setItems(list);
+    setRuns(history);
+    if (baseId) {
+      const settings = await api.getSettings(baseId);
+      const current = settings.integrations?.feishuWebhookUrl ?? "";
+      setSavedWebhook(current);
+      setWebhookDraft((draft) => (draft ? draft : current));
+    }
   }
   useEffect(() => {
     reload().catch((err) => setError(message(err)));
-  }, [tableId]);
+  }, [tableId, baseId]);
+  async function saveWebhook() {
+    if (!baseId) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await api.updateSettings(baseId, { integrations: { feishuWebhookUrl: webhookDraft.trim() } });
+      setSavedWebhook(webhookDraft.trim());
+      setNotice(webhookDraft.trim() ? "飞书机器人已保存。" : "已清空飞书机器人地址，飞书动作将不会发送。");
+    } catch (err) {
+      setError(message(err));
+    }
+  }
+  async function sendTest() {
+    if (!baseId) return;
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      await api.testFeishu(baseId, webhookDraft.trim() ? { webhookUrl: webhookDraft.trim() } : undefined);
+      setNotice("测试消息已发出，请到飞书群里确认。");
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function runNow(automationId: string) {
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      const result = await api.runAutomation(automationId);
+      setOpenRuns(automationId);
+      setNotice(`试跑结果：${runStatusLabel(result.run.status)}（${result.run.detail}）`);
+      await reload();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <Modal title="自动化" onClose={onClose} size="wide">
       <p className="fine">
-        支持创建触发、按钮、Webhook、定时；定时格式：every:5 / daily:09:00 / weekly:1:09:00 / 0 9 * * *；动作含改字段、评论、HTTP、邮件、飞书机器人。飞书地址在「日历 / 飞书」里配置。
+        支持创建触发、按钮、Webhook、定时；定时格式：every:5 / daily:09:00 / weekly:1:09:00 / 0 9 * * *；动作含改字段、评论、HTTP、邮件、飞书机器人。
       </p>
+      {feishuNeeded && (
+        <div className={`automation-setup${webhookReady ? "" : " is-missing"}`}>
+          <div className="automation-setup-head">
+            <strong>{webhookReady ? "飞书机器人已配置" : "飞书自动化不会发送：尚未配置飞书机器人 Webhook"}</strong>
+            {webhookReady && <span className="tag green">{webhookLabel(savedWebhook)}</span>}
+          </div>
+          <p className="fine" style={{ margin: 0 }}>
+            在飞书群里添加「自定义机器人」，把 Webhook 地址粘贴到这里；配置后可以点「发送测试消息」验证连通。
+          </p>
+          <div className="automation-setup-row">
+            <input
+              value={webhookDraft}
+              onChange={(event) => setWebhookDraft(event.target.value)}
+              placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/…"
+              disabled={!canOwn}
+            />
+            <button type="button" onClick={saveWebhook} disabled={!canOwn}>
+              保存
+            </button>
+            <button type="button" className="primary" onClick={sendTest} disabled={busy || !webhookDraft.trim()}>
+              发送测试消息
+            </button>
+          </div>
+        </div>
+      )}
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -4204,33 +4294,86 @@ function AutomationDialog({
         )}
         <button type="submit" className="primary">添加规则</button>
       </form>
-      <ul className="member-list">
-        {items.map((item) => (
-          <li key={item.id}>
-            <div>
-              <strong>{item.name}</strong>
-              <span>
-                {item.enabled ? "已启用" : "已停用"} · {item.trigger.type}
-                {item.trigger.type === "webhook" ? ` · POST /api/webhooks/automations/${item.id}` : ""}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                api.updateAutomation(item.id, { enabled: !item.enabled }).then(reload).catch((err) => setError(message(err)))
-              }
-            >
-              {item.enabled ? "停用" : "启用"}
-            </button>
-            <button type="button" onClick={() => api.deleteAutomation(item.id).then(reload).catch((err) => setError(message(err)))}>
-              删除
-            </button>
-          </li>
-        ))}
+      <ul className="member-list automation-list">
+        {items.map((item) => {
+          const history = runs.filter((run) => run.automationId === item.id).slice(0, 20);
+          const latest = history[0] ?? null;
+          const expanded = openRuns === item.id;
+          return (
+            <li key={item.id} className="automation-item">
+              <div>
+                <strong>{item.name}</strong>
+                <span>
+                  {item.enabled ? "已启用" : "已停用"} · {item.trigger.type}
+                  {item.trigger.type === "webhook" ? ` · POST /api/webhooks/automations/${item.id}` : ""}
+                </span>
+                <span className="automation-run-hint">
+                  <span className={`tag ${runStatusTone(latest?.status ?? null)}`}>
+                    {latest ? `${runStatusLabel(latest.status)} · ${formatWhen(latest.createdAt)}` : "尚无运行记录"}
+                  </span>
+                  {latest && <span>{latest.detail}</span>}
+                </span>
+                {history.length > 1 && (
+                  <button type="button" className="link-btn" onClick={() => setOpenRuns(expanded ? null : item.id)}>
+                    {expanded ? "收起运行记录" : `最近 ${history.length} 次运行`}
+                  </button>
+                )}
+                {expanded && (
+                  <ul className="automation-runs">
+                    {history.map((run) => (
+                      <li key={run.id}>
+                        <time>{formatWhen(run.createdAt)}</time>
+                        <span className={`tag ${runStatusTone(run.status)}`}>{runStatusLabel(run.status)}</span>
+                        <span>{run.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button type="button" onClick={() => runNow(item.id)} disabled={busy || !item.enabled}>
+                试跑
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  api.updateAutomation(item.id, { enabled: !item.enabled }).then(reload).catch((err) => setError(message(err)))
+                }
+              >
+                {item.enabled ? "停用" : "启用"}
+              </button>
+              <button type="button" onClick={() => api.deleteAutomation(item.id).then(reload).catch((err) => setError(message(err)))}>
+                删除
+              </button>
+            </li>
+          );
+        })}
       </ul>
+      {notice && <p className="form-ok">{notice}</p>}
       {error && <p className="form-error">{error}</p>}
     </Modal>
   );
+}
+
+function runStatusLabel(status: "ok" | "failed" | "skipped") {
+  if (status === "ok") return "成功";
+  if (status === "failed") return "失败";
+  return "跳过";
+}
+
+function runStatusTone(status: "ok" | "failed" | "skipped" | null) {
+  if (status === "ok") return "green";
+  if (status === "failed") return "red";
+  if (status === "skipped") return "yellow";
+  return "gray";
+}
+
+function webhookLabel(webhook: string) {
+  try {
+    const url = new URL(webhook);
+    return `${url.hostname}/…${url.pathname.slice(-6)}`;
+  } catch {
+    return "已配置";
+  }
 }
 
 function CalendarFeishuDialog({

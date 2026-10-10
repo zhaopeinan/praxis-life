@@ -857,6 +857,19 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     return c.json(await store.listAutomations(located.tableId));
   });
 
+  app.get("/api/tables/:tableId/automation-runs", async (c) => {
+    const located = await store.locateTable(c.req.param("tableId"));
+    await requireBase(c, located.baseId, "viewer");
+    const limit = Number(c.req.query("limit") ?? 50);
+    return c.json(await store.listAutomationRuns(located.tableId, Number.isFinite(limit) ? limit : 50));
+  });
+
+  app.post("/api/automations/:automationId/run", async (c) => {
+    const located = await store.locateAutomation(c.req.param("automationId"));
+    await requireBase(c, located.baseId, "editor");
+    return c.json(await store.runAutomationNow(c.req.param("automationId")));
+  });
+
   app.post("/api/tables/:tableId/automations", async (c) => {
     const located = await store.locateTable(c.req.param("tableId"));
     await requireBase(c, located.baseId, "editor");

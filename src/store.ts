@@ -21,6 +21,8 @@ import {
   type Automation,
   type AutomationAction,
   type AutomationCondition,
+  type AutomationRun,
+  type AutomationRunStatus,
   type AutomationTrigger,
   type BaseIntegrations,
   type BaseSummary,
@@ -75,6 +77,12 @@ import {
 const SYSTEM_SET = new Set<string>(SYSTEM_FIELD_TYPES);
 const VIEW_TYPES: ViewType[] = ["grid", "kanban", "calendar", "gallery", "form", "gantt"];
 const ROW_HEIGHTS: RowHeight[] = ["short", "medium", "tall", "extra"];
+
+type AutomationActionResult = {
+  type: AutomationAction["type"];
+  status: "ok" | "failed" | "skipped";
+  detail: string;
+};
 const FIELD_TYPE_SET = new Set<FieldType>([
   "text",
   "long_text",
@@ -329,6 +337,17 @@ export class Store {
         created_at INTEGER NOT NULL
       )`,
       `CREATE INDEX IF NOT EXISTS idx_automations_table ON automations(table_id)`,
+      `CREATE TABLE IF NOT EXISTS automation_runs (
+        id TEXT PRIMARY KEY,
+        automation_id TEXT NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+        table_id TEXT NOT NULL,
+        trigger TEXT NOT NULL,
+        status TEXT NOT NULL,
+        detail TEXT NOT NULL DEFAULT '',
+        record_id TEXT,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_automation_runs_auto ON automation_runs(automation_id, created_at DESC)`,
       `CREATE TABLE IF NOT EXISTS table_acls (
         table_id TEXT PRIMARY KEY REFERENCES tables(id) ON DELETE CASCADE,
         row_allow TEXT NOT NULL DEFAULT '{}',
@@ -513,6 +532,7 @@ export class Store {
       "ALTER TABLE workflow_audit ADD COLUMN record_id TEXT",
       "ALTER TABLE table_acls ADD COLUMN row_rules TEXT NOT NULL DEFAULT '{}'",
       "ALTER TABLE automations ADD COLUMN last_run_at INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE automations ADD COLUMN last_attempt_at INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE views ADD COLUMN protection TEXT NOT NULL DEFAULT 'public'",
       "ALTER TABLE views ADD COLUMN created_by TEXT",
       "ALTER TABLE base_settings ADD COLUMN integrations_json TEXT NOT NULL DEFAULT '{}'",
@@ -529,6 +549,24 @@ export class Store {
         table_id TEXT PRIMARY KEY REFERENCES tables(id) ON DELETE CASCADE,
         config_json TEXT NOT NULL DEFAULT '{}'
       )`);
+    } catch {
+      /* ignore */
+    }
+    // 定时去重口径从"最近成功"改为"最近尝试"：把旧的 last_run_at 回填为 last_attempt_at，
+    // 避免跳过（例如未配置飞书 Webhook）的自动化被每分钟反复触发。
+    try {
+      await this.db.execute(
+        "UPDATE automations SET last_attempt_at = last_run_at WHERE last_attempt_at = 0 AND last_run_at > 0",
+      );
+    } catch {
+      /* ignore */
+    }
+    // 运行记录只保留最近 30 天，避免无限增长。
+    try {
+      await this.db.execute({
+        sql: "DELETE FROM automation_runs WHERE created_at < ?",
+        args: [Date.now() - 30 * 24 * 60 * 60 * 1000],
+      });
     } catch {
       /* ignore */
     }
@@ -1862,6 +1900,7 @@ export class Store {
         }
       }
       if (!hit) continue;
+      const results: AutomationActionResult[] = [];
       if (auto.conditions.length) {
         const publicRec = await this.toPublic(record, fields);
         const ok = auto.conditions.every((condition) => {
@@ -1869,11 +1908,31 @@ export class Store {
           if (!field) return false;
           return matchesCondition(publicRec.fields[field.name], condition);
         });
-        if (!ok) continue;
+        if (!ok) {
+          await this.recordAutomationRun({
+            automationId: auto.id,
+            tableId,
+            trigger: trigger.type,
+            recordId: record.id,
+            results: auto.actions.map((action) => ({
+              type: action.type,
+              status: "skipped" as const,
+              detail: "触发条件未满足",
+            })),
+          });
+          continue;
+        }
       }
       for (const action of auto.actions) {
-        await this.applyAutomationAction(tableId, record, fields, action, meta);
+        results.push(await this.applyAutomationAction(tableId, record, fields, action, meta));
       }
+      await this.recordAutomationRun({
+        automationId: auto.id,
+        tableId,
+        trigger: trigger.type,
+        recordId: record.id,
+        results,
+      });
     }
   }
 
@@ -1883,10 +1942,32 @@ export class Store {
     fields: Field[],
     action: AutomationAction,
     meta?: { userId?: string; userName?: string },
-  ): Promise<void> {
+  ): Promise<AutomationActionResult> {
+    try {
+      return await this.runAutomationAction(tableId, record, fields, action, meta);
+    } catch (error) {
+      // 单个动作失败不再中断记录写入，而是落进运行记录，界面可见。
+      console.error(`automation action ${action.type} failed`, error);
+      return {
+        type: action.type,
+        status: "failed",
+        detail: `执行出错：${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  private async runAutomationAction(
+    tableId: string,
+    record: RawRecord,
+    fields: Field[],
+    action: AutomationAction,
+    meta?: { userId?: string; userName?: string },
+  ): Promise<AutomationActionResult> {
     if (action.type === "set_field") {
       const field = fields.find((item) => item.id === action.fieldId);
-      if (!field || SYSTEM_SET.has(field.type)) return;
+      if (!field || SYSTEM_SET.has(field.type)) {
+        return { type: action.type, status: "skipped", detail: "目标字段不存在或为系统字段" };
+      }
       const resolved = await this.writeFieldValue(fields, field.id, action.value);
       const values = { ...record.values };
       if (resolved.stored == null) delete values[resolved.fieldId];
@@ -1895,11 +1976,11 @@ export class Store {
       await this.writeValues(record.id, values, updatedAt);
       record.values = values;
       record.updatedAt = updatedAt;
-      return;
+      return { type: action.type, status: "ok", detail: `已设置「${field.name}」` };
     }
     if (action.type === "create_record") {
       await this.createRecord(tableId, action.fields, { skipAutomation: true });
-      return;
+      return { type: action.type, status: "ok", detail: "已新建记录" };
     }
     if (action.type === "add_comment") {
       await this.addComment(
@@ -1908,12 +1989,12 @@ export class Store {
         meta?.userName ?? "自动化",
         action.body.replaceAll("{recordId}", record.id),
       );
-      return;
+      return { type: action.type, status: "ok", detail: "已写入评论" };
     }
     if (action.type === "notify") {
       const table = await this.requireTable(tableId);
       const userId = action.userId ?? meta?.userId;
-      if (!userId) return;
+      if (!userId) return { type: action.type, status: "skipped", detail: "没有可通知的成员" };
       await this.createNotification({
         userId,
         baseId: table.baseId,
@@ -1921,7 +2002,7 @@ export class Store {
         recordId: record.id,
         message: action.message,
       });
-      return;
+      return { type: action.type, status: "ok", detail: "已发送站内通知" };
     }
     if (action.type === "http_request") {
       const method = action.method ?? "POST";
@@ -1931,45 +2012,110 @@ export class Store {
         method === "GET"
           ? undefined
           : await this.interpolateAutomationText(action.body ?? JSON.stringify({ recordId: record.id, tableId }), record, fields);
-      try {
-        await fetch(url, { method, headers, body });
-      } catch (error) {
-        console.error("automation http_request failed", error);
+      const response = await fetch(url, { method, headers, body });
+      if (!response.ok) {
+        return { type: action.type, status: "failed", detail: `请求返回 ${response.status}` };
       }
-      return;
+      return { type: action.type, status: "ok", detail: `请求成功（${response.status}）` };
     }
     if (action.type === "send_email") {
-      try {
-        const { sendMail, smtpConfigured } = await import("./mailer.js");
-        if (!smtpConfigured()) {
-          console.warn("automation send_email skipped: SMTP not configured");
-          return;
-        }
-        await sendMail({
-          to: await this.interpolateAutomationText(action.to, record, fields),
-          subject: await this.interpolateAutomationText(action.subject, record, fields),
-          text: await this.interpolateAutomationText(action.text, record, fields),
-        });
-      } catch (error) {
-        console.error("automation send_email failed", error);
+      const { sendMail, smtpConfigured } = await import("./mailer.js");
+      if (!smtpConfigured()) {
+        return { type: action.type, status: "skipped", detail: "未配置 SMTP，邮件不会发出" };
       }
-      return;
+      await sendMail({
+        to: await this.interpolateAutomationText(action.to, record, fields),
+        subject: await this.interpolateAutomationText(action.subject, record, fields),
+        text: await this.interpolateAutomationText(action.text, record, fields),
+      });
+      return { type: action.type, status: "ok", detail: "邮件已发出" };
     }
     if (action.type === "feishu_bot") {
       const table = await this.requireTable(tableId);
       const webhook = action.webhookUrl || (await this.getBaseSettings(table.baseId)).integrations.feishuWebhookUrl;
       if (!webhook) {
-        console.warn("automation feishu_bot skipped: no webhook");
-        return;
+        return { type: action.type, status: "skipped", detail: "未配置飞书机器人 Webhook，消息不会发出" };
       }
       const text = await this.interpolateAutomationText(action.text, record, fields);
       const result = await sendFeishuText(webhook, text);
-      if (!result.ok) console.error("automation feishu_bot failed", result.message);
-      return;
+      if (!result.ok) {
+        return { type: action.type, status: "failed", detail: `飞书发送失败：${result.message}` };
+      }
+      return { type: action.type, status: "ok", detail: "飞书消息已发出" };
     }
     if (action.type === "feishu_digest") {
-      await this.sendFeishuDigest(tableId, action);
+      const result = await this.sendFeishuDigest(tableId, action);
+      if (result.sent) {
+        return { type: action.type, status: "ok", detail: `飞书摘要已发出（${result.count} 条待办）` };
+      }
+      return {
+        type: action.type,
+        status: result.reason === "no-webhook" ? "skipped" : "failed",
+        detail: result.reason === "no-webhook" ? "未配置飞书机器人 Webhook，摘要不会发出" : `飞书摘要发送失败：${result.message ?? "未知原因"}`,
+      };
     }
+    const unknown = action as { type: AutomationAction["type"] };
+    return { type: unknown.type, status: "skipped", detail: "未知动作类型" };
+  }
+
+  /** 汇总一次自动化的动作结果，落一条运行记录，并按结果更新运行时间。 */
+  private async recordAutomationRun(input: {
+    automationId: string;
+    tableId: string;
+    trigger: string;
+    recordId?: string | null;
+    results: AutomationActionResult[];
+  }): Promise<AutomationRun> {
+    const status: AutomationRunStatus = input.results.some((item) => item.status === "failed")
+      ? "failed"
+      : input.results.some((item) => item.status === "ok")
+        ? "ok"
+        : "skipped";
+    const detail = input.results.map((item) => `${item.type}：${item.detail}`).join("；") || "没有动作";
+    const run: AutomationRun = {
+      id: nid("ar"),
+      automationId: input.automationId,
+      tableId: input.tableId,
+      trigger: input.trigger,
+      status,
+      detail,
+      recordId: input.recordId ?? null,
+      createdAt: Date.now(),
+    };
+    try {
+      await this.db.execute({
+        sql: "INSERT INTO automation_runs (id, automation_id, table_id, trigger, status, detail, record_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        args: [
+          run.id,
+          run.automationId,
+          run.tableId,
+          run.trigger,
+          run.status,
+          run.detail,
+          run.recordId,
+          run.createdAt,
+        ],
+      });
+      // 只有真正执行成功的运行才更新"最近成功"时间，避免出现假成功信号。
+      await this.db.execute({
+        sql: "UPDATE automations SET last_attempt_at = ? WHERE id = ?",
+        args: [run.createdAt, run.automationId],
+      });
+      if (status === "ok") {
+        await this.db.execute({
+          sql: "UPDATE automations SET last_run_at = ? WHERE id = ?",
+          args: [run.createdAt, run.automationId],
+        });
+      }
+      await this.db.execute({
+        sql: `DELETE FROM automation_runs WHERE automation_id = ? AND id NOT IN (
+                SELECT id FROM automation_runs WHERE automation_id = ? ORDER BY created_at DESC LIMIT 100)`,
+        args: [run.automationId, run.automationId],
+      });
+    } catch (error) {
+      console.error("record automation run failed", error);
+    }
+    return run;
   }
 
   async runWebhookAutomation(
@@ -1997,13 +2143,35 @@ export class Store {
         if (!field) return false;
         return matchesCondition(publicRec.fields[field.name], condition);
       });
-      if (!ok) return { ok: true, ran: false };
+      if (!ok) {
+        await this.recordAutomationRun({
+          automationId,
+          tableId: auto.tableId,
+          trigger: "webhook",
+          recordId: record.id,
+          results: auto.actions.map((action) => ({
+            type: action.type,
+            status: "skipped" as const,
+            detail: "触发条件未满足",
+          })),
+        });
+        return { ok: true, ran: false };
+      }
     }
+    const results: AutomationActionResult[] = [];
     for (const action of auto.actions) {
-      await this.applyAutomationAction(auto.tableId, record, fields, action, { userId: "system", userName: "Webhook" });
+      results.push(
+        await this.applyAutomationAction(auto.tableId, record, fields, action, { userId: "system", userName: "Webhook" }),
+      );
     }
-    await this.touchAutomationRun(automationId);
-    return { ok: true, ran: true };
+    const run = await this.recordAutomationRun({
+      automationId,
+      tableId: auto.tableId,
+      trigger: "webhook",
+      recordId: record.id,
+      results,
+    });
+    return { ok: true, ran: run.status === "ok" };
   }
 
   async runButtonAutomations(
@@ -2023,12 +2191,32 @@ export class Store {
           if (!field) return false;
           return matchesCondition(publicRec.fields[field.name], condition);
         });
-        if (!ok) continue;
+        if (!ok) {
+          await this.recordAutomationRun({
+            automationId: auto.id,
+            tableId,
+            trigger: "button",
+            recordId: record.id,
+            results: auto.actions.map((action) => ({
+              type: action.type,
+              status: "skipped" as const,
+              detail: "触发条件未满足",
+            })),
+          });
+          continue;
+        }
       }
+      const results: AutomationActionResult[] = [];
       for (const action of auto.actions) {
-        await this.applyAutomationAction(tableId, record, fields, action, meta);
+        results.push(await this.applyAutomationAction(tableId, record, fields, action, meta));
       }
-      await this.touchAutomationRun(auto.id);
+      await this.recordAutomationRun({
+        automationId: auto.id,
+        tableId,
+        trigger: "button",
+        recordId: record.id,
+        results,
+      });
     }
   }
 
@@ -2038,7 +2226,8 @@ export class Store {
     for (const row of result.rows) {
       const trigger = parseJson<AutomationTrigger>(row.trigger_json, { type: "record_created" });
       if (trigger.type !== "schedule") continue;
-      const last = asNumber(row.last_run_at ?? 0);
+      // 去重口径是"最近一次尝试"，跳过（例如未配置飞书）也算尝试过，否则会被每分钟反复触发。
+      const last = Math.max(asNumber(row.last_attempt_at ?? 0), asNumber(row.last_run_at ?? 0));
       if (!shouldRunSchedule(trigger.cron, last, now)) continue;
       const autoId = asString(row.id);
       const tableId = asString(row.table_id);
@@ -2048,19 +2237,50 @@ export class Store {
       const digestOnly = actions.length > 0 && actions.every((item) => item.type === "feishu_digest");
       const record = table.records[0] ? await this.requireRecord(table.records[0].id) : null;
       if (!record && !digestOnly) {
-        await this.touchAutomationRun(autoId, now);
+        await this.recordAutomationRun({
+          automationId: autoId,
+          tableId,
+          trigger: "schedule",
+          results: actions.map((action) => ({
+            type: action.type,
+            status: "skipped" as const,
+            detail: "表内没有可执行的记录",
+          })),
+        });
         continue;
       }
+      const results: AutomationActionResult[] = [];
       for (const action of actions) {
         if (action.type === "feishu_digest") {
-          await this.sendFeishuDigest(tableId, action);
+          const digest = await this.sendFeishuDigest(tableId, action);
+          results.push(
+            digest.sent
+              ? { type: action.type, status: "ok", detail: `飞书摘要已发出（${digest.count} 条待办）` }
+              : {
+                  type: action.type,
+                  status: digest.reason === "no-webhook" ? "skipped" : "failed",
+                  detail:
+                    digest.reason === "no-webhook"
+                      ? "未配置飞书机器人 Webhook，摘要不会发出"
+                      : `飞书摘要发送失败：${digest.message ?? "未知原因"}`,
+                },
+          );
           continue;
         }
-        if (!record) continue;
-        await this.applyAutomationAction(tableId, record, fields, action, { userId: "system", userName: "定时" });
+        if (!record) {
+          results.push({ type: action.type, status: "skipped", detail: "表内没有可执行的记录" });
+          continue;
+        }
+        results.push(await this.applyAutomationAction(tableId, record, fields, action, { userId: "system", userName: "定时" }));
       }
-      await this.touchAutomationRun(autoId, now);
-      ran += 1;
+      const run = await this.recordAutomationRun({
+        automationId: autoId,
+        tableId,
+        trigger: "schedule",
+        recordId: record?.id ?? null,
+        results,
+      });
+      if (run.status === "ok") ran += 1;
     }
     return ran;
   }
@@ -2069,24 +2289,63 @@ export class Store {
     const result = await this.db.execute({ sql: "SELECT * FROM automations WHERE id = ?", args: [automationId] });
     const row = result.rows[0];
     if (!row) throw new DomainError("找不到自动化", 404);
-    return {
-      id: asString(row.id),
-      tableId: asString(row.table_id),
-      name: asString(row.name),
-      enabled: asNumber(row.enabled) === 1,
-      trigger: parseJson<AutomationTrigger>(row.trigger_json, { type: "record_created" }),
-      conditions: parseJson<AutomationCondition[]>(row.conditions_json, []),
-      actions: parseJson<AutomationAction[]>(row.actions_json, []),
-      createdAt: asNumber(row.created_at),
-    };
+    return this.automationFromRow(row);
   }
 
   private async touchAutomationRun(automationId: string, at = Date.now()): Promise<void> {
     try {
-      await this.db.execute({ sql: "UPDATE automations SET last_run_at = ? WHERE id = ?", args: [at, automationId] });
+      await this.db.execute({ sql: "UPDATE automations SET last_attempt_at = ? WHERE id = ?", args: [at, automationId] });
     } catch {
       /* column may not exist yet on very old DBs */
     }
+  }
+
+  /** 手动试跑一条自动化（用于排障与失败重试）：以表内第一条记录为样本，只执行对外发送类动作，不改数据。 */
+  async runAutomationNow(automationId: string): Promise<{ ok: true; run: AutomationRun }> {
+    const auto = await this.requireAutomation(automationId);
+    const fields = await this.listFields(auto.tableId);
+    const table = await this.getTable(auto.tableId);
+    const first = table.records[0];
+    if (!first) throw new DomainError("表内没有记录，无法手动运行", 400);
+    const record = await this.requireRecord(first.id);
+    const results: AutomationActionResult[] = [];
+    for (const action of auto.actions) {
+      if (action.type === "feishu_digest") {
+        const digest = await this.sendFeishuDigest(auto.tableId, action);
+        results.push(
+          digest.sent
+            ? { type: action.type, status: "ok", detail: `飞书摘要已发出（${digest.count} 条待办）` }
+            : {
+                type: action.type,
+                status: digest.reason === "no-webhook" ? "skipped" : "failed",
+                detail:
+                  digest.reason === "no-webhook"
+                    ? "未配置飞书机器人 Webhook，摘要不会发出"
+                    : `飞书摘要发送失败：${digest.message ?? "未知原因"}`,
+              },
+        );
+        continue;
+      }
+      if (
+        action.type !== "feishu_bot" &&
+        action.type !== "http_request" &&
+        action.type !== "send_email"
+      ) {
+        results.push({ type: action.type, status: "skipped", detail: "手动试跑不会执行改数据的动作" });
+        continue;
+      }
+      results.push(
+        await this.applyAutomationAction(auto.tableId, record, fields, action, { userId: "system", userName: "手动试跑" }),
+      );
+    }
+    const run = await this.recordAutomationRun({
+      automationId,
+      tableId: auto.tableId,
+      trigger: "manual",
+      recordId: record.id,
+      results,
+    });
+    return { ok: true, run };
   }
 
   async exportCsv(tableId: string): Promise<string> {
@@ -2114,10 +2373,10 @@ export class Store {
   async sendFeishuDigest(
     tableId: string,
     action: Extract<AutomationAction, { type: "feishu_digest" }>,
-  ): Promise<{ sent: boolean; count: number }> {
+  ): Promise<{ sent: boolean; count: number; reason?: "no-webhook" | "send-failed"; message?: string }> {
     const table = await this.requireTable(tableId);
     const webhook = action.webhookUrl || (await this.getBaseSettings(table.baseId)).integrations.feishuWebhookUrl;
-    if (!webhook) return { sent: false, count: 0 };
+    if (!webhook) return { sent: false, count: 0, reason: "no-webhook", message: "未配置飞书机器人 Webhook" };
     const payload = await this.getTable(tableId);
     const dateField =
       (action.dateField
@@ -2146,8 +2405,8 @@ export class Store {
     const header = action.text?.trim() || `【待办摘要】${today} 起 ${daysAhead} 天内 ${due.length} 项`;
     const text = [header, ...lines].join("\n") || header;
     const result = await sendFeishuText(webhook, text);
-    if (!result.ok) console.error("feishu digest failed", result.message);
-    return { sent: result.ok, count: due.length };
+    if (!result.ok) return { sent: false, count: due.length, reason: "send-failed", message: result.message };
+    return { sent: true, count: due.length };
   }
 
   async exportIcs(tableId: string, opts?: { dateFieldId?: string; titleFieldId?: string }): Promise<string> {
@@ -2473,13 +2732,8 @@ export class Store {
     return map;
   }
 
-  async listAutomations(tableId: string): Promise<Automation[]> {
-    await this.requireTable(tableId);
-    const result = await this.db.execute({
-      sql: "SELECT * FROM automations WHERE table_id = ? ORDER BY created_at ASC",
-      args: [tableId],
-    });
-    return result.rows.map((row) => ({
+  private automationFromRow(row: Record<string, unknown>): Automation {
+    return {
       id: asString(row.id),
       tableId: asString(row.table_id),
       name: asString(row.name),
@@ -2488,7 +2742,64 @@ export class Store {
       conditions: parseJson<AutomationCondition[]>(row.conditions_json, []),
       actions: parseJson<AutomationAction[]>(row.actions_json, []),
       createdAt: asNumber(row.created_at),
-    }));
+      lastAttemptAt: 0,
+      lastRunAt: 0,
+      lastStatus: null,
+      lastDetail: null,
+    };
+  }
+
+  private runFromRow(row: Record<string, unknown>): AutomationRun {
+    return {
+      id: asString(row.id),
+      automationId: asString(row.automation_id),
+      tableId: asString(row.table_id),
+      trigger: asString(row.trigger),
+      status: asString(row.status) as AutomationRunStatus,
+      detail: asString(row.detail),
+      recordId: row.record_id == null ? null : asString(row.record_id),
+      createdAt: asNumber(row.created_at),
+    };
+  }
+
+  /** 某张表下所有自动化的最近运行记录（按时间倒序），供界面排障使用。 */
+  async listAutomationRuns(tableId: string, limit = 50): Promise<AutomationRun[]> {
+    await this.requireTable(tableId);
+    const result = await this.db.execute({
+      sql: "SELECT * FROM automation_runs WHERE table_id = ? ORDER BY created_at DESC LIMIT ?",
+      args: [tableId, Math.min(200, Math.max(1, limit))],
+    });
+    return result.rows.map((row) => this.runFromRow(row));
+  }
+
+  async listAutomations(tableId: string): Promise<Automation[]> {
+    await this.requireTable(tableId);
+    const result = await this.db.execute({
+      sql: "SELECT * FROM automations WHERE table_id = ? ORDER BY created_at ASC",
+      args: [tableId],
+    });
+    const runs = await this.db.execute({
+      sql: "SELECT * FROM automation_runs WHERE table_id = ? ORDER BY created_at DESC LIMIT 400",
+      args: [tableId],
+    });
+    const latest = new Map<string, AutomationRun>();
+    const lastOkAt = new Map<string, number>();
+    for (const row of runs.rows) {
+      const run = this.runFromRow(row);
+      if (!latest.has(run.automationId)) latest.set(run.automationId, run);
+      if (run.status === "ok" && !lastOkAt.has(run.automationId)) lastOkAt.set(run.automationId, run.createdAt);
+    }
+    return result.rows.map((row) => {
+      const auto = this.automationFromRow(row);
+      const run = latest.get(auto.id);
+      if (run) {
+        auto.lastAttemptAt = run.createdAt;
+        auto.lastStatus = run.status;
+        auto.lastDetail = run.detail;
+      }
+      auto.lastRunAt = lastOkAt.get(auto.id) ?? 0;
+      return auto;
+    });
   }
 
   async createAutomation(
@@ -2512,6 +2823,10 @@ export class Store {
       conditions: input.conditions ?? [],
       actions: input.actions,
       createdAt: Date.now(),
+      lastAttemptAt: 0,
+      lastRunAt: 0,
+      lastStatus: null,
+      lastDetail: null,
     };
     await this.db.execute({
       sql: "INSERT INTO automations (id, table_id, name, enabled, trigger_json, conditions_json, actions_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -2542,16 +2857,7 @@ export class Store {
     const list = await this.db.execute({ sql: "SELECT * FROM automations WHERE id = ?", args: [automationId] });
     const row = list.rows[0];
     if (!row) throw new DomainError("找不到自动化", 404);
-    const current: Automation = {
-      id: asString(row.id),
-      tableId: asString(row.table_id),
-      name: asString(row.name),
-      enabled: asNumber(row.enabled) === 1,
-      trigger: parseJson<AutomationTrigger>(row.trigger_json, { type: "record_created" }),
-      conditions: parseJson<AutomationCondition[]>(row.conditions_json, []),
-      actions: parseJson<AutomationAction[]>(row.actions_json, []),
-      createdAt: asNumber(row.created_at),
-    };
+    const current = this.automationFromRow(row);
     const next: Automation = {
       ...current,
       name: patch.name != null ? cleanName(patch.name) : current.name,

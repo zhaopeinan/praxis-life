@@ -3516,3 +3516,58 @@ body.col-resizing * { cursor: col-resize !important; }
   .docs-home { padding: 24px 16px 32px; }
   .doc-panel { max-height: 52%; }
 }
+
+/* ——— 自动化：运行状态与飞书配置 ——— */
+.automation-setup {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.automation-setup.is-missing {
+  border-color: color-mix(in srgb, var(--warn) 32%, var(--line));
+  background: var(--warn-soft);
+}
+.automation-setup-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.automation-setup-head strong { font-size: 12.5px; font-weight: 620; }
+.automation-setup.is-missing .automation-setup-head strong { color: var(--warn); }
+.automation-setup-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.automation-setup-row input { flex: 1 1 260px; }
+.automation-list li.automation-item { align-items: flex-start; }
+.automation-list .automation-run-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.automation-runs {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.automation-runs li { display: flex; align-items: baseline; gap: 8px; padding: 0; border: 0; background: transparent; }
+.automation-runs time { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--ink-4); }
+.automation-runs span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.link-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+.link-btn:hover { text-decoration: underline; background: transparent; }

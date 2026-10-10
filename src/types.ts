@@ -410,6 +410,22 @@ export type CalendarFeed = {
   createdAt: number;
 };
 
+export type AutomationRunStatus = "ok" | "failed" | "skipped";
+
+export type AutomationRun = {
+  id: string;
+  automationId: string;
+  tableId: string;
+  /** 触发方式：record_created / record_updated / field_equals / button / webhook / schedule */
+  trigger: string;
+  /** ok：至少一个动作真正送达；failed：有动作失败；skipped：全部动作被跳过（例如未配置飞书 Webhook） */
+  status: AutomationRunStatus;
+  /** 每个动作的结果摘要，用于界面展示与排障 */
+  detail: string;
+  recordId: string | null;
+  createdAt: number;
+};
+
 export type Automation = {
   id: string;
   tableId: string;
@@ -420,6 +436,14 @@ export type Automation = {
   conditions: AutomationCondition[];
   actions: AutomationAction[];
   createdAt: number;
+  /** 最近一次尝试运行的时间（无论成功、失败还是跳过） */
+  lastAttemptAt: number;
+  /** 最近一次真正成功运行的时间（跳过与失败不更新） */
+  lastRunAt: number;
+  /** 最近一次运行状态；从未运行过为 null */
+  lastStatus: AutomationRunStatus | null;
+  /** 最近一次运行的结果摘要 */
+  lastDetail: string | null;
 };
 
 export type Notification = {

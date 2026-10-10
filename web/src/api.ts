@@ -1,6 +1,7 @@
 import type {
   AccessTokenSummary,
   Automation,
+  AutomationRun,
   BaseMember,
   BaseSummary,
   Comment,
@@ -232,6 +233,10 @@ export const api = {
       `/api/records/${recordId}/history`,
     ),
   automations: (tableId: string) => request<Automation[]>(`/api/tables/${tableId}/automations`),
+  automationRuns: (tableId: string, limit = 50) =>
+    request<AutomationRun[]>(`/api/tables/${tableId}/automation-runs?limit=${limit}`),
+  runAutomation: (automationId: string) =>
+    request<{ ok: true; run: AutomationRun }>(`/api/automations/${automationId}/run`, { method: "POST" }),
   createAutomation: (
     tableId: string,
     body: {

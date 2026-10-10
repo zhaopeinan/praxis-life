@@ -543,6 +543,40 @@ server.tool("run_due_automations", "手动跑一轮到期的定时自动化（�
   }),
 );
 
+server.tool(
+  "list_automations",
+  "列出表内自动化及其最近运行状态（lastStatus/lastRunAt/lastAttemptAt/lastDetail）",
+  { tableId: z.string() },
+  async ({ tableId }) =>
+    run(async () => {
+      await allowTable(tableId, "viewer");
+      return store.listAutomations(tableId);
+    }),
+);
+
+server.tool(
+  "list_automation_runs",
+  "列出自动化最近运行记录（状态、结果摘要、触发时间），用于排查通知为什么没发出去",
+  { tableId: z.string(), limit: z.number().optional() },
+  async ({ tableId, limit }) =>
+    run(async () => {
+      await allowTable(tableId, "viewer");
+      return store.listAutomationRuns(tableId, limit ?? 50);
+    }),
+);
+
+server.tool(
+  "run_automation",
+  "手动试跑一条自动化（只执行飞书/HTTP/邮件等对外动作，不改数据），返回本次运行记录",
+  { automationId: z.string() },
+  async ({ automationId }) =>
+    run(async () => {
+      const located = await store.locateAutomation(automationId);
+      await assertBaseRole(accounts, user, located.baseId, "editor");
+      return store.runAutomationNow(automationId);
+    }),
+);
+
 const rowRule = z.union([
   z.object({ type: z.literal("all") }),
   z.object({ type: z.literal("allow_ids"), recordIds: z.array(z.string()) }),
