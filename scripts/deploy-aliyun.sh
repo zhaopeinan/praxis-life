@@ -106,6 +106,16 @@ rollback_to_previous() {
   exit 1
 }
 
+step "记住当前线上镜像为回滚点（$ROLLBACK_IMAGE）"
+# 必须在任何构建/传输动作之前：--remote-build 会在服务器上直接把 $RUN_IMAGE 覆盖成新镜像，
+# 放到后面就会把新镜像当成回滚点。
+remote "if podman image exists $RUN_IMAGE; then
+          podman tag $RUN_IMAGE $ROLLBACK_IMAGE
+          podman image inspect $ROLLBACK_IMAGE --format '回滚点已保存：{{.Id}}'
+        else
+          echo '线上还没有镜像，跳过保存回滚点'
+        fi"
+
 if (( REMOTE_BUILD )); then
   step "本机构建前端产物（原生 arm64，产物与平台无关）"
   (cd "$ROOT" && npm run build:web)
@@ -115,9 +125,10 @@ if (( REMOTE_BUILD )); then
   # 二是备份步骤本来也要停容器。
   # 刻意不带仓库根的 .dockerignore：它把 dist-web 排除在外（对根 Dockerfile 正确，因为前端是在镜像内构建的），
   # 而 Dockerfile.remote 正要 COPY dist-web。上下文由下面这份白名单控制，本来也不会带上 node_modules / data / .git。
+  # scripts / infra 也要带上：/opt/duowei-src 会被清空重建，值班日报、恢复演练脚本以这里为落点。
   tar czf - -C "$ROOT" \
       Dockerfile.remote package.json package-lock.json tsconfig.json \
-      src web dist-web \
+      src web dist-web scripts infra \
     | remote "set -e
              rm -rf $REMOTE_SRC_DIR && mkdir -p $REMOTE_SRC_DIR
              tar xzf - -C $REMOTE_SRC_DIR
