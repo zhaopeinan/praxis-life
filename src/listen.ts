@@ -17,3 +17,13 @@ if (scheduleMs > 0) {
     backup.tick().catch((error) => console.error("backup tick failed", error));
   }, scheduleMs).unref?.();
 }
+
+// 容器被 stop/restart 时把最后一批用量落库，避免最近几秒的计数留在内存里丢掉。
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    store.usage
+      .flush()
+      .catch((error) => console.error("usage flush on exit failed", error))
+      .finally(() => process.exit(0));
+  });
+}

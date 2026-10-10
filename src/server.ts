@@ -212,6 +212,27 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
   // 智能体运行时：这里再装配一次，保证自建 store（测试、嵌入）也能用工具与 run_agent 动作
   const agentRuntime = configureAgentRuntime({ store, accounts });
 
+  // 使用度量：/api 请求在响应后记一笔；健康检查与 4xx/5xx 不计，
+  // 免得部署探活和公网扫描的流量把"真实用量"冲花。带 Agent 令牌（dwa_…）的另记一笔，
+  // 用来区分人和 Agent 的用量（失败也记，那是 Agent 真的发起了调用）。
+  // 只做前缀判断，不查库，度量本身失败不影响请求。
+  app.use("/api/*", async (c, next) => {
+    if (c.req.path === "/api/health") return next();
+    const isAgent = Boolean(readSecret(c)?.startsWith("dwa_"));
+    let served = false;
+    try {
+      await next();
+      served = c.res.status < 400;
+    } finally {
+      try {
+        if (isAgent) store.usage.bump("agent_calls");
+        if (served) store.usage.bump("api_calls");
+      } catch {
+        /* 度量失败不影响接口 */
+      }
+    }
+  });
+
   app.onError((err, c) => {
     if (err instanceof DomainError) return c.json({ error: err.message }, err.status as 400);
     if (err instanceof ZodError) {
@@ -262,6 +283,13 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     await requireAdmin(c);
     const limit = Number(c.req.query("limit") ?? 50);
     return c.json(await backup.listLogs(Number.isFinite(limit) ? limit : 50));
+  });
+
+  // 使用度量：近 N 天按天聚合的接口/Agent 调用、记录与文档写入、自动化运行
+  app.get("/api/system/usage", async (c) => {
+    await requireAdmin(c);
+    const days = Number(c.req.query("days") ?? 14);
+    return c.json(await store.usage.summary(Number.isFinite(days) ? days : 14));
   });
   app.get("/api/templates", (c) => c.json(TEMPLATES));
   app.get("/api/limits", async (c) => {

@@ -42,6 +42,14 @@
 - **空间级导出**：`GET /api/bases/:baseId/export.zip`——一个 zip 包住整个空间：`tables/*.json`（字段、视图、全部记录）、`tables/*.csv`（表格快照）、`documents/*.md`（文档正文）、`attachments/*`（记录与文档引用到的附件原件），外加 `manifest.json`（清单与统计）与 `README.md`（包结构说明）。前端入口：表格顶栏「更多 → 导出整个空间（Zip）」。单表超 5000 条与附件缺失都会写进 manifest，不静默截断。
 - **单表 CSV**：`GET /api/tables/:tableId/export.csv`（既有能力）。
 
+## 使用度量（自有增强，非飞书对标）
+
+- **按天聚合**：`usage_daily` 表每天一行（北京时间分天），记接口调用、Agent 调用、记录写入、文档写入、自动化运行与自动化失败。
+- **埋点**：`/api/*` 在响应后记一笔成功调用（健康检查与 4xx/5xx 不计，避免探活和公网扫描冲花数字）；带 Agent 令牌（`dwa_…`）的请求另记 Agent 调用（失败的也记，那是 Agent 真的发起了调用）；记录/文档写入与自动化运行埋在 `store` 的写路径上。
+- **攒批落库**：计数先在内存攒批，每 10 秒或攒够 50 条再 upsert；容器停止时由 `listen.ts` 的 SIGTERM/SIGINT 钩子把最后一批 flush 进库。
+- **查看**：`GET /api/system/usage?days=N`（管理员，默认 14 天、上限 90 天，缺失的天补 0 并附合计）；前端入口：顶栏「使用度量」弹窗（近 14 天）。对应产品复盘 P2-4.6。
+- **口径说明**：Agent / MCP 走接口的调用（`dwa_` 令牌，含 `/api/mcp/tools`）计入 Agent 调用；本机 stdio 版 `src/mcp.ts` 直接读写同一个库，不经过 `/api`，其写入体现在记录/文档写入上，读取不计。
+
 ## Out-of-scope / 后续基础设施
 
 - 付费能力、商业套餐  

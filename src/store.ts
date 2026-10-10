@@ -5,6 +5,7 @@ import { applyQuery, displayText, evalFormulaCached, matchesFilter } from "./que
 import { emitPluginEvent, recentPluginEvents } from "./plugins.js";
 import { normalizeFeishuWebhook, sendFeishuText } from "./feishu.js";
 import { buildIcsCalendar } from "./ics.js";
+import { UsageMetrics } from "./usage.js";
 import {
   LIMITS,
   canChangeFieldType,
@@ -178,12 +179,15 @@ export function maskSecret(secret: string): string {
 export class Store {
   private db: Client;
   readonly uploadsDir: string;
+  /** 按天聚合的使用度量；写埋点散落在记录/文档/自动化路径里，汇总见 /api/system/usage */
+  readonly usage: UsageMetrics;
 
   constructor(dbPath: string) {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     this.uploadsDir = path.join(path.dirname(dbPath), "uploads");
     fs.mkdirSync(this.uploadsDir, { recursive: true });
     this.db = createClient({ url: `file:${dbPath}` });
+    this.usage = new UsageMetrics(this.db);
   }
 
   async init(): Promise<void> {
@@ -364,6 +368,16 @@ export class Store {
         created_at INTEGER NOT NULL
       )`,
       `CREATE INDEX IF NOT EXISTS idx_automation_runs_auto ON automation_runs(automation_id, created_at DESC)`,
+      `CREATE TABLE IF NOT EXISTS usage_daily (
+        day TEXT PRIMARY KEY,
+        api_calls INTEGER NOT NULL DEFAULT 0,
+        agent_calls INTEGER NOT NULL DEFAULT 0,
+        record_writes INTEGER NOT NULL DEFAULT 0,
+        doc_writes INTEGER NOT NULL DEFAULT 0,
+        automation_runs INTEGER NOT NULL DEFAULT 0,
+        automation_failures INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL DEFAULT 0
+      )`,
       `CREATE TABLE IF NOT EXISTS table_acls (
         table_id TEXT PRIMARY KEY REFERENCES tables(id) ON DELETE CASCADE,
         row_allow TEXT NOT NULL DEFAULT '{}',
@@ -1069,6 +1083,7 @@ export class Store {
       sql: "INSERT INTO records (id, table_id, values_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
       args: [id, tableId, JSON.stringify(values), now, now],
     });
+    this.usage.bump("record_writes");
     await this.touchTable(tableId);
     await this.appendHistory({
       recordId: id,
@@ -1129,6 +1144,7 @@ export class Store {
     this.assertOptionCascades(fields, values);
     const updatedAt = Date.now();
     await this.writeValues(recordId, values, updatedAt);
+    this.usage.bump("record_writes");
     await this.touchTable(current.tableId);
     await this.appendHistory({
       recordId,
@@ -1159,6 +1175,7 @@ export class Store {
   async deleteRecord(recordId: string): Promise<void> {
     const record = await this.requireRecord(recordId);
     await this.db.execute({ sql: "DELETE FROM records WHERE id = ?", args: [recordId] });
+    this.usage.bump("record_writes");
     await this.touchTable(record.tableId);
     await this.firePluginHooks("record_deleted", record.tableId, recordId);
   }
@@ -2187,6 +2204,8 @@ export class Store {
     } catch (error) {
       console.error("record automation run failed", error);
     }
+    this.usage.bump("automation_runs");
+    if (status === "failed") this.usage.bump("automation_failures");
     return run;
   }
 
@@ -3639,6 +3658,7 @@ export class Store {
         now,
       ],
     });
+    this.usage.bump("doc_writes");
     return this.getDocument(id);
   }
 
@@ -3665,6 +3685,7 @@ export class Store {
       sql: "UPDATE documents SET title = ?, body_md = ?, icon = ?, updated_at = ? WHERE id = ?",
       args: [title, bodyMd, icon, now, documentId],
     });
+    this.usage.bump("doc_writes");
     return this.getDocument(documentId);
   }
 

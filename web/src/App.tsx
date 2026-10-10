@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { applyQuery } from "../../src/query.js";
 import type { Automation, AutomationRun, BaseMember, BaseSummary, DisplayValue, DocumentSummary, Field, LlmAgent, LlmAgentRun, LlmAgentToolId, McpAgent, PublicRecord, PublicUser, RecordDocumentLink, TablePayload, View, ViewType } from "../../src/types.js";
 import { DOC_TEMPLATES, FIELD_TYPE_LABELS, LLM_AGENT_TOOL_LABELS, LLM_AGENT_TOOLS, VIEW_TYPE_LABELS } from "../../src/types.js";
-import { api, type BackupLogDto, type BackupSettingsDto } from "./api";
+import { api, type BackupLogDto, type BackupSettingsDto, type UsageSummaryDto } from "./api";
 import { AuthScreen } from "./AuthScreen";
 import { DashboardView } from "./DashboardView";
 import { DocumentsView, DocumentTree } from "./DocumentsView";
@@ -1053,6 +1053,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               <button type="button" className="secondary" onClick={() => setDialog("help")}>使用说明</button>
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("admin")}>用户管理</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("backup")}>数据备份</button>}
+              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("usage")}>使用度量</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("agents")}>Agent 管理</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("smart-agents")}>智能体</button>}
               <span>{user.name}</span>
@@ -1074,6 +1075,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 <button type="button" onClick={() => setDialog("help")}>使用说明</button>
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("admin")}>用户管理</button>}
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("backup")}>数据备份</button>}
+                {user.role === "admin" && <button type="button" onClick={() => setDialog("usage")}>使用度量</button>}
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("agents")}>Agent 管理</button>}
                 {payload && canOwn && (
                   <button type="button" className="danger-text" onClick={() => deleteCurrentTable().catch(fail)}>
@@ -1686,6 +1688,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       {dialog === "tokens" && <TokenDialog onClose={closeDialog} />}
       {dialog === "admin" && <AdminDialog selfId={user.id} onSelf={onUser} onClose={closeDialog} />}
       {dialog === "backup" && user.role === "admin" && <BackupDialog onClose={closeDialog} />}
+      {dialog === "usage" && user.role === "admin" && <UsageDialog onClose={closeDialog} />}
       {dialog === "agents" && user.role === "admin" && (
         <AgentManageDialog bases={bases} onClose={closeDialog} />
       )}
@@ -4086,6 +4089,74 @@ function BackupDialog({ onClose }: { onClose: () => void }) {
           ))}
         </ul>
       )}
+    </Modal>
+  );
+}
+
+/** 近 14 天的使用度量：接口 / Agent 调用、记录与文档写入、自动化运行与失败，只读。 */
+function UsageDialog({ onClose }: { onClose: () => void }) {
+  const [summary, setSummary] = useState<UsageSummaryDto | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api
+      .systemUsage(14)
+      .then(setSummary)
+      .catch((err) => setError(message(err)));
+  }, []);
+  return (
+    <Modal title="使用度量 · 近 14 天" onClose={onClose} size="wide">
+      <p className="fine">
+        按天（北京时间）聚合的用量：接口与 Agent 调用、记录 / 文档写入、自动化运行与失败。用来看哪些功能真在被使用。
+      </p>
+      {error && <p className="form-error">{error}</p>}
+      {!summary ? (
+        <p className="fine">{error ? "" : "加载中…"}</p>
+      ) : (
+        <table className="usage-table">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>接口调用</th>
+              <th>Agent 调用</th>
+              <th>记录写入</th>
+              <th>文档写入</th>
+              <th>自动化运行</th>
+              <th>自动化失败</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.days.map((day) => (
+              <tr key={day.day}>
+                <td>{day.day}</td>
+                <td>{day.apiCalls}</td>
+                <td>{day.agentCalls}</td>
+                <td>{day.recordWrites}</td>
+                <td>{day.docWrites}</td>
+                <td>{day.automationRuns}</td>
+                <td className={day.automationFailures > 0 ? "usage-alert" : undefined}>{day.automationFailures}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>合计</td>
+              <td>{summary.totals.apiCalls}</td>
+              <td>{summary.totals.agentCalls}</td>
+              <td>{summary.totals.recordWrites}</td>
+              <td>{summary.totals.docWrites}</td>
+              <td>{summary.totals.automationRuns}</td>
+              <td className={summary.totals.automationFailures > 0 ? "usage-alert" : undefined}>
+                {summary.totals.automationFailures}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+      <div className="dialog-actions">
+        <button type="button" className="primary" onClick={onClose}>
+          知道了
+        </button>
+      </div>
     </Modal>
   );
 }

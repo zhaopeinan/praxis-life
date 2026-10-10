@@ -67,6 +67,21 @@ export type BackupLogDto = {
   remotePath: string | null;
 };
 
+export type UsageDayDto = {
+  day: string;
+  apiCalls: number;
+  agentCalls: number;
+  recordWrites: number;
+  docWrites: number;
+  automationRuns: number;
+  automationFailures: number;
+};
+
+export type UsageSummaryDto = {
+  days: UsageDayDto[];
+  totals: Omit<UsageDayDto, "day">;
+};
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -462,5 +477,6 @@ export const api = {
   }),
   testBackup: () => request<{ ok: true; url: string; remotePath: string }>("/api/system/backup/test", { method: "POST" }),
   runBackup: () => request<{ log: BackupLogDto }>("/api/system/backup/run", { method: "POST" }),
+  systemUsage: (days = 14) => request<UsageSummaryDto>(`/api/system/usage?days=${days}`),
 };
 

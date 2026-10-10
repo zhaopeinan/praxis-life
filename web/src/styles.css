@@ -2073,6 +2073,34 @@ body.col-resizing * { cursor: col-resize !important; }
 .backup-status-ok { color: var(--ok, #1f7a4d); }
 .backup-status-error { color: var(--danger); }
 .backup-status-running { color: var(--ink-3, #666); }
+/* 使用度量：对话框里的小表，数字右对齐，失败数标红 */
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.usage-table th,
+.usage-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.usage-table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.usage-table th:first-child,
+.usage-table td:first-child { text-align: left; }
+.usage-table tbody tr:hover td { background: var(--surface-hover); }
+.usage-table tfoot td {
+  font-weight: 600;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: none;
+}
+.usage-table .usage-alert { color: var(--danger-ink); font-weight: 600; }
 .detail-fields {
   display: grid;
   gap: 10px;

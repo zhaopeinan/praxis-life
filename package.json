@@ -10,7 +10,7 @@
     "dev:web": "vite",
     "start": "tsx src/listen.ts",
     "mcp": "tsx src/mcp.ts",
-    "test": "tsx src/formula.test.ts && tsx src/store.test.ts && tsx src/export.test.ts",
+    "test": "tsx src/formula.test.ts && tsx src/store.test.ts && tsx src/export.test.ts && tsx src/usage.test.ts",
     "typecheck": "tsc --noEmit",
     "build:feishu-index": "tsx scripts/build-feishu-index.mts",
     "scrape:feishu": "tsx scripts/scrape-feishu-bitable.mts",
