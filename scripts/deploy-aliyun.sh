@@ -109,7 +109,13 @@ rollback_to_previous() {
 step "记住当前线上镜像为回滚点（${ROLLBACK_IMAGE}）"
 # 必须在任何构建/传输动作之前：--remote-build 会在服务器上直接把 $RUN_IMAGE 覆盖成新镜像，
 # 放到后面就会把新镜像当成回滚点。
-remote "if podman image exists $RUN_IMAGE; then
+# 取"运行中容器实际用的镜像"而不是 $RUN_IMAGE 标签：上一轮部署中断过（镜像建好但容器没重建）、
+# 或镜像被别的途径重建时，标签可能已经指到新镜像，照标签存回滚点就等于没存。
+remote "if podman container exists $CONTAINER; then
+          IMAGE_ID=\$(podman inspect --format '{{.Image}}' $CONTAINER)
+          podman tag \$IMAGE_ID $ROLLBACK_IMAGE
+          podman image inspect $ROLLBACK_IMAGE --format '回滚点已保存：{{.Id}}（取自运行中的容器）'
+        elif podman image exists $RUN_IMAGE; then
           podman tag $RUN_IMAGE $ROLLBACK_IMAGE
           podman image inspect $ROLLBACK_IMAGE --format '回滚点已保存：{{.Id}}'
         else
@@ -170,7 +176,19 @@ remote "podman stop $CONTAINER >/dev/null 2>&1 || true
         ls -1t $REMOTE_DATA_DIR/duowei-db-*.tar.gz | head -1"
 
 step "同步 Caddy 配置（仓库 infra/caddy/duowei.caddyfile 为准）"
-sshpass -e scp "${SSH_OPTS[@]}" "$ROOT/infra/caddy/duowei.caddyfile" "$SSH_USER@$HOST:/etc/caddy/duowei.caddyfile"
+# scp 偶尔会在认证阶段被客户端提前关掉（服务器忙时更明显，sshd 侧看到的是 preauth 断开），
+# 重试即可；连续三次都失败才让部署停在这里。
+upload_caddy() {
+  for attempt in 1 2 3; do
+    if sshpass -e scp "${SSH_OPTS[@]}" "$ROOT/infra/caddy/duowei.caddyfile" "$SSH_USER@$HOST:/etc/caddy/duowei.caddyfile"; then
+      return 0
+    fi
+    echo "Caddy 配置上传失败（第 ${attempt} 次），2 秒后重试……" >&2
+    sleep 2
+  done
+  return 1
+}
+upload_caddy
 remote 'set -euo pipefail
 CADDY=/etc/caddy/Caddyfile
 if ! grep -q "^import /etc/caddy/duowei.caddyfile" "$CADDY"; then
