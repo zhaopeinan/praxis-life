@@ -2111,6 +2111,21 @@ export class Store {
         detail: result.reason === "no-webhook" ? "未配置飞书机器人 Webhook，摘要不会发出" : `飞书摘要发送失败：${result.message ?? "未知原因"}`,
       };
     }
+    if (action.type === "run_agent") {
+      const runner = this.agentActionRunner;
+      if (!runner) {
+        return { type: action.type, status: "skipped", detail: "智能体运行时未装配，动作不会执行" };
+      }
+      const prompt = await this.interpolateAutomationText(action.prompt, record, fields);
+      const result = await runner({
+        agentId: action.agentId,
+        prompt,
+        tableId,
+        actorName: meta?.userName ?? "自动化",
+        trigger: "automation",
+      });
+      return { type: action.type, status: result.ok ? "ok" : "failed", detail: result.detail };
+    }
     const unknown = action as { type: AutomationAction["type"] };
     return { type: unknown.type, status: "skipped", detail: "未知动作类型" };
   }
@@ -2291,9 +2306,10 @@ export class Store {
       const fields = await this.listFields(tableId);
       const table = await this.getTable(tableId);
       const actions = parseJson<AutomationAction[]>(row.actions_json, []);
-      const digestOnly = actions.length > 0 && actions.every((item) => item.type === "feishu_digest");
+      // 飞书摘要与智能体不依赖样本记录，其余动作要以表内第一条记录为上下文
+      const recordFree = (type: AutomationAction["type"]) => type === "feishu_digest" || type === "run_agent";
       const record = table.records[0] ? await this.requireRecord(table.records[0].id) : null;
-      if (!record && !digestOnly) {
+      if (!record && actions.some((item) => !recordFree(item.type))) {
         await this.recordAutomationRun({
           automationId: autoId,
           tableId,
@@ -2322,6 +2338,22 @@ export class Store {
                       : `飞书摘要发送失败：${digest.message ?? "未知原因"}`,
                 },
           );
+          continue;
+        }
+        if (action.type === "run_agent") {
+          const runner = this.agentActionRunner;
+          if (!runner) {
+            results.push({ type: action.type, status: "skipped", detail: "智能体运行时未装配，动作不会执行" });
+            continue;
+          }
+          const result = await runner({
+            agentId: action.agentId,
+            prompt: record ? await this.interpolateAutomationText(action.prompt, record, fields) : action.prompt,
+            tableId,
+            actorName: "定时",
+            trigger: "schedule",
+          });
+          results.push({ type: action.type, status: result.ok ? "ok" : "failed", detail: result.detail });
           continue;
         }
         if (!record) {
@@ -2381,6 +2413,22 @@ export class Store {
                     : `飞书摘要发送失败：${digest.message ?? "未知原因"}`,
               },
         );
+        continue;
+      }
+      if (action.type === "run_agent") {
+        const runner = this.agentActionRunner;
+        if (!runner) {
+          results.push({ type: action.type, status: "skipped", detail: "智能体运行时未装配，动作不会执行" });
+          continue;
+        }
+        const result = await runner({
+          agentId: action.agentId,
+          prompt: await this.interpolateAutomationText(action.prompt, record, fields),
+          tableId: auto.tableId,
+          actorName: "手动试跑",
+          trigger: "manual",
+        });
+        results.push({ type: action.type, status: result.ok ? "ok" : "failed", detail: result.detail });
         continue;
       }
       if (
@@ -2945,13 +2993,25 @@ export class Store {
 
   /* ——— 站内 LLM 智能体 ——— */
 
-  /** 由运行时装配：定时/手动触发里的 run_agent 动作交给它执行 */
+  /** 由运行时装配：定时/事件/手动触发里的 run_agent 动作交给它执行 */
   private agentActionRunner:
-    | ((input: { agentId: string; prompt: string; tableId: string; actorName: string }) => Promise<{ ok: boolean; detail: string }>)
+    | ((input: {
+        agentId: string;
+        prompt: string;
+        tableId: string;
+        actorName: string;
+        trigger?: LlmAgentRunTrigger;
+      }) => Promise<{ ok: boolean; detail: string }>)
     | null = null;
 
   setAgentActionRunner(
-    runner: (input: { agentId: string; prompt: string; tableId: string; actorName: string }) => Promise<{ ok: boolean; detail: string }>,
+    runner: (input: {
+      agentId: string;
+      prompt: string;
+      tableId: string;
+      actorName: string;
+      trigger?: LlmAgentRunTrigger;
+    }) => Promise<{ ok: boolean; detail: string }>,
   ): void {
     this.agentActionRunner = runner;
   }

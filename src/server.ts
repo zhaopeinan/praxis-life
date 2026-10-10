@@ -7,12 +7,14 @@ import path from "node:path";
 import { ZodError, z } from "zod";
 import { Accounts } from "./accounts.js";
 import { assertBaseRole } from "./access.js";
+import { configureAgentRuntime } from "./agent-runtime.js";
 import { BackupService } from "./backup.js";
 import { DomainError, type Store } from "./store.js";
 import { createTemplate, TEMPLATES, type TemplateId } from "./templates.js";
 import {
   FIELD_TYPES,
   FILTER_OPS,
+  LLM_AGENT_TOOLS,
   TAG_COLORS,
   type MemberRole,
   type PublicUser,
@@ -174,6 +176,7 @@ const AutomationActionSchema = z.discriminatedUnion("type", [
     excludeStatuses: z.array(z.string()).optional(),
     webhookUrl: z.string().optional(),
   }),
+  z.object({ type: z.literal("run_agent"), agentId: z.string(), prompt: z.string() }),
 ]);
 
 const AutomationConditionSchema = z.object({
@@ -182,9 +185,31 @@ const AutomationConditionSchema = z.object({
   value: z.string().optional(),
 });
 
+const LlmAgentDraftSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  baseId: z.string().nullable().optional(),
+  instructions: z.string().optional(),
+  mode: z.enum(["tools", "prompt"]).optional(),
+  tools: z.array(z.enum(LLM_AGENT_TOOLS)).optional(),
+  provider: z
+    .object({
+      baseUrl: z.string(),
+      model: z.string(),
+      temperature: z.number().min(0).max(2).optional(),
+    })
+    .optional(),
+  apiKey: z.string().optional(),
+  status: z.enum(["enabled", "disabled"]).optional(),
+});
+
+const LlmAgentPatchSchema = LlmAgentDraftSchema.partial();
+
 export function createApp(store: Store, accounts: Accounts, backupService?: BackupService) {
   const backup = backupService ?? new BackupService(store.database, path.dirname(store.uploadsDir));
   const app = new Hono();
+  // 智能体运行时：这里再装配一次，保证自建 store（测试、嵌入）也能用工具与 run_agent 动作
+  const agentRuntime = configureAgentRuntime({ store, accounts });
 
   app.onError((err, c) => {
     if (err instanceof DomainError) return c.json({ error: err.message }, err.status as 400);
@@ -918,6 +943,110 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     const user = await requireUser(c);
     if (user.role !== "admin") throw new DomainError("仅管理员可手动触发定时自动化", 403);
     return c.json({ ran: await store.runDueSchedules() });
+  });
+
+  /* ——— 站内 LLM 智能体 ——— */
+
+  app.get("/api/agents", async (c) => {
+    await requireAdmin(c);
+    const baseId = c.req.query("baseId");
+    return c.json(await store.listLlmAgents(baseId ? { baseId } : undefined));
+  });
+
+  app.post("/api/agents", async (c) => {
+    const user = await requireAdmin(c);
+    const body = LlmAgentDraftSchema.parse(await readBody(c));
+    return c.json(await store.createLlmAgent({ ...body, ownerUserId: user.id }), 201);
+  });
+
+  app.patch("/api/agents/:agentId", async (c) => {
+    await requireAdmin(c);
+    const body = LlmAgentPatchSchema.parse(await readBody(c));
+    return c.json(await store.updateLlmAgent(c.req.param("agentId"), body));
+  });
+
+  app.delete("/api/agents/:agentId", async (c) => {
+    await requireAdmin(c);
+    await store.deleteLlmAgent(c.req.param("agentId"));
+    return c.json({ ok: true });
+  });
+
+  /** 手动跑一轮：以管理员自己的身份执行，连工具权限也是管理员的 */
+  app.post("/api/agents/:agentId/run", async (c) => {
+    const user = await requireAdmin(c);
+    const body = z.object({ prompt: z.string().optional() }).parse(await readBody(c).catch(() => ({})));
+    const agent = await store.getLlmAgent(c.req.param("agentId"));
+    const prompt = body.prompt?.trim() || "请按你的任务指令执行一次，并简要汇报结果。";
+    return c.json(
+      await agentRuntime.run({
+        agentId: agent.id,
+        prompt,
+        trigger: "manual",
+        actor: { userId: user.id, name: user.name },
+      }),
+    );
+  });
+
+  app.get("/api/agent-runs", async (c) => {
+    await requireAdmin(c);
+    const agentId = c.req.query("agentId");
+    const limit = Number(c.req.query("limit") ?? 50);
+    return c.json(
+      await store.listLlmAgentRuns({
+        agentId: agentId || undefined,
+        limit: Number.isFinite(limit) ? limit : 50,
+      }),
+    );
+  });
+
+  app.post("/api/agent-runs/:runId/retry", async (c) => {
+    const user = await requireAdmin(c);
+    return c.json(await agentRuntime.retry(c.req.param("runId"), { userId: user.id, name: user.name }));
+  });
+
+  /** 表内对话可选的智能体：只列启用且适用当前空间的 */
+  app.get("/api/tables/:tableId/agents", async (c) => {
+    const located = await store.locateTable(c.req.param("tableId"));
+    await requireBase(c, located.baseId, "viewer");
+    const agents = await store.listLlmAgents();
+    return c.json(agents.filter((agent) => agent.status === "enabled" && (!agent.baseId || agent.baseId === located.baseId)));
+  });
+
+  app.post("/api/tables/:tableId/agent-chat", async (c) => {
+    const located = await store.locateTable(c.req.param("tableId"));
+    const user = await requireBase(c, located.baseId, "viewer");
+    const body = z
+      .object({
+        agentId: z.string(),
+        question: z.string(),
+        history: z
+          .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string() }))
+          .max(20)
+          .optional(),
+      })
+      .parse(await readBody(c));
+    const agent = await store.getLlmAgent(body.agentId);
+    if (agent.status !== "enabled") throw new DomainError("该智能体已停用", 400);
+    if (agent.baseId && agent.baseId !== located.baseId) throw new DomainError("该智能体不服务于当前空间", 403);
+    const table = await store.getTable(located.tableId);
+    const run = await agentRuntime.run({
+      agentId: agent.id,
+      prompt: body.question,
+      trigger: "chat",
+      tableId: located.tableId,
+      actor: { userId: user.id, name: user.name },
+      history: body.history,
+      contextNote: `用户正在数据表「${table.name}」（tableId：${located.tableId}）里提问，表内记录可以直接用工具读取。`,
+    });
+    return c.json({
+      agentId: agent.id,
+      agentName: agent.name,
+      runId: run.id,
+      answer: run.status === "ok" ? run.output : "",
+      error: run.error,
+      steps: run.steps.map((step) => ({ tool: step.tool, status: step.status, ms: step.ms })),
+      durationMs: run.durationMs,
+    });
   });
 
   app.post("/api/tables/:tableId/fields", async (c) => {

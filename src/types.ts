@@ -520,7 +520,7 @@ export type LlmAgentRunStep = {
   ms: number;
 };
 
-export type LlmAgentRunTrigger = "chat" | "schedule" | "manual" | "retry" | "api";
+export type LlmAgentRunTrigger = "chat" | "schedule" | "manual" | "retry" | "api" | "automation";
 
 export type LlmAgentRun = {
   id: string;
