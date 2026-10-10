@@ -156,14 +156,6 @@ elif (( BUILD )); then
   fi
 fi
 
-step "记住当前线上镜像为回滚点（$ROLLBACK_IMAGE）"
-remote "if podman image exists $RUN_IMAGE; then
-          podman tag $RUN_IMAGE $ROLLBACK_IMAGE
-          podman image inspect $ROLLBACK_IMAGE --format '回滚点已保存：{{.Id}}'
-        else
-          echo '线上还没有镜像，跳过保存回滚点'
-        fi"
-
 if (( REMOTE_BUILD )); then
   step "跳过镜像传输（镜像已在服务器上构建）"
 else
