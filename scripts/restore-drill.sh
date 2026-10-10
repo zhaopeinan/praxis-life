@@ -105,7 +105,7 @@ if [[ -n "$RESTORE_TO" ]]; then
   mkdir -p "$RESTORE_TO"
   cp -a "$WORK/." "$RESTORE_TO/"
   rm -f "$RESTORE_TO/entries.txt"
-  echo "已恢复（未启动服务）。如需启用到该目录：停容器后把 duowei.db*、pepper、uploads 覆盖回 $DATA_DIR。"
+  echo "已恢复（未启动服务）。如需启用到该目录：停容器后把 duowei.db*、pepper、uploads 覆盖回 ${DATA_DIR}。"
 fi
 
 echo

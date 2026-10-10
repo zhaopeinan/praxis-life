@@ -48,7 +48,7 @@ REMOTE_BUILD=0
 [[ "${1:-}" == "--remote-build" ]] && REMOTE_BUILD=1
 
 if [[ ! -f "$ENV_FILE" ]]; then
-  echo "缺少 $ENV_FILE（需要 主机/用户/密码 三行）" >&2
+  echo "缺少 ${ENV_FILE}（需要 主机/用户/密码 三行）" >&2
   exit 1
 fi
 
@@ -106,7 +106,7 @@ rollback_to_previous() {
   exit 1
 }
 
-step "记住当前线上镜像为回滚点（$ROLLBACK_IMAGE）"
+step "记住当前线上镜像为回滚点（${ROLLBACK_IMAGE}）"
 # 必须在任何构建/传输动作之前：--remote-build 会在服务器上直接把 $RUN_IMAGE 覆盖成新镜像，
 # 放到后面就会把新镜像当成回滚点。
 remote "if podman image exists $RUN_IMAGE; then
@@ -150,7 +150,7 @@ elif (( BUILD )); then
   # 也不要把跑不起来的镜像推上服务器。
   ARCH="$(docker image inspect "$IMAGE" --format '{{.Os}}/{{.Architecture}}')"
   if [[ "$ARCH" != "linux/amd64" ]]; then
-    echo "构建产物的平台是 $ARCH，不是 linux/amd64，服务器（x86_64）跑不了。" >&2
+    echo "构建产物的平台是 ${ARCH}，不是 linux/amd64，服务器（x86_64）跑不了。" >&2
     echo "改用：scripts/deploy-aliyun.sh --remote-build" >&2
     exit 1
   fi
@@ -199,7 +199,7 @@ remote "$(container_run_cmd)
         podman ps --format '{{.Names}} | {{.Image}} | {{.Status}} | {{.Ports}}' | grep $CONTAINER
         podman logs --tail 5 $CONTAINER"
 
-step "冒烟检查（失败自动回滚到 $ROLLBACK_IMAGE）"
+step "冒烟检查（失败自动回滚到 ${ROLLBACK_IMAGE}）"
 smoke_check || rollback_to_previous
 curl -s -m 20 -o /dev/null -w "公网 $PUBLIC_URL: %{http_code}\n" "$PUBLIC_URL" || echo "（本机访问不了公网地址时可用浏览器自行确认）"
 
@@ -207,4 +207,4 @@ step "清理历史悬空镜像"
 remote "podman image prune -f | tail -1"
 
 echo
-echo "部署完成。上一版镜像保留为 $ROLLBACK_IMAGE，数据库备份在服务器 $REMOTE_DATA_DIR/duowei-db-*.tar.gz"
+echo "部署完成。上一版镜像保留为 ${ROLLBACK_IMAGE}，数据库备份在服务器 ${REMOTE_DATA_DIR}/duowei-db-*.tar.gz"
