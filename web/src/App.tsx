@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { applyQuery } from "../../src/query.js";
-import type { Automation, AutomationRun, BaseMember, BaseSummary, DisplayValue, DocumentSummary, Field, McpAgent, PublicRecord, PublicUser, RecordDocumentLink, TablePayload, View, ViewType } from "../../src/types.js";
-import { DOC_TEMPLATES, FIELD_TYPE_LABELS, VIEW_TYPE_LABELS } from "../../src/types.js";
+import type { Automation, AutomationRun, BaseMember, BaseSummary, DisplayValue, DocumentSummary, Field, LlmAgent, LlmAgentRun, LlmAgentToolId, McpAgent, PublicRecord, PublicUser, RecordDocumentLink, TablePayload, View, ViewType } from "../../src/types.js";
+import { DOC_TEMPLATES, FIELD_TYPE_LABELS, LLM_AGENT_TOOL_LABELS, LLM_AGENT_TOOLS, VIEW_TYPE_LABELS } from "../../src/types.js";
 import { api, type BackupLogDto, type BackupSettingsDto } from "./api";
 import { AuthScreen } from "./AuthScreen";
 import { DashboardView } from "./DashboardView";
@@ -1031,6 +1031,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("admin")}>用户管理</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("backup")}>数据备份</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("agents")}>Agent 管理</button>}
+              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("smart-agents")}>智能体</button>}
               <span>{user.name}</span>
               <button
                 type="button"
@@ -1664,6 +1665,9 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       {dialog === "backup" && user.role === "admin" && <BackupDialog onClose={closeDialog} />}
       {dialog === "agents" && user.role === "admin" && (
         <AgentManageDialog bases={bases} onClose={closeDialog} />
+      )}
+      {dialog === "smart-agents" && user.role === "admin" && (
+        <SmartAgentDialog bases={bases} onClose={closeDialog} />
       )}
     </div>
   );
@@ -3136,6 +3140,548 @@ function AgentManageDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: 
   );
 }
 
+const LLM_AGENT_MODE_LABELS: Record<LlmAgent["mode"], string> = {
+  tools: "工具调用",
+  prompt: "纯提示词",
+};
+
+const LLM_AGENT_STATUS_LABELS: Record<LlmAgent["status"], string> = {
+  enabled: "已启用",
+  disabled: "已停用",
+};
+
+const LLM_RUN_TRIGGER_LABELS: Record<LlmAgentRun["trigger"], string> = {
+  chat: "表内对话",
+  schedule: "定时",
+  manual: "手动",
+  retry: "重试",
+  api: "接口",
+  automation: "自动化",
+};
+
+const LLM_RUN_STATUS_LABELS: Record<LlmAgentRun["status"], string> = {
+  running: "运行中",
+  ok: "成功",
+  failed: "失败",
+};
+
+function llmRunStatusTone(status: LlmAgentRun["status"]) {
+  if (status === "ok") return "green";
+  if (status === "failed") return "red";
+  return "gray";
+}
+
+function llmRunTriggerLabel(trigger: LlmAgentRun["trigger"]) {
+  return LLM_RUN_TRIGGER_LABELS[trigger] ?? trigger;
+}
+
+type AgentFormState = {
+  name: string;
+  description: string;
+  baseId: string;
+  instructions: string;
+  mode: LlmAgent["mode"];
+  tools: LlmAgentToolId[];
+  providerBaseUrl: string;
+  providerModel: string;
+  temperature: string;
+  apiKey: string;
+  status: LlmAgent["status"];
+};
+
+function emptyAgentForm(): AgentFormState {
+  return {
+    name: "",
+    description: "",
+    baseId: "",
+    instructions:
+      "你是这个空间里的助理。先读表了解现状，再按指令执行；写记录或评论前先确认字段存在，汇报时用简短中文说明做了什么。",
+    mode: "tools",
+    tools: ["list_tables", "get_table_schema", "query_records"],
+    providerBaseUrl: "",
+    providerModel: "",
+    temperature: "0.2",
+    apiKey: "",
+    status: "enabled",
+  };
+}
+
+function agentFormFrom(agent: LlmAgent): AgentFormState {
+  return {
+    name: agent.name,
+    description: agent.description,
+    baseId: agent.baseId ?? "",
+    instructions: agent.instructions,
+    mode: agent.mode,
+    tools: [...agent.tools],
+    providerBaseUrl: agent.provider.baseUrl,
+    providerModel: agent.provider.model,
+    temperature: String(agent.provider.temperature),
+    apiKey: "",
+    status: agent.status,
+  };
+}
+
+function SmartAgentDialog({ bases, onClose }: { bases: BaseSummary[]; onClose: () => void }) {
+  const [agents, setAgents] = useState<LlmAgent[]>([]);
+  const [runs, setRuns] = useState<LlmAgentRun[]>([]);
+  const [form, setForm] = useState<AgentFormState | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [runFor, setRunFor] = useState<string | null>(null);
+  const [testPrompt, setTestPrompt] = useState("");
+  const [openRun, setOpenRun] = useState<string | null>(null);
+  const [logAgentId, setLogAgentId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function reload() {
+    const [list, history] = await Promise.all([api.llmAgents(), api.llmAgentRuns()]);
+    setAgents(list);
+    setRuns(history);
+  }
+
+  useEffect(() => {
+    reload().catch((err) => setError(message(err)));
+  }, []);
+
+  function startCreate() {
+    setForm(emptyAgentForm());
+    setEditingId(null);
+    setError(null);
+    setNotice(null);
+  }
+
+  function startEdit(agent: LlmAgent) {
+    setForm(agentFormFrom(agent));
+    setEditingId(agent.id);
+    setError(null);
+    setNotice(null);
+  }
+
+  async function save() {
+    if (!form) return;
+    const name = form.name.trim();
+    if (!name) {
+      setError("请填写智能体名称");
+      return;
+    }
+    const body = {
+      name,
+      description: form.description.trim(),
+      baseId: form.baseId || null,
+      instructions: form.instructions,
+      mode: form.mode,
+      tools: form.mode === "tools" ? form.tools : [],
+      provider: {
+        baseUrl: form.providerBaseUrl.trim(),
+        model: form.providerModel.trim(),
+        temperature: Number(form.temperature) || 0,
+      },
+      status: form.status,
+    };
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (editingId) {
+        const patch = form.apiKey.trim() ? { ...body, apiKey: form.apiKey.trim() } : body;
+        await api.updateLlmAgent(editingId, patch);
+        setNotice(`已保存「${name}」`);
+      } else {
+        await api.createLlmAgent(form.apiKey.trim() ? { ...body, apiKey: form.apiKey.trim() } : body);
+        setNotice(`已创建「${name}」`);
+      }
+      setForm(null);
+      setEditingId(null);
+      await reload();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runAgent(agent: LlmAgent, prompt: string) {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const run = await api.runLlmAgent(agent.id, prompt);
+      setNotice(
+        run.status === "ok"
+          ? `「${agent.name}」运行成功：${firstLineOf(run.output)}`
+          : `「${agent.name}」运行失败：${run.error ?? "未知原因"}`,
+      );
+      setOpenRun(run.id);
+      await reload();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retryRun(run: LlmAgentRun) {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const next = await api.retryLlmAgentRun(run.id);
+      setNotice(next.status === "ok" ? "重试成功。" : `重试失败：${next.error ?? "未知原因"}`);
+      setOpenRun(next.id);
+      await reload();
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const visibleRuns = logAgentId ? runs.filter((run) => run.agentId === logAgentId) : runs;
+
+  return (
+    <Modal title="智能体（LLM Agent）" onClose={onClose} size="wide">
+      <p className="fine">
+        智能体 = 任务指令 + 工具白名单 + 模型配置。表内对话、定时自动化（动作「调用智能体」）和这里的手动试跑共用同一条运行时，
+        工具读写都按触发者身份过表级行列权限，每次运行都留下日志。
+      </p>
+
+      <div className="agent-toolbar">
+        <button type="button" className="primary" onClick={startCreate} disabled={busy}>
+          ＋ 新建智能体
+        </button>
+        <button type="button" onClick={() => reload().catch((err) => setError(message(err)))} disabled={busy}>
+          刷新
+        </button>
+        <span className="fine">共 {agents.length} 个</span>
+      </div>
+
+      {form && (
+        <form
+          className="smart-agent-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void save();
+          }}
+        >
+          <h3>{editingId ? "编辑智能体" : "新建智能体"}</h3>
+          <div className="smart-agent-grid">
+            <label>
+              名称
+              <input
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                placeholder="例如：每日进度汇总"
+                required
+              />
+            </label>
+            <label>
+              绑定空间
+              <FancySelect
+                value={form.baseId}
+                onChange={(value) => setForm({ ...form, baseId: value })}
+                options={[
+                  { value: "", label: "不限（按触发者可见范围）" },
+                  ...bases.map((base) => ({ value: base.id, label: base.name })),
+                ]}
+              />
+            </label>
+          </div>
+          <label>
+            描述
+            <input
+              value={form.description}
+              onChange={(event) => setForm({ ...form, description: event.target.value })}
+              placeholder="给协作者看的一句话说明"
+            />
+          </label>
+          <label>
+            任务指令（系统提示词）
+            <textarea
+              value={form.instructions}
+              onChange={(event) => setForm({ ...form, instructions: event.target.value })}
+              rows={5}
+            />
+          </label>
+          <div className="smart-agent-grid">
+            <label>
+              运行模式
+              <FancySelect
+                value={form.mode}
+                onChange={(value) => setForm({ ...form, mode: value as LlmAgent["mode"] })}
+                options={[
+                  { value: "tools", label: "工具调用（可读写表）" },
+                  { value: "prompt", label: "纯提示词（只答不算）" },
+                ]}
+              />
+            </label>
+            <label>
+              状态
+              <FancySelect
+                value={form.status}
+                onChange={(value) => setForm({ ...form, status: value as LlmAgent["status"] })}
+                options={[
+                  { value: "enabled", label: "启用" },
+                  { value: "disabled", label: "停用" },
+                ]}
+              />
+            </label>
+          </div>
+          <div>
+            <span className="smart-agent-label">工具白名单</span>
+            <div className="smart-agent-tools">
+              {LLM_AGENT_TOOLS.map((tool) => {
+                const checked = form.tools.includes(tool);
+                return (
+                  <label
+                    key={tool}
+                    className={["tool-chip", checked ? "is-on" : "", form.mode !== "tools" ? "is-off" : ""]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={form.mode !== "tools"}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          tools: event.target.checked
+                            ? [...form.tools, tool]
+                            : form.tools.filter((item) => item !== tool),
+                        })
+                      }
+                    />
+                    {LLM_AGENT_TOOL_LABELS[tool]}
+                  </label>
+                );
+              })}
+            </div>
+            {form.mode !== "tools" && <p className="fine">纯提示词模式不会调用任何工具。</p>}
+          </div>
+          <div className="smart-agent-grid">
+            <label>
+              模型地址（OpenAI 兼容）
+              <input
+                value={form.providerBaseUrl}
+                onChange={(event) => setForm({ ...form, providerBaseUrl: event.target.value })}
+                placeholder="https://api.deepseek.com/v1"
+              />
+            </label>
+            <label>
+              模型名称
+              <input
+                value={form.providerModel}
+                onChange={(event) => setForm({ ...form, providerModel: event.target.value })}
+                placeholder="deepseek-chat"
+              />
+            </label>
+          </div>
+          <div className="smart-agent-grid">
+            <label>
+              温度
+              <input
+                value={form.temperature}
+                onChange={(event) => setForm({ ...form, temperature: event.target.value })}
+                placeholder="0.2"
+              />
+            </label>
+            <label>
+              模型密钥
+              <input
+                value={form.apiKey}
+                onChange={(event) => setForm({ ...form, apiKey: event.target.value })}
+                placeholder={editingId ? "留空表示不修改" : "sk-…"}
+                autoComplete="off"
+              />
+            </label>
+          </div>
+          <div className="smart-agent-form-actions">
+            <button type="submit" className="primary" disabled={busy}>
+              {editingId ? "保存" : "创建"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setForm(null);
+                setEditingId(null);
+              }}
+              disabled={busy}
+            >
+              取消
+            </button>
+          </div>
+        </form>
+      )}
+
+      <ul className="agent-cards">
+        {agents.length === 0 && !form && (
+          <li className="agent-card agent-card-empty">
+            <p className="fine">还没有智能体。新建一个，填上模型地址与密钥，就能在表内对话里用起来。</p>
+          </li>
+        )}
+        {agents.map((agent) => {
+          const baseName = agent.baseId ? (bases.find((base) => base.id === agent.baseId)?.name ?? agent.baseName ?? agent.baseId) : "不限空间";
+          const agentRuns = runs.filter((run) => run.agentId === agent.id).slice(0, 5);
+          return (
+            <li key={agent.id} className="agent-card">
+              <div className="agent-card-head">
+                <div className="agent-card-title">
+                  <strong>{agent.name}</strong>
+                  <em className={`agent-status ${agent.status === "enabled" ? "is-active" : "is-rejected"}`}>
+                    {LLM_AGENT_STATUS_LABELS[agent.status]}
+                  </em>
+                  {!agent.apiKeySet && <em className="agent-status is-pending">未配密钥</em>}
+                </div>
+                <div className="agent-actions">
+                  <button type="button" onClick={() => startEdit(agent)} disabled={busy}>
+                    编辑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      api
+                        .updateLlmAgent(agent.id, { status: agent.status === "enabled" ? "disabled" : "enabled" })
+                        .then(reload)
+                        .catch((err) => setError(message(err)))
+                    }
+                    disabled={busy}
+                  >
+                    {agent.status === "enabled" ? "停用" : "启用"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!window.confirm(`删除智能体「${agent.name}」？运行日志会一起删除。`)) return;
+                      api
+                        .deleteLlmAgent(agent.id)
+                        .then(reload)
+                        .catch((err) => setError(message(err)));
+                    }}
+                    disabled={busy}
+                  >
+                    删除
+                  </button>
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => {
+                      setRunFor(runFor === agent.id ? null : agent.id);
+                      setTestPrompt("");
+                    }}
+                    disabled={busy}
+                  >
+                    试跑
+                  </button>
+                </div>
+              </div>
+              <p className="agent-card-meta">
+                {baseName} · {LLM_AGENT_MODE_LABELS[agent.mode]}
+                {agent.mode === "tools" ? `（${agent.tools.length} 个工具）` : ""} · {agent.provider.model || "未配模型"} ·{" "}
+                {agent.apiKeyHint ?? "未配密钥"} · 已运行 {agent.runCount} 次
+                {agent.lastRunAt ? ` · 最近 ${formatWhen(agent.lastRunAt)}（${agent.lastRunStatus ? LLM_RUN_STATUS_LABELS[agent.lastRunStatus] : "—"}）` : ""}
+              </p>
+              {agent.description && <p className="agent-card-meta">{agent.description}</p>}
+              {runFor === agent.id && (
+                <div className="smart-agent-trial">
+                  <input
+                    value={testPrompt}
+                    onChange={(event) => setTestPrompt(event.target.value)}
+                    placeholder="留空则按任务指令试跑一次"
+                  />
+                  <button type="button" className="primary" onClick={() => void runAgent(agent, testPrompt)} disabled={busy}>
+                    运行
+                  </button>
+                </div>
+              )}
+              {agentRuns.length > 0 && (
+                <ul className="smart-agent-miniruns">
+                  {agentRuns.map((run) => (
+                    <li key={run.id}>
+                      <time>{formatWhen(run.createdAt)}</time>
+                      <span className={`tag ${llmRunStatusTone(run.status)}`}>{LLM_RUN_STATUS_LABELS[run.status]}</span>
+                      <span>{llmRunTriggerLabel(run.trigger)}</span>
+                      <span className="run-hint">{firstLineOf(run.error ?? run.output)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="agent-toolbar">
+        <h3 style={{ margin: 0 }}>运行日志</h3>
+        <FancySelect
+          value={logAgentId}
+          onChange={setLogAgentId}
+          options={[{ value: "", label: "全部智能体" }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]}
+        />
+        <span className="fine">最近 {visibleRuns.length} 条</span>
+      </div>
+      <ul className="smart-agent-runs">
+        {visibleRuns.length === 0 && (
+          <li className="run-empty">还没有运行记录。</li>
+        )}
+        {visibleRuns.slice(0, 50).map((run) => {
+          const expanded = openRun === run.id;
+          return (
+            <li key={run.id} className="run-item">
+              <div className="run-head">
+                <time>{formatWhen(run.createdAt)}</time>
+                <strong>{run.agentName ?? agents.find((agent) => agent.id === run.agentId)?.name ?? run.agentId}</strong>
+                <span className={`tag ${llmRunStatusTone(run.status)}`}>{LLM_RUN_STATUS_LABELS[run.status]}</span>
+                <span className="fine">
+                  {llmRunTriggerLabel(run.trigger)} · {run.durationMs}ms
+                  {run.steps.length > 0 ? ` · ${run.steps.length} 步工具` : ""}
+                </span>
+                <button type="button" className="link-btn" onClick={() => setOpenRun(expanded ? null : run.id)}>
+                  {expanded ? "收起" : "详情"}
+                </button>
+                {run.status === "failed" && (
+                  <button type="button" onClick={() => void retryRun(run)} disabled={busy}>
+                    重试
+                  </button>
+                )}
+              </div>
+              <p className="run-input">{firstLineOf(run.input, 200)}</p>
+              {expanded && (
+                <div className="run-detail">
+                  {run.error && <p className="form-error">{run.error}</p>}
+                  {run.output && <pre className="dev-code">{run.output}</pre>}
+                  {run.steps.length > 0 && (
+                    <ul className="run-steps">
+                      {run.steps.map((step, index) => (
+                        <li key={`${run.id}-${index}`}>
+                          <span className={`tag ${step.status === "ok" ? "green" : "red"}`}>{step.status === "ok" ? "成功" : "失败"}</span>
+                          <code>{step.tool}</code>
+                          <span className="fine">{step.ms}ms</span>
+                          <span className="run-hint">{firstLineOf(step.result, 160)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {notice && <p className="form-ok">{notice}</p>}
+      {error && <p className="form-error">{error}</p>}
+    </Modal>
+  );
+}
+
+function firstLineOf(text: string, max = 140) {
+  const line = (text ?? "").trim().split("\n").find((item) => item.trim().length > 0)?.trim() ?? "";
+  if (!line) return "（无输出）";
+  return line.length > max ? `${line.slice(0, max)}…` : line;
+}
+
 function AdminDialog({ selfId, onSelf, onClose }: { selfId: string; onSelf: (user: PublicUser) => void; onClose: () => void }) {
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -4031,7 +4577,7 @@ function AutomationDialog({
   const [fieldId, setFieldId] = useState(fields.find((field) => field.type === "single_select")?.id ?? fields[0]?.id ?? "");
   const [buttonFieldId, setButtonFieldId] = useState(fields.find((field) => field.type === "button")?.id ?? "");
   const [value, setValue] = useState("待办");
-  const [actionType, setActionType] = useState<"set_field" | "http_request" | "add_comment" | "send_email" | "feishu_bot" | "feishu_digest">("set_field");
+  const [actionType, setActionType] = useState<"set_field" | "http_request" | "add_comment" | "send_email" | "feishu_bot" | "feishu_digest" | "run_agent">("set_field");
   const [httpUrl, setHttpUrl] = useState("https://example.com/hook");
   const [webhookSecret, setWebhookSecret] = useState("duowei");
   const [scheduleCron, setScheduleCron] = useState("every:5");
@@ -4040,15 +4586,21 @@ function AutomationDialog({
   const [emailSubject, setEmailSubject] = useState("知行人生通知");
   const [emailText, setEmailText] = useState("记录 {recordId} 触发了自动化");
   const [feishuText, setFeishuText] = useState("【知行人生】{标题} · {状态} · 截止 {截止日期}");
+  const [agentItems, setAgentItems] = useState<LlmAgent[]>([]);
+  const [agentId, setAgentId] = useState("");
+  const [agentPrompt, setAgentPrompt] = useState("请按你的任务指令处理一次，并简要汇报结果。");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const feishuNeeded = items.some((item) => item.actions.some((action) => action.type === "feishu_bot" || action.type === "feishu_digest"));
   const webhookReady = Boolean(savedWebhook);
   async function reload() {
-    const [list, history] = await Promise.all([api.automations(tableId), api.automationRuns(tableId)]);
+    const [list, history, agentList] = await Promise.all([api.automations(tableId), api.automationRuns(tableId), api.llmAgents()]);
     setItems(list);
     setRuns(history);
+    const usable = agentList.filter((agent) => agent.status === "enabled" && (!agent.baseId || agent.baseId === baseId));
+    setAgentItems(usable);
+    setAgentId((current) => (current && usable.some((agent) => agent.id === current) ? current : (usable[0]?.id ?? "")));
     if (baseId) {
       const settings = await api.getSettings(baseId);
       const current = settings.integrations?.feishuWebhookUrl ?? "";
@@ -4103,7 +4655,7 @@ function AutomationDialog({
   return (
     <Modal title="自动化" onClose={onClose} size="wide">
       <p className="fine">
-        支持创建触发、按钮、Webhook、定时；定时格式：every:5 / daily:09:00 / weekly:1:09:00 / 0 9 * * *；动作含改字段、评论、HTTP、邮件、飞书机器人。
+        支持创建触发、按钮、Webhook、定时；定时格式：every:5 / daily:09:00 / weekly:1:09:00 / 0 9 * * *；动作含改字段、评论、HTTP、邮件、飞书机器人、调用智能体。
       </p>
       {feishuNeeded && (
         <div className={`automation-setup${webhookReady ? "" : " is-missing"}`}>
@@ -4153,6 +4705,8 @@ function AutomationDialog({
                       ? [{ type: "feishu_bot" as const, text: feishuText }]
                       : actionType === "feishu_digest"
                         ? [{ type: "feishu_digest" as const, daysAhead: 2, excludeStatuses: ["已完成", "已搁置"] }]
+                        : actionType === "run_agent"
+                          ? [{ type: "run_agent" as const, agentId, prompt: agentPrompt }]
                     : [{ type: "set_field" as const, fieldId, value }];
             await api.createAutomation(tableId, { name, trigger, actions });
             await reload();
@@ -4236,6 +4790,7 @@ function AutomationDialog({
               { value: "send_email", label: "发送邮件" },
               { value: "feishu_bot", label: "飞书机器人（单条）" },
               { value: "feishu_digest", label: "飞书待办摘要" },
+              { value: "run_agent", label: "调用智能体" },
             ]}
           />
         </label>
@@ -4276,6 +4831,33 @@ function AutomationDialog({
         {actionType === "feishu_digest" && (
           <p className="fine">将汇总截止日期在未来 2 天内、且未完成的记录，推到本空间配置的飞书机器人。</p>
         )}
+        {actionType === "run_agent" && (
+          <>
+            {agentItems.length === 0 ? (
+              <p className="fine">
+                还没有启用中的智能体：请管理员到右上角「智能体」里新建并启用一个，再回到这里挂到自动化上。
+              </p>
+            ) : (
+              <>
+                <label>
+                  智能体
+                  <FancySelect
+                    value={agentId}
+                    onChange={setAgentId}
+                    options={agentItems.map((agent) => ({ value: agent.id, label: agent.name }))}
+                  />
+                </label>
+                <label>
+                  指令（可用 {"{字段名}"}）
+                  <input value={agentPrompt} onChange={(event) => setAgentPrompt(event.target.value)} required />
+                </label>
+                <p className="fine">
+                  运行会以智能体负责人的身份执行；定时触发时不带记录上下文，适合「每日 9 点汇总进度」这类任务。
+                </p>
+              </>
+            )}
+          </>
+        )}
         {actionType === "send_email" && (
           <>
             <label>
@@ -4292,7 +4874,9 @@ function AutomationDialog({
             </label>
           </>
         )}
-        <button type="submit" className="primary">添加规则</button>
+        <button type="submit" className="primary" disabled={actionType === "run_agent" && !agentId}>
+          添加规则
+        </button>
       </form>
       <ul className="member-list automation-list">
         {items.map((item) => {
@@ -4801,11 +5385,31 @@ function AssistantPanel({
   tableName: string;
   onClose: () => void;
 }) {
+  const [tab, setTab] = useState<"agent" | "local">("local");
+  const [agents, setAgents] = useState<LlmAgent[]>([]);
+  const [agentId, setAgentId] = useState("");
+  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
+  const [agentNote, setAgentNote] = useState<string | null>(null);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
   const [question, setQuestion] = useState("这张表有多少条？");
   const [answer, setAnswer] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tokenHint, setTokenHint] = useState(() => localStorage.getItem("duowei_pat_hint") || "");
+
+  useEffect(() => {
+    api
+      .tableAgents(tableId)
+      .then((list) => {
+        setAgents(list);
+        if (list.length > 0) {
+          setAgentId(list[0].id);
+          setTab("agent");
+        }
+      })
+      .catch(() => setAgents([]));
+  }, [tableId]);
 
   async function ask(q: string) {
     setQuestion(q);
@@ -4819,10 +5423,39 @@ function AssistantPanel({
     }
   }
 
-  return (
-    <Modal title={`数据问答 · ${tableName}`} onClose={onClose} size="wide">
+  async function askAgent(q: string) {
+    const text = q.trim();
+    if (!text || !agentId) return;
+    const nextMessages = [...messages, { role: "user" as const, content: text }];
+    setMessages(nextMessages);
+    setAgentBusy(true);
+    setAgentError(null);
+    setAgentNote(null);
+    try {
+      const result = await api.agentChat(tableId, {
+        agentId,
+        question: text,
+        history: messages.slice(-10),
+      });
+      if (result.error || !result.answer) {
+        setAgentError(result.error ?? "智能体没有返回内容");
+        setMessages(nextMessages);
+      } else {
+        setMessages([...nextMessages, { role: "assistant", content: result.answer }]);
+        const tools = result.steps.filter((step) => step.tool).length;
+        setAgentNote(`用时 ${result.durationMs}ms${tools ? `，调用 ${tools} 次工具` : ""}`);
+      }
+    } catch (err) {
+      setAgentError(message(err));
+    } finally {
+      setAgentBusy(false);
+    }
+  }
+
+  const localSection = (
+    <>
       <p className="fine">
-        本地规则问数（非大模型 Agent）：条数、字段、按字段统计、数值求和、上限与按钮说明、MCP 工具。令牌用于启动 MCP：
+        本地规则问数（非大模型）：条数、字段、按字段统计、数值求和、上限与按钮说明、MCP 工具。令牌用于启动 MCP：
         <code>DUOWEI_TOKEN=… npx tsx src/mcp.ts</code>
       </p>
       <label>
@@ -4896,6 +5529,73 @@ function AssistantPanel({
       )}
       {answer && <pre className="dev-code">{answer}</pre>}
       {error && <p className="form-error">{error}</p>}
+    </>
+  );
+
+  return (
+    <Modal title={`数据问答 · ${tableName}`} onClose={onClose} size="wide">
+      {(agents.length > 0 || tab === "local") && (
+        <div className="agent-filters" style={{ marginBottom: 10 }}>
+          {agents.length > 0 && (
+            <button type="button" className={tab === "agent" ? "is-on" : ""} onClick={() => setTab("agent")}>
+              智能体
+            </button>
+          )}
+          <button type="button" className={tab === "local" ? "is-on" : ""} onClick={() => setTab("local")}>
+            本地问数
+          </button>
+        </div>
+      )}
+      {tab === "agent" ? (
+        <>
+          <p className="fine">
+            智能体按你的身份读写这张表，需要写字段时会先读字段表再动手；回答由大模型生成，涉及数据请自行核对。
+          </p>
+          {agents.length > 1 && (
+            <label>
+              智能体
+              <FancySelect
+                value={agentId}
+                onChange={setAgentId}
+                options={agents.map((agent) => ({ value: agent.id, label: agent.name }))}
+              />
+            </label>
+          )}
+          <div className="agent-chat">
+            {messages.length === 0 && (
+              <p className="fine">
+                向「{agents.find((agent) => agent.id === agentId)?.name ?? "智能体"}」提问，例如：这张表里状态为「进行中」的有哪些？帮我新建一条明天的待办。
+              </p>
+            )}
+            {messages.map((item, index) => (
+              <div key={index} className={item.role === "user" ? "chat-bubble user" : "chat-bubble assistant"}>
+                {item.content}
+              </div>
+            ))}
+            {agentBusy && <div className="chat-bubble assistant">思考中…</div>}
+          </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const target = new FormData(event.currentTarget).get("agent-q");
+              void askAgent(String(target ?? ""));
+              event.currentTarget.reset();
+            }}
+          >
+            <label>
+              提问
+              <input name="agent-q" placeholder="例如：把截止日期在明天的记录列出来" autoComplete="off" required />
+            </label>
+            <button type="submit" className="primary" disabled={agentBusy || !agentId}>
+              发送
+            </button>
+          </form>
+          {agentNote && <p className="fine">{agentNote}</p>}
+          {agentError && <p className="form-error">{agentError}</p>}
+        </>
+      ) : (
+        localSection
+      )}
     </Modal>
   );
 }

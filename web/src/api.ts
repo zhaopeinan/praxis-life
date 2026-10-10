@@ -9,6 +9,9 @@ import type {
   DocumentRevision,
   DocumentSummary,
   Field,
+  LlmAgent,
+  LlmAgentRun,
+  LlmAgentToolId,
   McpAgent,
   PublicRecord,
   PublicUser,
@@ -17,6 +20,28 @@ import type {
   View,
   ViewType,
 } from "../../src/types.js";
+
+export type LlmAgentDraftBody = {
+  name?: string;
+  description?: string;
+  baseId?: string | null;
+  instructions?: string;
+  mode?: LlmAgent["mode"];
+  tools?: LlmAgentToolId[];
+  provider?: { baseUrl: string; model: string; temperature?: number };
+  apiKey?: string;
+  status?: LlmAgent["status"];
+};
+
+export type AgentChatResult = {
+  agentId: string;
+  agentName: string;
+  runId: string;
+  answer: string;
+  error: string | null;
+  steps: Array<{ tool: string; status: string; ms: number }>;
+  durationMs: number;
+};
 
 export type BackupSettingsDto = {
   enabled: boolean;
@@ -123,6 +148,27 @@ export const api = {
   rotateMcpAgentToken: (agentId: string) =>
     request<{ agent: McpAgent; token: string }>(`/api/mcp-agents/${agentId}/rotate-token`, { method: "POST" }),
   deleteMcpAgent: (agentId: string) => request(`/api/mcp-agents/${agentId}`, { method: "DELETE" }),
+  /* ——— 站内 LLM 智能体 ——— */
+  llmAgents: () => request<LlmAgent[]>("/api/agents"),
+  createLlmAgent: (body: LlmAgentDraftBody & { name: string }) =>
+    request<LlmAgent>("/api/agents", { method: "POST", body: JSON.stringify(body) }),
+  updateLlmAgent: (agentId: string, patch: LlmAgentDraftBody) =>
+    request<LlmAgent>(`/api/agents/${agentId}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  deleteLlmAgent: (agentId: string) => request(`/api/agents/${agentId}`, { method: "DELETE" }),
+  runLlmAgent: (agentId: string, prompt?: string) =>
+    request<LlmAgentRun>(`/api/agents/${agentId}/run`, {
+      method: "POST",
+      body: JSON.stringify(prompt?.trim() ? { prompt: prompt.trim() } : {}),
+    }),
+  llmAgentRuns: (agentId?: string, limit = 50) =>
+    request<LlmAgentRun[]>(`/api/agent-runs?limit=${limit}${agentId ? `&agentId=${encodeURIComponent(agentId)}` : ""}`),
+  retryLlmAgentRun: (runId: string) =>
+    request<LlmAgentRun>(`/api/agent-runs/${runId}/retry`, { method: "POST" }),
+  tableAgents: (tableId: string) => request<LlmAgent[]>(`/api/tables/${tableId}/agents`),
+  agentChat: (
+    tableId: string,
+    body: { agentId: string; question: string; history?: Array<{ role: "user" | "assistant"; content: string }> },
+  ) => request<AgentChatResult>(`/api/tables/${tableId}/agent-chat`, { method: "POST", body: JSON.stringify(body) }),
   tokens: () => request<AccessTokenSummary[]>("/api/tokens"),
   createToken: (name: string) =>
     request<{ token: string; summary: AccessTokenSummary }>("/api/tokens", {

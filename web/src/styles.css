@@ -3571,3 +3571,114 @@ body.col-resizing * { cursor: col-resize !important; }
   cursor: pointer;
 }
 .link-btn:hover { text-decoration: underline; background: transparent; }
+
+/* ——— 站内 LLM 智能体：配置表单 / 运行日志 / 表内对话 ——— */
+.smart-agent-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-soft);
+}
+.smart-agent-form h3 { margin: 0; font-size: 14px; }
+.smart-agent-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.smart-agent-label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-3); margin-bottom: 6px; }
+.smart-agent-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.tool-chip input { margin: 0; }
+.tool-chip.is-on {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-softer);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.tool-chip.is-off { opacity: 0.55; cursor: not-allowed; }
+.smart-agent-form-actions { display: flex; gap: 8px; }
+.smart-agent-trial { display: flex; align-items: center; gap: 8px; }
+.smart-agent-trial input { flex: 1 1 auto; min-width: 0; }
+
+.smart-agent-miniruns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.smart-agent-miniruns li { display: flex; align-items: baseline; gap: 8px; }
+.smart-agent-miniruns time { flex: 0 0 auto; color: var(--ink-4); font-variant-numeric: tabular-nums; }
+
+.smart-agent-runs { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.smart-agent-runs .run-empty { padding: 8px 0; font-size: 12px; color: var(--ink-4); }
+.run-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.run-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 12px; }
+.run-head time { color: var(--ink-4); font-variant-numeric: tabular-nums; }
+.run-head strong { font-size: 12.5px; }
+.run-head .link-btn { margin-top: 0; }
+.run-input { margin: 0; font-size: 12px; color: var(--ink-3); overflow-wrap: anywhere; }
+.run-detail { display: flex; flex-direction: column; gap: 6px; }
+.run-detail .dev-code { margin: 0; max-height: 260px; overflow: auto; }
+.run-hint { min-width: 0; overflow-wrap: anywhere; color: var(--ink-4); }
+.run-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.run-steps li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.run-steps code { font-size: 11.5px; color: var(--ink-2); }
+
+.agent-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 8px 0;
+  padding: 4px 2px;
+}
+.chat-bubble {
+  max-width: 86%;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-bubble.user {
+  align-self: flex-end;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  background: var(--accent-softer);
+  color: var(--accent-ink);
+}
+.chat-bubble.assistant {
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--ink-2);
+}
+@media (max-width: 720px) {
+  .smart-agent-grid { grid-template-columns: 1fr; }
+  .chat-bubble { max-width: 94%; }
+}
