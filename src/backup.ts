@@ -122,7 +122,7 @@ export class BackupService {
       remote_path TEXT NOT NULL DEFAULT '/知行人生备份',
       hour INTEGER NOT NULL DEFAULT 2,
       minute INTEGER NOT NULL DEFAULT 0,
-      keep_days INTEGER NOT NULL DEFAULT 3,
+      keep_days INTEGER NOT NULL DEFAULT 7,
       last_run_at INTEGER
     )`);
     await this.db.execute(`CREATE TABLE IF NOT EXISTS system_backup_logs (
@@ -140,7 +140,7 @@ export class BackupService {
     if (!existing.rows[0]) {
       await this.db.execute({
         sql: `INSERT INTO system_backup_settings (id, enabled, dav_url, username, password, remote_path, hour, minute, keep_days)
-              VALUES (1, 0, 'https://dav.jianguoyun.com/dav/', '', '', '/知行人生备份', 2, 0, 3)`,
+              VALUES (1, 0, 'https://dav.jianguoyun.com/dav/', '', '', '/知行人生备份', 2, 0, 7)`,
         args: [],
       });
     }
@@ -159,7 +159,7 @@ export class BackupService {
       remote_path: String(row.remote_path ?? "/知行人生备份"),
       hour: Number(row.hour ?? 2),
       minute: Number(row.minute ?? 0),
-      keep_days: Number(row.keep_days ?? 3),
+      keep_days: Number(row.keep_days ?? 7),
       last_run_at: row.last_run_at == null ? null : Number(row.last_run_at),
     };
   }
@@ -340,11 +340,22 @@ export class BackupService {
     return files;
   }
 
+  /**
+   * 保留策略：最近 keep_days 份（每天一份）+ 最近 12 个月每月各留最新一份。
+   * 备份文件名形如 zhixing-YYYYMMDD-HHMMSS.tar.gz，名字倒序即时间倒序。
+   */
   private async pruneRemote(settings: StoredSettings) {
     const files = await this.listRemoteFiles(settings);
     const sorted = files.sort((a, b) => b.name.localeCompare(a.name));
-    const keep = Math.max(1, settings.keep_days);
-    for (const file of sorted.slice(keep)) {
+    const keepNames = new Set(sorted.slice(0, Math.max(1, settings.keep_days)).map((file) => file.name));
+    const monthlyByMonth = new Map<string, string>();
+    for (const file of sorted) {
+      const month = file.name.slice("zhixing-".length, "zhixing-".length + 6); // YYYYMM
+      if (!monthlyByMonth.has(month)) monthlyByMonth.set(month, file.name);
+    }
+    for (const name of [...monthlyByMonth.values()].slice(0, 12)) keepNames.add(name);
+    for (const file of sorted) {
+      if (keepNames.has(file.name)) continue;
       const relative = `${settings.remote_path.replace(/^\/+|\/+$/g, "")}/${file.name}`;
       await this.davRequest(settings, "DELETE", relative);
     }
