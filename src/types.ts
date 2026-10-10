@@ -394,7 +394,9 @@ export type AutomationAction =
       dateField?: string;
       excludeStatuses?: string[];
       webhookUrl?: string;
-    };
+    }
+  /** 调用站内 LLM 智能体跑一轮（结果写入智能体运行日志） */
+  | { type: "run_agent"; agentId: string; prompt: string };
 
 export type BaseIntegrations = {
   feishuWebhookUrl?: string;
@@ -444,6 +446,99 @@ export type Automation = {
   lastStatus: AutomationRunStatus | null;
   /** 最近一次运行的结果摘要 */
   lastDetail: string | null;
+};
+
+/* ——— 站内 LLM 智能体（多维表格智能体） ——— */
+
+/** tools：可调工具的多轮 Agent；prompt：单次生成文本，不调工具 */
+export type LlmAgentMode = "tools" | "prompt";
+
+export type LlmAgentStatus = "enabled" | "disabled";
+
+export const LLM_AGENT_TOOLS = [
+  "list_tables",
+  "get_table_schema",
+  "query_records",
+  "create_record",
+  "update_record",
+  "add_comment",
+] as const;
+
+export type LlmAgentToolId = (typeof LLM_AGENT_TOOLS)[number];
+
+export const LLM_AGENT_TOOL_LABELS: Record<LlmAgentToolId, string> = {
+  list_tables: "列空间与数据表",
+  get_table_schema: "读字段与视图",
+  query_records: "查记录（只读）",
+  create_record: "新建记录",
+  update_record: "改记录",
+  add_comment: "给记录写评论",
+};
+
+/** LLM Provider 配置：OpenAI 兼容的 Chat Completions */
+export type LlmProviderConfig = {
+  baseUrl: string;
+  model: string;
+  temperature: number;
+};
+
+export type LlmAgent = {
+  id: string;
+  name: string;
+  description: string;
+  /** 绑定空间；null 表示按触发者可见范围 */
+  baseId: string | null;
+  baseName?: string;
+  /** 任务指令（系统提示词） */
+  instructions: string;
+  mode: LlmAgentMode;
+  tools: LlmAgentToolId[];
+  provider: LlmProviderConfig;
+  /** 密钥是否已配置（接口不返回明文） */
+  apiKeySet: boolean;
+  /** 脱敏后的密钥提示，例如 sk-…cdef */
+  apiKeyHint: string | null;
+  /** 定时/事件触发时使用的服务身份（创建者） */
+  ownerUserId: string;
+  ownerName?: string;
+  status: LlmAgentStatus;
+  createdAt: number;
+  updatedAt: number;
+  lastRunAt: number | null;
+  lastRunStatus: LlmAgentRunStatus | null;
+  runCount: number;
+};
+
+export type LlmAgentRunStatus = "running" | "ok" | "failed";
+
+export type LlmAgentRunStep = {
+  /** 工具名；prompt 模式为空数组 */
+  tool: string;
+  args: string;
+  result: string;
+  status: "ok" | "failed";
+  ms: number;
+};
+
+export type LlmAgentRunTrigger = "chat" | "schedule" | "manual" | "retry" | "api";
+
+export type LlmAgentRun = {
+  id: string;
+  agentId: string;
+  agentName?: string;
+  trigger: LlmAgentRunTrigger;
+  status: LlmAgentRunStatus;
+  /** 触发输入（用户问题或定时 prompt） */
+  input: string;
+  output: string;
+  error: string | null;
+  steps: LlmAgentRunStep[];
+  tableId: string | null;
+  actorUserId: string | null;
+  actorName: string | null;
+  createdAt: number;
+  finishedAt: number;
+  durationMs: number;
 };
 
 export type Notification = {

@@ -70,10 +70,18 @@ import {
   type PublicShare,
   type PublicShareKind,
   type GeoPoint,
+  type LlmAgent,
+  type LlmAgentMode,
+  type LlmAgentRun,
+  type LlmAgentRunStatus,
+  type LlmAgentRunStep,
+  type LlmAgentRunTrigger,
+  type LlmAgentStatus,
+  type LlmAgentToolId,
+  type LlmProviderConfig,
   emptyDetailPageConfig,
   findDocTemplate,
 } from "./types.js";
-
 const SYSTEM_SET = new Set<string>(SYSTEM_FIELD_TYPES);
 const VIEW_TYPES: ViewType[] = ["grid", "kanban", "calendar", "gallery", "form", "gantt"];
 const ROW_HEIGHTS: RowHeight[] = ["short", "medium", "tall", "extra"];
@@ -157,6 +165,14 @@ function parseJson<T>(value: unknown, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+/** 接口回显用的密钥提示：只露头尾，中间打码 */
+export function maskSecret(secret: string): string {
+  const value = secret.trim();
+  if (value.length === 0) return "";
+  if (value.length <= 8) return `${value.slice(0, 1)}***`;
+  return `${value.slice(0, 4)}***${value.slice(-4)}`;
 }
 
 export class Store {
@@ -507,6 +523,38 @@ export class Store {
         updated_at INTEGER NOT NULL
       )`,
       `CREATE INDEX IF NOT EXISTS idx_proxy_rules_proxy ON approval_proxy_rules(proxy_user_id)`,
+      `CREATE TABLE IF NOT EXISTS llm_agents (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        base_id TEXT,
+        instructions TEXT NOT NULL DEFAULT '',
+        mode TEXT NOT NULL DEFAULT 'tools',
+        tools_json TEXT NOT NULL DEFAULT '[]',
+        provider_json TEXT NOT NULL DEFAULT '{}',
+        api_key TEXT NOT NULL DEFAULT '',
+        owner_user_id TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'enabled',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS llm_agent_runs (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT NOT NULL REFERENCES llm_agents(id) ON DELETE CASCADE,
+        trigger TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'running',
+        input TEXT NOT NULL DEFAULT '',
+        output TEXT NOT NULL DEFAULT '',
+        error TEXT,
+        steps_json TEXT NOT NULL DEFAULT '[]',
+        table_id TEXT,
+        actor_user_id TEXT,
+        actor_name TEXT,
+        created_at INTEGER NOT NULL,
+        finished_at INTEGER NOT NULL DEFAULT 0,
+        duration_ms INTEGER NOT NULL DEFAULT 0
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_llm_agent_runs_agent ON llm_agent_runs(agent_id, created_at DESC)`,
     ];
     for (const sql of statements) await this.db.execute(sql);
     // migrate automations conditions column if missing
@@ -565,6 +613,15 @@ export class Store {
     try {
       await this.db.execute({
         sql: "DELETE FROM automation_runs WHERE created_at < ?",
+        args: [Date.now() - 30 * 24 * 60 * 60 * 1000],
+      });
+    } catch {
+      /* ignore */
+    }
+    // 智能体运行记录同样只保留最近 30 天。
+    try {
+      await this.db.execute({
+        sql: "DELETE FROM llm_agent_runs WHERE created_at < ?",
         args: [Date.now() - 30 * 24 * 60 * 60 * 1000],
       });
     } catch {
@@ -2884,6 +2941,327 @@ export class Store {
     const result = await this.db.execute({ sql: "SELECT id FROM automations WHERE id = ?", args: [automationId] });
     if (!result.rows[0]) throw new DomainError("找不到自动化", 404);
     await this.db.execute({ sql: "DELETE FROM automations WHERE id = ?", args: [automationId] });
+  }
+
+  /* ——— 站内 LLM 智能体 ——— */
+
+  /** 由运行时装配：定时/手动触发里的 run_agent 动作交给它执行 */
+  private agentActionRunner:
+    | ((input: { agentId: string; prompt: string; tableId: string; actorName: string }) => Promise<{ ok: boolean; detail: string }>)
+    | null = null;
+
+  setAgentActionRunner(
+    runner: (input: { agentId: string; prompt: string; tableId: string; actorName: string }) => Promise<{ ok: boolean; detail: string }>,
+  ): void {
+    this.agentActionRunner = runner;
+  }
+
+  async listLlmAgents(opts?: { baseId?: string }): Promise<LlmAgent[]> {
+    const [agents, bases, runs] = await Promise.all([
+      this.db.execute("SELECT * FROM llm_agents ORDER BY created_at ASC"),
+      this.db.execute("SELECT id, name FROM bases"),
+      this.db.execute("SELECT * FROM llm_agent_runs ORDER BY created_at DESC LIMIT 2000"),
+    ]);
+    const baseNames = new Map(bases.rows.map((row) => [asString(row.id), asString(row.name)]));
+    const stats = new Map<string, { count: number; lastAt: number; lastStatus: LlmAgentRunStatus }>();
+    for (const row of runs.rows) {
+      const agentId = asString(row.agent_id);
+      const entry = stats.get(agentId);
+      if (!entry) {
+        stats.set(agentId, {
+          count: 1,
+          lastAt: asNumber(row.created_at),
+          lastStatus: asString(row.status) as LlmAgentRunStatus,
+        });
+        continue;
+      }
+      entry.count += 1;
+      if (asNumber(row.created_at) > entry.lastAt) {
+        entry.lastAt = asNumber(row.created_at);
+        entry.lastStatus = asString(row.status) as LlmAgentRunStatus;
+      }
+    }
+    return agents.rows
+      .filter((row) => !opts?.baseId || asString(row.base_id) === opts.baseId || !asString(row.base_id))
+      .map((row) => this.llmAgentFromRow(row, baseNames, stats.get(asString(row.id))));
+  }
+
+  async getLlmAgent(agentId: string): Promise<LlmAgent> {
+    const result = await this.db.execute({ sql: "SELECT * FROM llm_agents WHERE id = ?", args: [agentId] });
+    const row = result.rows[0];
+    if (!row) throw new DomainError("找不到智能体", 404);
+    const [bases, runs] = await Promise.all([
+      this.db.execute("SELECT id, name FROM bases"),
+      this.db.execute({
+        sql: "SELECT * FROM llm_agent_runs WHERE agent_id = ? ORDER BY created_at DESC LIMIT 200",
+        args: [agentId],
+      }),
+    ]);
+    const baseNames = new Map(bases.rows.map((item) => [asString(item.id), asString(item.name)]));
+    const last = runs.rows[0];
+    return this.llmAgentFromRow(
+      row,
+      baseNames,
+      last
+        ? { count: runs.rows.length, lastAt: asNumber(last.created_at), lastStatus: asString(last.status) as LlmAgentRunStatus }
+        : undefined,
+    );
+  }
+
+  /** 运行时用：连同明文密钥一起取（不经过 HTTP 输出） */
+  async getLlmAgentSecret(agentId: string): Promise<{ agent: LlmAgent; apiKey: string }> {
+    const agent = await this.getLlmAgent(agentId);
+    const result = await this.db.execute({ sql: "SELECT api_key FROM llm_agents WHERE id = ?", args: [agentId] });
+    return { agent, apiKey: asString(result.rows[0]?.api_key) };
+  }
+
+  async createLlmAgent(input: {
+    name: string;
+    description?: string;
+    baseId?: string | null;
+    instructions?: string;
+    mode?: LlmAgentMode;
+    tools?: LlmAgentToolId[];
+    provider?: Partial<LlmProviderConfig>;
+    apiKey?: string;
+    ownerUserId: string;
+    status?: LlmAgentStatus;
+  }): Promise<LlmAgent> {
+    const name = cleanName(input.name);
+    if (input.baseId) await this.requireBase(input.baseId);
+    const now = Date.now();
+    const id = nid("ag");
+    await this.db.execute({
+      sql: `INSERT INTO llm_agents
+        (id, name, description, base_id, instructions, mode, tools_json, provider_json, api_key, owner_user_id, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        id,
+        name,
+        (input.description ?? "").trim(),
+        input.baseId ?? null,
+        input.instructions ?? "",
+        input.mode ?? "tools",
+        JSON.stringify(input.tools ?? []),
+        JSON.stringify({
+          baseUrl: input.provider?.baseUrl ?? "",
+          model: input.provider?.model ?? "",
+          temperature: input.provider?.temperature ?? 0.2,
+        }),
+        input.apiKey ?? "",
+        input.ownerUserId,
+        input.status ?? "enabled",
+        now,
+        now,
+      ],
+    });
+    return this.getLlmAgent(id);
+  }
+
+  async updateLlmAgent(
+    agentId: string,
+    patch: {
+      name?: string;
+      description?: string;
+      baseId?: string | null;
+      instructions?: string;
+      mode?: LlmAgentMode;
+      tools?: LlmAgentToolId[];
+      provider?: Partial<LlmProviderConfig>;
+      apiKey?: string;
+      status?: LlmAgentStatus;
+    },
+  ): Promise<LlmAgent> {
+    const current = await this.getLlmAgent(agentId);
+    if (patch.baseId) await this.requireBase(patch.baseId);
+    const providerJson = await this.db.execute({
+      sql: "SELECT provider_json, api_key FROM llm_agents WHERE id = ?",
+      args: [agentId],
+    });
+    const currentProvider = parseJson<Partial<LlmProviderConfig>>(providerJson.rows[0]?.provider_json, {});
+    const nextProvider: LlmProviderConfig = {
+      baseUrl: patch.provider?.baseUrl ?? currentProvider.baseUrl ?? "",
+      model: patch.provider?.model ?? currentProvider.model ?? "",
+      temperature: patch.provider?.temperature ?? currentProvider.temperature ?? 0.2,
+    };
+    const apiKey = patch.apiKey != null ? patch.apiKey.trim() : asString(providerJson.rows[0]?.api_key);
+    await this.db.execute({
+      sql: `UPDATE llm_agents SET name = ?, description = ?, base_id = ?, instructions = ?, mode = ?, tools_json = ?,
+              provider_json = ?, api_key = ?, status = ?, updated_at = ? WHERE id = ?`,
+      args: [
+        patch.name != null ? cleanName(patch.name) : current.name,
+        patch.description != null ? patch.description.trim() : current.description,
+        patch.baseId !== undefined ? patch.baseId : current.baseId,
+        patch.instructions ?? current.instructions,
+        patch.mode ?? current.mode,
+        JSON.stringify(patch.tools ?? current.tools),
+        JSON.stringify(nextProvider),
+        apiKey,
+        patch.status ?? current.status,
+        Date.now(),
+        agentId,
+      ],
+    });
+    return this.getLlmAgent(agentId);
+  }
+
+  async deleteLlmAgent(agentId: string): Promise<void> {
+    const result = await this.db.execute({ sql: "SELECT id FROM llm_agents WHERE id = ?", args: [agentId] });
+    if (!result.rows[0]) throw new DomainError("找不到智能体", 404);
+    await this.db.execute({ sql: "DELETE FROM llm_agents WHERE id = ?", args: [agentId] });
+  }
+
+  async createLlmAgentRun(input: {
+    agentId: string;
+    trigger: LlmAgentRunTrigger;
+    input: string;
+    tableId?: string | null;
+    actorUserId?: string | null;
+    actorName?: string | null;
+  }): Promise<LlmAgentRun> {
+    const run: LlmAgentRun = {
+      id: nid("run"),
+      agentId: input.agentId,
+      trigger: input.trigger,
+      status: "running",
+      input: input.input,
+      output: "",
+      error: null,
+      steps: [],
+      tableId: input.tableId ?? null,
+      actorUserId: input.actorUserId ?? null,
+      actorName: input.actorName ?? null,
+      createdAt: Date.now(),
+      finishedAt: 0,
+      durationMs: 0,
+    };
+    await this.db.execute({
+      sql: `INSERT INTO llm_agent_runs
+        (id, agent_id, trigger, status, input, output, error, steps_json, table_id, actor_user_id, actor_name, created_at, finished_at, duration_ms)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        run.id,
+        run.agentId,
+        run.trigger,
+        run.status,
+        run.input,
+        run.output,
+        run.error,
+        JSON.stringify(run.steps),
+        run.tableId,
+        run.actorUserId,
+        run.actorName,
+        run.createdAt,
+        run.finishedAt,
+        run.durationMs,
+      ],
+    });
+    return run;
+  }
+
+  async finishLlmAgentRun(
+    runId: string,
+    patch: { status: "ok" | "failed"; output?: string; error?: string | null; steps?: LlmAgentRunStep[] },
+  ): Promise<LlmAgentRun> {
+    const finishedAt = Date.now();
+    const result = await this.db.execute({ sql: "SELECT * FROM llm_agent_runs WHERE id = ?", args: [runId] });
+    const row = result.rows[0];
+    if (!row) throw new DomainError("找不到运行记录", 404);
+    const durationMs = finishedAt - asNumber(row.created_at);
+    await this.db.execute({
+      sql: "UPDATE llm_agent_runs SET status = ?, output = ?, error = ?, steps_json = ?, finished_at = ?, duration_ms = ? WHERE id = ?",
+      args: [
+        patch.status,
+        patch.output ?? asString(row.output),
+        patch.error ?? null,
+        JSON.stringify(patch.steps ?? parseJson<LlmAgentRunStep[]>(row.steps_json, [])),
+        finishedAt,
+        durationMs,
+        runId,
+      ],
+    });
+    // 每个智能体只保留最近 100 条
+    try {
+      await this.db.execute({
+        sql: `DELETE FROM llm_agent_runs WHERE agent_id = ? AND id NOT IN (
+                SELECT id FROM llm_agent_runs WHERE agent_id = ? ORDER BY created_at DESC LIMIT 100)`,
+        args: [asString(row.agent_id), asString(row.agent_id)],
+      });
+    } catch {
+      /* ignore */
+    }
+    return this.requireLlmAgentRun(runId);
+  }
+
+  async listLlmAgentRuns(opts?: { agentId?: string; limit?: number }): Promise<LlmAgentRun[]> {
+    const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 200);
+    const result = opts?.agentId
+      ? await this.db.execute({
+          sql: "SELECT * FROM llm_agent_runs WHERE agent_id = ? ORDER BY created_at DESC LIMIT ?",
+          args: [opts.agentId, limit],
+        })
+      : await this.db.execute({ sql: "SELECT * FROM llm_agent_runs ORDER BY created_at DESC LIMIT ?", args: [limit] });
+    return result.rows.map((row) => this.llmAgentRunFromRow(row));
+  }
+
+  async requireLlmAgentRun(runId: string): Promise<LlmAgentRun> {
+    const result = await this.db.execute({ sql: "SELECT * FROM llm_agent_runs WHERE id = ?", args: [runId] });
+    const row = result.rows[0];
+    if (!row) throw new DomainError("找不到运行记录", 404);
+    return this.llmAgentRunFromRow(row);
+  }
+
+  private llmAgentFromRow(
+    row: Record<string, unknown>,
+    baseNames?: Map<string, string>,
+    stats?: { count: number; lastAt: number; lastStatus: LlmAgentRunStatus },
+  ): LlmAgent {
+    const provider = parseJson<Partial<LlmProviderConfig>>(row.provider_json, {});
+    const apiKey = asString(row.api_key);
+    const baseId = row.base_id == null || asString(row.base_id) === "" ? null : asString(row.base_id);
+    return {
+      id: asString(row.id),
+      name: asString(row.name),
+      description: asString(row.description),
+      baseId,
+      baseName: baseId ? baseNames?.get(baseId) : undefined,
+      instructions: asString(row.instructions),
+      mode: (asString(row.mode) === "prompt" ? "prompt" : "tools") as LlmAgentMode,
+      tools: parseJson<LlmAgentToolId[]>(row.tools_json, []),
+      provider: {
+        baseUrl: provider.baseUrl ?? "",
+        model: provider.model ?? "",
+        temperature: typeof provider.temperature === "number" ? provider.temperature : 0.2,
+      },
+      apiKeySet: apiKey.length > 0,
+      apiKeyHint: apiKey.length > 0 ? maskSecret(apiKey) : null,
+      ownerUserId: asString(row.owner_user_id),
+      status: (asString(row.status) === "disabled" ? "disabled" : "enabled") as LlmAgentStatus,
+      createdAt: asNumber(row.created_at),
+      updatedAt: asNumber(row.updated_at),
+      lastRunAt: stats?.lastAt ?? null,
+      lastRunStatus: stats?.lastStatus ?? null,
+      runCount: stats?.count ?? 0,
+    };
+  }
+
+  private llmAgentRunFromRow(row: Record<string, unknown>): LlmAgentRun {
+    return {
+      id: asString(row.id),
+      agentId: asString(row.agent_id),
+      trigger: asString(row.trigger) as LlmAgentRunTrigger,
+      status: asString(row.status) as LlmAgentRunStatus,
+      input: asString(row.input),
+      output: asString(row.output),
+      error: row.error == null ? null : asString(row.error),
+      steps: parseJson<LlmAgentRunStep[]>(row.steps_json, []),
+      tableId: row.table_id == null ? null : asString(row.table_id),
+      actorUserId: row.actor_user_id == null ? null : asString(row.actor_user_id),
+      actorName: row.actor_name == null ? null : asString(row.actor_name),
+      createdAt: asNumber(row.created_at),
+      finishedAt: asNumber(row.finished_at),
+      durationMs: asNumber(row.duration_ms),
+    };
   }
 
   async listHistory(recordId: string): Promise<
