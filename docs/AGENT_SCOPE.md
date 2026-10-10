@@ -125,16 +125,28 @@ duowei-agent/
 
 ## 4. 推荐落地分期（不含付费）
 
-### P0 — Agent MVP（先证明「能配、能跑、能改表」）
+### P0 — Agent MVP（先证明「能配、能跑、能改表」）—— ✅ 已落地（2026-10-10）
 
-- [ ] Agent 实体：名称、指令、工具白名单、绑定 base  
-- [ ] Runtime：OpenAI-compatible Chat Completions + function/tools  
-- [ ] 工具集：只读查询 + 写记录/改字段（走现有 Store，带 ACL）  
-- [ ] 入口 ①：表内对话（替换/增强现有「智能问答」为真 LLM+tools）  
-- [ ] 入口 ②：定时触发（复用 schedule）  
-- [ ] 运行日志与失败重试  
+- [x] Agent 实体：名称、指令、工具白名单、绑定 base  
+- [x] Runtime：OpenAI-compatible Chat Completions + function/tools  
+- [x] 工具集：只读查询 + 写记录/改字段（走现有 Store，带 ACL）  
+- [x] 入口 ①：表内对话（替换/增强现有「智能问答」为真 LLM+tools）  
+- [x] 入口 ②：定时触发（复用 schedule）  
+- [x] 运行日志与失败重试  
 
-**验收：** 「每日 9 点汇总状态为进行中的需求，写进日报表并评论」可配置跑通。
+**落地位置**
+
+| 层 | 文件 / 接口 |
+|----|-------------|
+| 数据层 | `src/types.ts`（`LlmAgent` / `LlmAgentRun` / `LlmAgentToolId`）；Store 内置智能体与运行日志表 |
+| 模型适配 | `src/llm.ts`（OpenAI 兼容 Chat Completions；provider 自配 baseUrl / model / apiKey） |
+| 运行时 | `src/agent.ts`（工具循环、per-trigger 运行日志、工具白名单与绑定空间校验） |
+| 装配 | `src/agent-runtime.ts`（`configureAgentRuntime`，自动化动作 `run_agent` 也走这里） |
+| REST | `GET/POST /api/agents`、`PATCH/DELETE /api/agents/:agentId`、`POST /api/agents/:agentId/run`、`GET /api/agent-runs`、`POST /api/agent-runs/:runId/retry`、`GET /api/tables/:tableId/agents`、`POST /api/tables/:tableId/agent-chat` |
+| 工具集 | `list_tables`、`get_table_schema`、`query_records`、`create_record`、`update_record`、`add_comment`——全部以触发者身份做空间角色与表级行列权限校验；智能体写入不触发自动化（避免互相触发） |
+| 前端 | 「智能体管理」弹窗（配置/试跑/运行记录）+ 表内助手面板的 LLM 对话 |
+
+**验收：** 「每日 9 点汇总状态为进行中的需求，写进日报表并评论」可配置跑通——定时自动化挂 `run_agent` 动作，智能体开 `query_records` + `create_record` + `add_comment` 即满足；试跑与定时两条路径共用同一运行时与运行日志。
 
 ### P1 — 触发器与嵌入
 
