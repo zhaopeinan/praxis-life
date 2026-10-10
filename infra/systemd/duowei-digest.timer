@@ -1,0 +1,10 @@
+[Unit]
+Description=每天 09:30（服务器本地时间为北京时间）推送知行人生值班日报
+
+[Timer]
+OnCalendar=*-*-* 09:30:00
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

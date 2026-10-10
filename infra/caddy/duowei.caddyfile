@@ -1,0 +1,11 @@
+# --- DuoWei · 按 IP 直连入口（duowei-ip-entry）---
+# 由 scripts/deploy-aliyun.sh 同步到服务器 /etc/caddy/duowei.caddyfile，主 Caddyfile 里以
+# `import /etc/caddy/duowei.caddyfile` 引入。改这里的配置后重跑部署脚本即可生效，不要直接在
+# 服务器上手工追加——这里才是唯一事实来源。
+#
+# 为什么是裸 IP：阿里云按 Host / TLS SNI 拦截未备案域名（HTTP 403 / TLS RST），Host 是裸 IP
+# 不会被拦。必须显式 http://，否则 Caddy 会做 80→443 跳转，而 443 对未备案域名会被重置。
+http://47.122.123.1 {
+	encode gzip
+	reverse_proxy 127.0.0.1:8787
+}

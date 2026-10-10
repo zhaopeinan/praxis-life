@@ -14,6 +14,10 @@
 #       在服务器（本来就是 x86_64）上原生 podman build。没有跨架构模拟，快很多；
 #       本机装不了 buildx / 跑不了 amd64 模拟时也用这个。
 #
+# 部署带冒烟与回滚：上线前把当前镜像打成 duowei:rollback，冒烟（健康检查 + 首页 200 +
+# 前端资源可取到）不通过就自动切回上一版并重建容器。Caddy 配置以仓库
+# infra/caddy/duowei.caddyfile 为准，服务器上的内联块会被清理并换成 import。
+#
 # 连接信息从仓库根的 aliyun.env 读取（该文件已被 .gitignore 忽略），四行依次为：
 #   备注 / 主机 / 用户 / 密码
 #
@@ -22,13 +26,15 @@
 #
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="${DUOWEI_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}"
 ENV_FILE="$ROOT/aliyun.env"
 
 IMAGE="duowei:latest"
 # 本机 docker 侧的标签；服务器 podman 侧统一用这个全名，两条构建路径（本机 load / 服务器 build）
 # 都收敛到同一个标签，避免 podman 把新镜像存成 localhost/… 而 run 时又用到旧的 docker.io/library/…。
 RUN_IMAGE="docker.io/library/duowei:latest"
+# 上一版镜像的标签：每次部署前把当前线上镜像打到这里，冒烟失败就切回来。
+ROLLBACK_IMAGE="docker.io/library/duowei:rollback"
 CONTAINER="duowei"
 REMOTE_DATA_DIR="/opt/duowei/data"
 REMOTE_SRC_DIR="/opt/duowei-src"
@@ -57,6 +63,48 @@ command -v sshpass >/dev/null || { echo "需要 sshpass：brew install hudochenk
 remote() { sshpass -e ssh "${SSH_OPTS[@]}" "$SSH_USER@$HOST" "$@"; }
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
+
+# 起容器的命令（正式部署与回滚共用，避免两处漂移）
+container_run_cmd() {
+  cat <<EOF
+podman rm $CONTAINER >/dev/null 2>&1 || true
+podman run -d --name $CONTAINER --restart unless-stopped \\
+  -p 127.0.0.1:8787:8787 \\
+  -v $REMOTE_DATA_DIR:/app/data \\
+  -e DUOWEI_HOST=0.0.0.0 \\
+  -e DUOWEI_PORT=8787 \\
+  -e DUOWEI_WEB_ROOT=/app/dist-web \\
+  -e DUOWEI_DEV_CODES=0 \\
+  -e DUOWEI_COOKIE_SECURE=0 \\
+  $RUN_IMAGE >/dev/null
+sleep 6
+EOF
+}
+
+# 冒烟：健康检查 + 首页 200 + 首页引用的前端资源能取到 + 关键只读接口
+smoke_check() {
+  remote 'set -e
+    curl -fsS -m 10 http://127.0.0.1:8787/api/health | grep -q "\"ok\":true"
+    test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8787/)" = "200"
+    ASSET="$(curl -s http://127.0.0.1:8787/ | grep -o "assets/index-[A-Za-z0-9_-]*\.js" | head -1)"
+    test -n "$ASSET"
+    curl -fsS -o /dev/null "http://127.0.0.1:8787/$ASSET"
+    echo "冒烟通过（健康检查 / 首页 / 前端资源）"'
+}
+
+rollback_to_previous() {
+  step "冒烟失败：回滚到上一版镜像"
+  remote "set -e
+          podman tag $ROLLBACK_IMAGE $RUN_IMAGE
+          $(container_run_cmd)
+          podman ps --format '{{.Names}} | {{.Image}} | {{.Status}}' | grep $CONTAINER"
+  if smoke_check; then
+    echo "已回滚到上一版镜像，服务正常。请检查本次改动。" >&2
+  else
+    echo "回滚后冒烟仍失败，需要人工介入。" >&2
+  fi
+  exit 1
+}
 
 if (( REMOTE_BUILD )); then
   step "本机构建前端产物（原生 arm64，产物与平台无关）"
@@ -97,6 +145,14 @@ elif (( BUILD )); then
   fi
 fi
 
+step "记住当前线上镜像为回滚点（$ROLLBACK_IMAGE）"
+remote "if podman image exists $RUN_IMAGE; then
+          podman tag $RUN_IMAGE $ROLLBACK_IMAGE
+          podman image inspect $ROLLBACK_IMAGE --format '回滚点已保存：{{.Id}}'
+        else
+          echo '线上还没有镜像，跳过保存回滚点'
+        fi"
+
 if (( REMOTE_BUILD )); then
   step "跳过镜像传输（镜像已在服务器上构建）"
 else
@@ -110,53 +166,42 @@ remote "podman stop $CONTAINER >/dev/null 2>&1 || true
         tar czf $REMOTE_DATA_DIR/duowei-db-\$(date +%Y%m%d-%H%M%S).tar.gz -C $REMOTE_DATA_DIR duowei.db duowei.db-wal duowei.db-shm 2>/dev/null || true
         ls -1t $REMOTE_DATA_DIR/duowei-db-*.tar.gz | head -1"
 
-step "确保 Caddy 按 IP 暴露 DuoWei（Host 为裸 IP 时阿里云不拦截）"
-remote "bash -s" <<'REMOTE_CADDY'
-set -euo pipefail
+step "同步 Caddy 配置（仓库 infra/caddy/duowei.caddyfile 为准）"
+sshpass -e scp "${SSH_OPTS[@]}" "$ROOT/infra/caddy/duowei.caddyfile" "$SSH_USER@$HOST:/etc/caddy/duowei.caddyfile"
+remote 'set -euo pipefail
 CADDY=/etc/caddy/Caddyfile
-MARK="duowei-ip-entry"
-if grep -q "$MARK" "$CADDY"; then
-  echo "Caddy IP 站点已存在，跳过"
-  exit 0
+if ! grep -q "^import /etc/caddy/duowei.caddyfile" "$CADDY"; then
+  cp "$CADDY" "$CADDY.bak.$(date +%Y%m%d%H%M%S)"
+  # 清掉早期脚本直接追加的内联块（标记行到该块结束的 "}" 为止），改为 import
+  awk '"'"'
+    index($0, "duowei-ip-entry") { skip = 1; next }
+    skip && $0 == "}" { skip = 0; next }
+    skip { next }
+    { print }
+  '"'"' "$CADDY" > "$CADDY.tmp"
+  mv "$CADDY.tmp" "$CADDY"
+  printf "\nimport /etc/caddy/duowei.caddyfile\n" >> "$CADDY"
+  echo "已清理旧内联块并加入 import"
+else
+  echo "已存在 import，仅更新被 import 的文件"
 fi
-cp "$CADDY" "$CADDY.bak.$(date +%Y%m%d%H%M%S)"
-cat >> "$CADDY" <<'CADDY_BLOCK'
-
-# --- DuoWei · 按 IP 直连入口（duowei-ip-entry）---
-# 阿里云只拦 Host / TLS SNI 里未备案的域名；Host 是裸 IP 不会被拦。
-# 必须显式 http://，否则 Caddy 会做 80→443 跳转，而 443 对未备案域名会被 RST。
-http://47.122.123.1 {
-	encode gzip
-	reverse_proxy 127.0.0.1:8787
-}
-CADDY_BLOCK
 caddy validate --config "$CADDY" --adapter caddyfile
 systemctl reload caddy
-echo "已追加 IP 站点并 reload Caddy"
-REMOTE_CADDY
+# 配置文件已入仓，历史手工备份只保留最近 2 份
+ls -1t /etc/caddy/Caddyfile.bak.* 2>/dev/null | tail -n +3 | xargs -r rm -f
+echo "Caddy 已按仓库配置重载"'
 
 step "用新的 duowei:latest 重建容器"
-remote "podman rm $CONTAINER >/dev/null 2>&1 || true
-        podman run -d --name $CONTAINER --restart unless-stopped \
-          -p 127.0.0.1:8787:8787 \
-          -v $REMOTE_DATA_DIR:/app/data \
-          -e DUOWEI_HOST=0.0.0.0 \
-          -e DUOWEI_PORT=8787 \
-          -e DUOWEI_WEB_ROOT=/app/dist-web \
-          -e DUOWEI_DEV_CODES=0 \
-          -e DUOWEI_COOKIE_SECURE=0 \
-          $RUN_IMAGE >/dev/null
-        sleep 6
+remote "$(container_run_cmd)
         podman ps --format '{{.Names}} | {{.Image}} | {{.Status}} | {{.Ports}}' | grep $CONTAINER
         podman logs --tail 5 $CONTAINER"
+
+step "冒烟检查（失败自动回滚到 $ROLLBACK_IMAGE）"
+smoke_check || rollback_to_previous
+curl -s -m 20 -o /dev/null -w "公网 $PUBLIC_URL: %{http_code}\n" "$PUBLIC_URL" || echo "（本机访问不了公网地址时可用浏览器自行确认）"
 
 step "清理历史悬空镜像"
 remote "podman image prune -f | tail -1"
 
-step "冒烟检查"
-remote "curl -s -o /dev/null -w '容器内 index.html: %{http_code}\n' http://127.0.0.1:8787/
-        curl -s http://127.0.0.1:8787/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js' | head -1"
-curl -s -m 20 -o /dev/null -w "公网 $PUBLIC_URL: %{http_code}\n" "$PUBLIC_URL" || echo "（本机访问不了公网域名时可用浏览器自行确认）"
-
 echo
-echo "部署完成。数据库备份在服务器 $REMOTE_DATA_DIR/duowei-db-*.tar.gz"
+echo "部署完成。上一版镜像保留为 $ROLLBACK_IMAGE，数据库备份在服务器 $REMOTE_DATA_DIR/duowei-db-*.tar.gz"

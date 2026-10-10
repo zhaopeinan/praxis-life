@@ -1,0 +1,8 @@
+[Unit]
+Description=知行人生每日值班日报（服务/容器/磁盘/备份/写入量，推送到飞书）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/duowei-src/scripts/ops-digest.sh
