@@ -1,6 +1,6 @@
 import type { DisplayValue, Filter, PublicRecord, RecordQuery, Sort } from "./types.js";
-import { displayText, isEmptyValue } from "./query-helpers.js";
-export { displayText, isEmptyValue } from "./query-helpers.js";
+import { displayText, isEmptyValue, resolveDateToken } from "./query-helpers.js";
+export { displayText, isEmptyValue, resolveDateToken } from "./query-helpers.js";
 export { evalFormula, evalFormulaCached, clearFormulaCache, formulaCacheSize } from "./formula.js";
 
 function asNumber(value: DisplayValue | undefined): number | null {
@@ -13,7 +13,11 @@ export function matchesFilter(value: DisplayValue | undefined, filter: Filter): 
   if (filter.op === "is_empty") return isEmptyValue(value);
   if (filter.op === "is_not_empty") return !isEmptyValue(value);
 
-  const expected = (filter.value ?? "").trim();
+  // 比较值支持相对日期 token（today / today+3 / today-90 / week_start / week_end /
+  // month_start / month_end / now±Nh），视图过滤器与颜色规则因此可以做「本周」「未来 2 天」
+  // 「超过 90 天未动」这类长期条件，不必每周改死日期。普通文本原样比较。
+  const raw = (filter.value ?? "").trim();
+  const expected = resolveDateToken(raw) ?? raw;
   const expectedLower = expected.toLowerCase();
   const text = displayText(value).toLowerCase();
   const num = asNumber(value);

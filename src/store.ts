@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createClient, type Client } from "@libsql/client";
-import { applyQuery, displayText, evalFormulaCached, matchesFilter } from "./query.js";
+import { applyQuery, displayText, evalFormulaCached, matchesFilter, resolveDateToken } from "./query.js";
 import { emitPluginEvent, recentPluginEvents } from "./plugins.js";
 import { normalizeFeishuWebhook, sendFeishuText } from "./feishu.js";
 import { buildIcsCalendar } from "./ics.js";
@@ -5704,35 +5704,7 @@ function addDaysYmd(ymd: string, days: number): string {
   return localYmd(next);
 }
 
-/**
- * 相对日期 token 求值：today、today+N、today-N、week_start、week_end、month_start、month_end、
- * now、now+Nh、now-Nh。普通文本返回 null，由调用方决定是否回退原文。
- * 一周按周一起算；date 字段取前十位即可，时间相关判断可用 now±Nh 的「YYYY-MM-DD HH:MM」。
- */
-function resolveDateToken(text: string, now = new Date()): string | null {
-  const key = text.trim().toLowerCase();
-  if (!key) return null;
-  if (key === "today") return localYmd(now);
-  if (key === "now") return formatTs(now.getTime());
-  const day = key.match(/^today([+-])(\d{1,4})$/);
-  if (day) return addDaysYmd(localYmd(now), Number(day[2]) * (day[1] === "+" ? 1 : -1));
-  const hour = key.match(/^now([+-])(\d{1,4})h$/);
-  if (hour) return formatTs(now.getTime() + Number(hour[2]) * (hour[1] === "+" ? 1 : -1) * 3_600_000);
-  if (key === "week_start" || key === "week_end") {
-    const weekday = now.getDay();
-    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (weekday === 0 ? -6 : 1 - weekday));
-    const target = key === "week_end" ? new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6) : monday;
-    return localYmd(target);
-  }
-  if (key === "month_start" || key === "month_end") {
-    return localYmd(
-      key === "month_start" ? new Date(now.getFullYear(), now.getMonth(), 1) : new Date(now.getFullYear(), now.getMonth() + 1, 0),
-    );
-  }
-  return null;
-}
-
-/** Accept every:N, daily:HH:MM, weekly:D:HH:MM, hourly, or plain minutes. */
+/** 只解析纯间隔语法：every:N（每 N 分钟）、hourly、纯数字 N（每 N 分钟）。 */
 function parseScheduleMs(cron: string): number | null {
   const text = cron.trim();
   const every = text.match(/^every:(\d+)$/i);

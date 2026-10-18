@@ -1914,5 +1914,48 @@ const foreignRun = engineRuns.data.find((item: { automationId: string }) => item
 assert.equal(foreignRun.status, "failed");
 assert.match(foreignRun.detail, /同一多维表格/);
 
+/* ——— 视图过滤器支持相对日期 token（第 10/15/23 讲的「本周」「未来 3 天」「超期未动」闸门）——— */
+const nearView = await json(`/api/tables/${engineTableId}/views`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ name: "未来三天内到期", type: "grid" }),
+});
+assert.equal(nearView.status, 201);
+assert.equal(
+  (
+    await json(`/api/views/${nearView.data.id}`, {
+      method: "PATCH",
+      cookie: ada2,
+      body: JSON.stringify({ config: { filters: [{ fieldId: engineDateId, op: "lte", value: "today+3" }] } }),
+    })
+  ).status,
+  200,
+);
+const nearViewRead = await json(`/api/tables/${engineTableId}?viewId=${nearView.data.id}`, { cookie: ada2 });
+const nearTitles = nearViewRead.data.records.map((record: { fields: Record<string, string> }) => record.fields["标题"]);
+assert.ok(nearTitles.includes("两天内"));
+assert.ok(!nearTitles.includes("五天后"));
+
+const staleView = await json(`/api/tables/${engineTableId}/views`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ name: "超三个月未动", type: "grid" }),
+});
+assert.equal(staleView.status, 201);
+assert.equal(
+  (
+    await json(`/api/views/${staleView.data.id}`, {
+      method: "PATCH",
+      cookie: ada2,
+      body: JSON.stringify({ config: { filters: [{ fieldId: engineDateId, op: "lt", value: "today-90" }] } }),
+    })
+  ).status,
+  200,
+);
+const staleViewRead = await json(`/api/tables/${engineTableId}?viewId=${staleView.data.id}`, { cookie: ada2 });
+const staleTitles = staleViewRead.data.records.map((record: { fields: Record<string, string> }) => record.fields["标题"]);
+assert.ok(staleTitles.includes("很久没动"));
+assert.ok(!staleTitles.includes("两天内"));
+
 console.log("duowei tests passed");
 
