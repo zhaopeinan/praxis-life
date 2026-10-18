@@ -4749,7 +4749,7 @@ function AutomationDialog({
   return (
     <Modal title="自动化" onClose={onClose} size="wide">
       <p className="fine">
-        支持创建触发、按钮、Webhook、定时；定时格式：every:5 / daily:09:00 / weekly:1:09:00 / 0 9 * * *；动作含改字段、评论、HTTP、邮件、飞书机器人、调用智能体。
+        支持创建触发、按钮、Webhook、定时；定时格式：every:5 / daily:09:00 / weekly:1:09:00 / monthly:1:09:00 / quarterly:3-1:09:00 / yearly:1-1:09:00 / 0 9 * * *；动作含改字段、评论、HTTP、邮件、飞书机器人、调用智能体。
       </p>
       {feishuNeeded && (
         <div className={`automation-setup${webhookReady ? "" : " is-missing"}`}>
@@ -4849,7 +4849,7 @@ function AutomationDialog({
           <label>
             周期表达式
             <FancySelect
-              value={["every:5", "every:60", "hourly", "daily:09:00", "weekly:1:09:00", "0 9 * * *"].includes(scheduleCron) ? scheduleCron : "__custom__"}
+              value={["every:5", "every:60", "hourly", "daily:09:00", "weekly:1:09:00", "monthly:1:09:00", "quarterly:3-1:09:00", "yearly:1-1:09:00", "0 9 * * *"].includes(scheduleCron) ? scheduleCron : "__custom__"}
               onChange={(v) => {
                 if (v !== "__custom__") setScheduleCron(v);
               }}
@@ -4859,6 +4859,9 @@ function AutomationDialog({
                 { value: "hourly", label: "每小时" },
                 { value: "daily:09:00", label: "每天 09:00" },
                 { value: "weekly:1:09:00", label: "每周一 09:00" },
+                { value: "monthly:1:09:00", label: "每月 1 日 09:00" },
+                { value: "quarterly:3-1:09:00", label: "每季度首日 09:00" },
+                { value: "yearly:1-1:09:00", label: "每年 1 月 1 日 09:00" },
                 { value: "0 9 * * *", label: "cron：每天 9 点" },
                 { value: "__custom__", label: "自定义…" },
               ]}
@@ -4866,7 +4869,7 @@ function AutomationDialog({
             <input
               value={scheduleCron}
               onChange={(event) => setScheduleCron(event.target.value)}
-              placeholder="every:5 / daily:09:00 / weekly:1:09:00"
+              placeholder="every:5 / daily:09:00 / weekly:1:09:00 / monthly:1:09:00 / quarterly:3-1:09:00 / yearly:1-1:09:00"
               required
               style={{ marginTop: 6 }}
             />

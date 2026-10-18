@@ -5720,26 +5720,77 @@ function parseScheduleMs(cron: string): number | null {
   return null;
 }
 
-function shouldRunSchedule(cron: string, lastRunAt: number, now: number): boolean {
+/** 解析 `<...>:<HH>:<MM>` 里的时分；不合法返回 null。 */
+function parseHourMinute(hourText: string, minuteText: string): { hour: number; minute: number } | null {
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+  if (hour > 23 || minute > 59 || hour < 0 || minute < 0) return null;
+  return { hour, minute };
+}
+
+/**
+ * 调度判定。支持的语法：
+ * - 间隔类：`every:N`（每 N 分钟）、`hourly`、纯数字 `N`（每 N 分钟）
+ * - 定点类：`daily:HH:MM`、`weekly:D:HH:MM`（D：0=周日 … 6=周六）
+ * - 月历类：`monthly:DD:HH:MM`（每月某日）、`quarterly:M-D:HH:MM`（从 M 月起每 3 个月）、`yearly:M-D:HH:MM`（每年某日）
+ * - 简化 5 段：`m h * * *`
+ */
+export function shouldRunSchedule(cron: string, lastRunAt: number, now: number): boolean {
   const everyMs = parseScheduleMs(cron);
   if (everyMs) return now - lastRunAt >= everyMs;
   const text = cron.trim();
   const daily = text.match(/^daily:(\d{1,2}):(\d{2})$/i);
   if (daily) {
-    const hour = Number(daily[1]);
-    const minute = Number(daily[2]);
-    if (hour > 23 || minute > 59) return false;
+    const hm = parseHourMinute(daily[1], daily[2]);
+    if (!hm) return false;
     const d = new Date(now);
-    if (d.getHours() !== hour || d.getMinutes() !== minute) return false;
+    if (d.getHours() !== hm.hour || d.getMinutes() !== hm.minute) return false;
     return now - lastRunAt >= 60_000;
   }
   const weekly = text.match(/^weekly:([0-6]):(\d{1,2}):(\d{2})$/i);
   if (weekly) {
     const dow = Number(weekly[1]);
-    const hour = Number(weekly[2]);
-    const minute = Number(weekly[3]);
+    const hm = parseHourMinute(weekly[2], weekly[3]);
+    if (!hm) return false;
     const d = new Date(now);
-    if (d.getDay() !== dow || d.getHours() !== hour || d.getMinutes() !== minute) return false;
+    if (d.getDay() !== dow || d.getHours() !== hm.hour || d.getMinutes() !== hm.minute) return false;
+    return now - lastRunAt >= 60_000;
+  }
+  // monthly:DD:HH:MM —— 每月的 DD 日触发；当月没有该日（如 31 日遇二月）则跳过，等下个月。
+  const monthly = text.match(/^monthly:(\d{1,2}):(\d{1,2}):(\d{2})$/i);
+  if (monthly) {
+    const day = Number(monthly[1]);
+    const hm = parseHourMinute(monthly[2], monthly[3]);
+    if (!hm || day < 1 || day > 31) return false;
+    const d = new Date(now);
+    if (d.getDate() !== day || d.getHours() !== hm.hour || d.getMinutes() !== hm.minute) return false;
+    return now - lastRunAt >= 60_000;
+  }
+  // quarterly:M-D:HH:MM —— 从月份 M 起每 3 个月的第 D 日触发（M、M+3、M+6、M+9），如
+  // quarterly:3-1:09:00 = 3/1、6/1、9/1、12/1。让「季度 / 学期复盘」有精确提醒，不再靠周级近似。
+  const quarterly = text.match(/^quarterly:(\d{1,2})-(\d{1,2}):(\d{1,2}):(\d{2})$/i);
+  if (quarterly) {
+    const month = Number(quarterly[1]);
+    const day = Number(quarterly[2]);
+    const hm = parseHourMinute(quarterly[3], quarterly[4]);
+    if (!hm || month < 1 || month > 12 || day < 1 || day > 31) return false;
+    const d = new Date(now);
+    const monthDiff = (d.getMonth() + 1 - month + 1200) % 12;
+    if (monthDiff % 3 !== 0) return false;
+    if (d.getDate() !== day || d.getHours() !== hm.hour || d.getMinutes() !== hm.minute) return false;
+    return now - lastRunAt >= 60_000;
+  }
+  // yearly:M-D:HH:MM —— 每年固定一天触发（年度回顾 / 年度检验提醒）。
+  const yearly = text.match(/^yearly:(\d{1,2})-(\d{1,2}):(\d{1,2}):(\d{2})$/i);
+  if (yearly) {
+    const month = Number(yearly[1]);
+    const day = Number(yearly[2]);
+    const hm = parseHourMinute(yearly[3], yearly[4]);
+    if (!hm || month < 1 || month > 12 || day < 1 || day > 31) return false;
+    const d = new Date(now);
+    if (d.getMonth() + 1 !== month || d.getDate() !== day) return false;
+    if (d.getHours() !== hm.hour || d.getMinutes() !== hm.minute) return false;
     return now - lastRunAt >= 60_000;
   }
   // simple cron: m h * * *

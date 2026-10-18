@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Accounts } from "./accounts.js";
-import { Store } from "./store.js";
+import { Store, shouldRunSchedule } from "./store.js";
 import { createApp } from "./server.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "duowei-"));
@@ -1956,6 +1956,26 @@ const staleViewRead = await json(`/api/tables/${engineTableId}?viewId=${staleVie
 const staleTitles = staleViewRead.data.records.map((record: { fields: Record<string, string> }) => record.fields["标题"]);
 assert.ok(staleTitles.includes("很久没动"));
 assert.ok(!staleTitles.includes("两天内"));
+
+/* ——— cron 新语法：monthly / quarterly / yearly（第 23 讲月复盘、学期复盘）——— */
+const at = (y: number, m: number, d: number, h = 0, min = 0) => new Date(y, m - 1, d, h, min).getTime();
+assert.equal(shouldRunSchedule("monthly:15:09:00", 0, at(2026, 11, 15, 9, 0)), true);
+assert.equal(shouldRunSchedule("monthly:15:09:00", 0, at(2026, 11, 16, 9, 0)), false);
+assert.equal(shouldRunSchedule("monthly:15:09:00", 0, at(2026, 11, 15, 9, 1)), false);
+assert.equal(shouldRunSchedule("monthly:15:09:00", at(2026, 11, 15, 9, 0) - 30_000, at(2026, 11, 15, 9, 0)), false);
+assert.equal(shouldRunSchedule("monthly:30:09:00", 0, at(2027, 2, 28, 9, 0)), false);
+assert.equal(shouldRunSchedule("quarterly:3-1:09:00", 0, at(2026, 3, 1, 9, 0)), true);
+assert.equal(shouldRunSchedule("quarterly:3-1:09:00", 0, at(2026, 6, 1, 9, 0)), true);
+assert.equal(shouldRunSchedule("quarterly:3-1:09:00", 0, at(2026, 9, 1, 9, 0)), true);
+assert.equal(shouldRunSchedule("quarterly:3-1:09:00", 0, at(2026, 5, 1, 9, 0)), false);
+assert.equal(shouldRunSchedule("yearly:1-5:10:00", 0, at(2027, 1, 5, 10, 0)), true);
+assert.equal(shouldRunSchedule("yearly:1-5:10:00", 0, at(2026, 12, 5, 10, 0)), false);
+assert.equal(shouldRunSchedule("monthly:99:09:00", 0, at(2026, 11, 15, 9, 0)), false);
+// 旧语法回归
+assert.equal(shouldRunSchedule("daily:09:00", 0, at(2026, 10, 19, 9, 0)), true);
+assert.equal(shouldRunSchedule("daily:09:00", 0, at(2026, 10, 19, 9, 30)), false);
+assert.equal(shouldRunSchedule("weekly:1:09:00", 0, at(2026, 10, 19, 9, 0)), true);
+assert.equal(shouldRunSchedule("weekly:1:09:00", 0, at(2026, 10, 20, 9, 0)), false);
 
 console.log("duowei tests passed");
 
