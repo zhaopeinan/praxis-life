@@ -1309,6 +1309,16 @@ body.col-resizing * { cursor: col-resize !important; }
 .icon-button:hover, .head-label:hover { background: var(--bg-muted); color: var(--ink-2); }
 .icon-button.danger { color: var(--ink-4); }
 .icon-button.tiny { letter-spacing: 0; font-size: 14px; font-weight: 700; }
+.lock-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
+  line-height: 1;
+  flex: none;
+  cursor: help;
+}
 .row-actions { justify-content: center; }
 .grid-row:hover .row-actions .icon-button { color: var(--danger); }
 .add-row, .add-card {

@@ -185,7 +185,7 @@ export function GridView({
     const raw = record.fields[field.name];
     const filterValue = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
     if (onFilterBy && filterValue) items.push({ label: `按「${field.name}」筛选此值`, onClick: () => onFilterBy(record, field) });
-    if (!readOnly) {
+    if (!readOnly && !record.lockedAt) {
       items.push("sep");
       items.push({ label: "删除记录", danger: true, onClick: () => onDelete(record.id) });
     }
@@ -246,6 +246,7 @@ export function GridView({
             )}
             {group.records.map((record) => {
               const rowColor = resolveRowColor(record, catalog, colorRules);
+              const locked = Boolean(record.lockedAt);
               return (
               <div className="grid-row" key={record.id} style={rowColor ? { background: rowColor } : undefined}>
                 {fields.map((field) => (
@@ -262,7 +263,7 @@ export function GridView({
                       allFields={catalog}
                       record={record}
                       value={record.fields[field.name] ?? null}
-                      readOnly={readOnly || READONLY_TYPES.has(field.type)}
+                      readOnly={readOnly || locked || READONLY_TYPES.has(field.type)}
                       baseId={baseId}
                       onChange={(value) => {
                         if (field.type === "single_select" || field.type === "multi_select") {
@@ -291,7 +292,12 @@ export function GridView({
                       …
                     </button>
                   )}
-                  {!readOnly && (
+                  {locked && (
+                    <span className="lock-badge" title={`已锁定（写保护）${record.lockedBy ? ` · ${record.lockedBy}` : ""}`}>
+                      🔒
+                    </span>
+                  )}
+                  {!readOnly && !locked && (
                     <button type="button" className="icon-button danger" onClick={() => onDelete(record.id)} aria-label="删除记录">
                       ×
                     </button>

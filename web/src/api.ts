@@ -256,6 +256,11 @@ export const api = {
       body: JSON.stringify({ fields }),
     }),
   deleteRecord: (recordId: string) => request(`/api/records/${recordId}`, { method: "DELETE" }),
+  setRecordLock: (recordId: string, locked: boolean) =>
+    request<{ record: PublicRecord; fields: Field[] }>(`/api/records/${recordId}/lock`, {
+      method: "POST",
+      body: JSON.stringify({ locked }),
+    }),
   createView: (
     tableId: string,
     body: {

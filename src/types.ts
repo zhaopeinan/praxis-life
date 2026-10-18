@@ -85,7 +85,9 @@ export type AttachmentMeta = {
 export type ButtonAction =
   | { type: "set_field"; fieldId: string; value: string }
   | { type: "open_url"; url: string }
-  | { type: "add_comment"; body: string };
+  | { type: "add_comment"; body: string }
+  | { type: "lock_record" }
+  | { type: "unlock_record" };
 
 export type FieldConfig = {
   options?: SelectOption[];
@@ -226,6 +228,9 @@ export type PublicRecord = {
   id: string;
   createdAt: number;
   updatedAt: number;
+  /** 记录级写保护：锁定时间戳（毫秒），0 / 缺省表示未锁定 */
+  lockedAt?: number | null;
+  lockedBy?: string | null;
   fields: Record<string, DisplayValue>;
 };
 
@@ -408,7 +413,10 @@ export type AutomationAction =
       webhookUrl?: string;
     }
   /** 调用站内 LLM 智能体跑一轮（结果写入智能体运行日志） */
-  | { type: "run_agent"; agentId: string; prompt: string };
+  | { type: "run_agent"; agentId: string; prompt: string }
+  /** 锁定触发记录（写保护；解锁需手动或 unlock_record） */
+  | { type: "lock_record" }
+  | { type: "unlock_record" };
 
 export type BaseIntegrations = {
   feishuWebhookUrl?: string;

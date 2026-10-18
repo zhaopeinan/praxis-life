@@ -78,24 +78,27 @@ export function KanbanView({
               <em>{cards.length}</em>
             </header>
             <div className="cards">
-              {cards.map((record) => (
+              {cards.map((record) => {
+                const locked = Boolean(record.lockedAt);
+                return (
                 <article
                   key={record.id}
                   className={touchDragging === record.id ? "touch-dragging" : undefined}
-                  draggable={!readOnly}
+                  draggable={!readOnly && !locked}
                   title={onOpenRecord && !readOnly ? "点击查看详情，拖动改状态" : undefined}
                   onPointerDown={(event) => {
                     pointerStart.current = { x: event.clientX, y: event.clientY };
                   }}
                   onClick={(event) => openRecord(record.id, event)}
                   onDragStart={() => {
+                    if (locked) return;
                     dragId.current = record.id;
                   }}
                   onDragEnd={() => {
                     dragId.current = null;
                   }}
                   onTouchStart={(event) => {
-                    if (readOnly) return;
+                    if (readOnly || locked) return;
                     beginTouchDrag(event, {
                       onActivate: () => setTouchDragging(record.id),
                       onTargetChange: (key) => setOver(key),
@@ -111,7 +114,12 @@ export function KanbanView({
                 >
                   <div className="card-top">
                     <h3>{text(record.fields[primary?.name ?? ""]) || "未命名"}</h3>
-                    {!readOnly && (
+                    {locked && (
+                      <span className="lock-badge" title={`已锁定（写保护）${record.lockedBy ? ` · ${record.lockedBy}` : ""}`}>
+                        🔒
+                      </span>
+                    )}
+                    {!readOnly && !locked && (
                       <button type="button" className="icon-button tiny" aria-label="删除记录" onClick={() => onDelete(record.id)}>
                         ×
                       </button>
@@ -138,7 +146,8 @@ export function KanbanView({
                     })}
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
             {!readOnly && (
               <button type="button" className="add-card" onClick={() => onAdd(column.key === "__empty__" ? null : column.name)}>

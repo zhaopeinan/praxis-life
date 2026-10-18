@@ -144,6 +144,10 @@ type RawRecord = {
   values: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
+  /** 记录级写保护：锁定时间戳（毫秒），0 表示未锁定 */
+  lockedAt: number;
+  lockedBy: string | null;
+  lockedById: string | null;
 };
 
 function nid(prefix: string): string {
@@ -223,7 +227,10 @@ export class Store {
         table_id TEXT NOT NULL REFERENCES tables(id) ON DELETE CASCADE,
         values_json TEXT NOT NULL DEFAULT '{}',
         created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
+        updated_at INTEGER NOT NULL,
+        locked_at INTEGER NOT NULL DEFAULT 0,
+        locked_by TEXT,
+        locked_by_id TEXT
       )`,
       `CREATE TABLE IF NOT EXISTS views (
         id TEXT PRIMARY KEY,
@@ -599,6 +606,9 @@ export class Store {
       "ALTER TABLE views ADD COLUMN created_by TEXT",
       "ALTER TABLE base_settings ADD COLUMN integrations_json TEXT NOT NULL DEFAULT '{}'",
       "ALTER TABLE mcp_agents ADD COLUMN token_plain TEXT",
+      "ALTER TABLE records ADD COLUMN locked_at INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE records ADD COLUMN locked_by TEXT",
+      "ALTER TABLE records ADD COLUMN locked_by_id TEXT",
     ]) {
       try {
         await this.db.execute(sql);
@@ -1096,7 +1106,7 @@ export class Store {
     for (const op of duplexOps) {
       await this.syncDuplexLinks(id, op.field, op.ids, op.previous);
     }
-    const record = { id, tableId, values, createdAt: now, updatedAt: now };
+    const record = { id, tableId, values, createdAt: now, updatedAt: now, lockedAt: 0, lockedBy: null, lockedById: null };
     if (!meta?.skipAutomation) {
       await this.runAutomations(tableId, "record_created", record, fields, null, meta);
       await this.runWorkflows(tableId, "record_created", record, fields, meta);
@@ -1113,6 +1123,11 @@ export class Store {
     meta?: { userId?: string; userName?: string; skipAutomation?: boolean; skipDuplex?: boolean },
   ): Promise<{ record: PublicRecord; fields: Field[] }> {
     const current = await this.requireRecord(recordId);
+    if (current.lockedAt > 0) {
+      throw new DomainError(
+        `记录已锁定（写保护${current.lockedBy ? `，锁定人：${current.lockedBy}` : ""}），请先解锁再修改`,
+      );
+    }
     let fields = await this.listFields(current.tableId);
     const values = { ...current.values };
     const changedFieldIds: string[] = [];
@@ -1174,10 +1189,59 @@ export class Store {
 
   async deleteRecord(recordId: string): Promise<void> {
     const record = await this.requireRecord(recordId);
+    if (record.lockedAt > 0) {
+      throw new DomainError(
+        `记录已锁定（写保护${record.lockedBy ? `，锁定人：${record.lockedBy}` : ""}），请先解锁再删除`,
+      );
+    }
     await this.db.execute({ sql: "DELETE FROM records WHERE id = ?", args: [recordId] });
     this.usage.bump("record_writes");
     await this.touchTable(record.tableId);
     await this.firePluginHooks("record_deleted", record.tableId, recordId);
+  }
+
+  /**
+   * 记录级写保护（第 10/12 讲 P1）：锁定后 updateRecord / deleteRecord / 自动化 set_field
+   * 一律拒绝或跳过，只有本方法能改锁状态；锁定与解锁都会写一条评论 + 一条历史，留痕不可静默。
+   */
+  async setRecordLock(
+    recordId: string,
+    locked: boolean,
+    meta?: { userId?: string; userName?: string },
+  ): Promise<{ record: PublicRecord; fields: Field[] }> {
+    const record = await this.requireRecord(recordId);
+    const already = record.lockedAt > 0;
+    if (locked !== already) {
+      const now = Date.now();
+      await this.db.execute({
+        sql: "UPDATE records SET locked_at = ?, locked_by = ?, locked_by_id = ? WHERE id = ?",
+        args: [
+          locked ? now : 0,
+          locked ? (meta?.userName ?? "system") : null,
+          locked ? (meta?.userId ?? null) : null,
+          recordId,
+        ],
+      });
+      await this.appendHistory({
+        recordId,
+        tableId: record.tableId,
+        userId: meta?.userId,
+        userName: meta?.userName,
+        action: locked ? "lock" : "unlock",
+        patch: {},
+      });
+      await this.addComment(
+        recordId,
+        meta?.userId ?? "system",
+        meta?.userName ?? "系统",
+        locked
+          ? "🔒 记录已锁定（写保护）：锁定期间字段不可修改、记录不可删除；解锁将同样留痕。"
+          : "🔓 记录已解锁：字段可继续修改。",
+      );
+    }
+    const refreshed = await this.requireRecord(recordId);
+    const fields = await this.listFields(record.tableId);
+    return { record: await this.toPublic(refreshed, fields), fields };
   }
 
   async createView(
@@ -1751,6 +1815,8 @@ export class Store {
       id: record.id,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
+      lockedAt: record.lockedAt || null,
+      lockedBy: record.lockedBy,
       fields: display,
     };
   }
@@ -1813,6 +1879,7 @@ export class Store {
     const removed = previousIds.filter((id) => !nextIds.includes(id));
     for (const peerId of added) {
       const peer = await this.requireRecord(peerId);
+      if (peer.lockedAt > 0) continue;
       const current = Array.isArray(peer.values[peerField.id])
         ? (peer.values[peerField.id] as unknown[]).map(String)
         : [];
@@ -1823,6 +1890,7 @@ export class Store {
     for (const peerId of removed) {
       const peer = await this.requireRecord(peerId).catch(() => null);
       if (!peer) continue;
+      if (peer.lockedAt > 0) continue;
       const current = Array.isArray(peer.values[peerField.id])
         ? (peer.values[peerField.id] as unknown[]).map(String)
         : [];
@@ -2045,6 +2113,9 @@ export class Store {
       if (!field || SYSTEM_SET.has(field.type)) {
         return { type: action.type, status: "skipped", detail: "目标字段不存在或为系统字段" };
       }
+      if (record.lockedAt > 0) {
+        return { type: action.type, status: "skipped", detail: "记录已锁定（写保护），跳过写入" };
+      }
       const resolved = await this.writeFieldValue(fields, field.id, action.value);
       const values = { ...record.values };
       if (resolved.stored == null) delete values[resolved.fieldId];
@@ -2076,6 +2147,17 @@ export class Store {
         action.body.replaceAll("{recordId}", record.id),
       );
       return { type: action.type, status: "ok", detail: "已写入评论" };
+    }
+    if (action.type === "lock_record" || action.type === "unlock_record") {
+      const wantLocked = action.type === "lock_record";
+      if ((record.lockedAt > 0) === wantLocked) {
+        return { type: action.type, status: "skipped", detail: wantLocked ? "记录已锁定" : "记录未锁定" };
+      }
+      await this.setRecordLock(record.id, wantLocked, meta);
+      record.lockedAt = wantLocked ? Date.now() : 0;
+      record.lockedBy = wantLocked ? (meta?.userName ?? "自动化") : null;
+      record.lockedById = wantLocked ? (meta?.userId ?? null) : null;
+      return { type: action.type, status: "ok", detail: wantLocked ? "已锁定记录" : "已解锁记录" };
     }
     if (action.type === "notify") {
       const table = await this.requireTable(tableId);
@@ -4303,6 +4385,12 @@ export class Store {
     } else if (action?.type === "add_comment") {
       await this.addComment(recordId, meta?.userId ?? "system", meta?.userName ?? "按钮", action.body);
       detail = "已添加评论";
+    } else if (action?.type === "lock_record") {
+      await this.setRecordLock(recordId, true, meta);
+      detail = "已锁定记录";
+    } else if (action?.type === "unlock_record") {
+      await this.setRecordLock(recordId, false, meta);
+      detail = "已解锁记录";
     } else if (action?.type === "open_url") {
       detail = action.url;
     }
@@ -5598,6 +5686,9 @@ export class Store {
       values: parseJson<Record<string, unknown>>(row.values_json, {}),
       createdAt: asNumber(row.created_at),
       updatedAt: asNumber(row.updated_at),
+      lockedAt: asNumber(row.locked_at ?? 0),
+      lockedBy: row.locked_by == null ? null : asString(row.locked_by),
+      lockedById: row.locked_by_id == null ? null : asString(row.locked_by_id),
     }));
   }
 
@@ -5645,6 +5736,9 @@ export class Store {
       values: parseJson<Record<string, unknown>>(row.values_json, {}),
       createdAt: asNumber(row.created_at),
       updatedAt: asNumber(row.updated_at),
+      lockedAt: asNumber(row.locked_at ?? 0),
+      lockedBy: row.locked_by == null ? null : asString(row.locked_by),
+      lockedById: row.locked_by_id == null ? null : asString(row.locked_by_id),
     };
   }
 

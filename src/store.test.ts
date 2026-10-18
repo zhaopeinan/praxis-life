@@ -366,6 +366,62 @@ assert.equal(comments.data.length, 1);
 const history = await json(`/api/records/${numbered.data.record.id}/history`, { cookie: ada2 });
 assert.ok(history.data.length >= 1);
 
+// 记录级写保护（第 10/12 讲 P1）：锁定后不可改不可删，锁定与解锁均留痕
+const lockRes = await json(`/api/records/${numbered.data.record.id}/lock`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ locked: true }),
+});
+assert.equal(lockRes.status, 200);
+assert.ok(lockRes.data.record.lockedAt);
+assert.equal(lockRes.data.record.lockedBy, "Ada");
+
+const lockedUpdate = await json(`/api/records/${numbered.data.record.id}`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 评分: 5 } }),
+});
+assert.equal(lockedUpdate.status, 400);
+assert.match(String(lockedUpdate.data.error), /锁定/);
+
+const lockedDelete = await json(`/api/records/${numbered.data.record.id}`, { method: "DELETE", cookie: ada2 });
+assert.equal(lockedDelete.status, 400);
+assert.match(String(lockedDelete.data.error), /锁定/);
+
+const lockedComments = await json(`/api/records/${numbered.data.record.id}/comments`, { cookie: ada2 });
+assert.ok(lockedComments.data.some((item: { body: string }) => item.body.includes("🔒")));
+const lockHistory = await json(`/api/records/${numbered.data.record.id}/history`, { cookie: ada2 });
+assert.ok(lockHistory.data.some((item: { action: string }) => item.action === "lock"));
+
+// 重复锁定幂等：不重复留痕
+const relock = await json(`/api/records/${numbered.data.record.id}/lock`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ locked: true }),
+});
+assert.equal(relock.status, 200);
+assert.equal(relock.data.record.lockedAt, lockRes.data.record.lockedAt);
+const commentsAfterRelock = await json(`/api/records/${numbered.data.record.id}/comments`, { cookie: ada2 });
+assert.equal(commentsAfterRelock.data.length, lockedComments.data.length);
+
+// 解锁后可继续修改，并留下解锁痕迹
+const unlockRes = await json(`/api/records/${numbered.data.record.id}/lock`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ locked: false }),
+});
+assert.equal(unlockRes.status, 200);
+assert.equal(unlockRes.data.record.lockedAt, null);
+const afterUnlock = await json(`/api/records/${numbered.data.record.id}`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 评分: 5 } }),
+});
+assert.equal(afterUnlock.status, 200);
+assert.equal(afterUnlock.data.record.fields["评分"], 5);
+const unlockHistory = await json(`/api/records/${numbered.data.record.id}/history`, { cookie: ada2 });
+assert.ok(unlockHistory.data.some((item: { action: string }) => item.action === "unlock"));
+
 const iterations = bases.data[0].tables.find((item: { name: string }) => item.name === "项目");
 assert.ok(iterations);
 const linkField = await json(`/api/tables/${requirementTable.id}/fields`, {

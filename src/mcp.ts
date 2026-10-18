@@ -348,6 +348,26 @@ server.tool("delete_record", "删除记录", { recordId: z.string() }, async ({ 
 );
 
 server.tool(
+  "lock_record",
+  "锁定记录（写保护）：锁定后字段不可修改、记录不可删除，需解锁才能继续。用于预期结果卡、主结果配置等防事后涂改场景",
+  { recordId: z.string() },
+  async ({ recordId }) =>
+    run(async () => {
+      const located = await store.locateRecord(recordId);
+      await assertBaseRole(accounts, user, located.baseId, "editor");
+      return store.setRecordLock(recordId, true, { userId: user.id, userName: user.name });
+    }),
+);
+
+server.tool("unlock_record", "解锁记录：解除写保护并留下解锁留痕", { recordId: z.string() }, async ({ recordId }) =>
+  run(async () => {
+    const located = await store.locateRecord(recordId);
+    await assertBaseRole(accounts, user, located.baseId, "editor");
+    return store.setRecordLock(recordId, false, { userId: user.id, userName: user.name });
+  }),
+);
+
+server.tool(
   "create_view",
   "新建视图：grid/kanban/calendar/gallery/form/gantt",
   {

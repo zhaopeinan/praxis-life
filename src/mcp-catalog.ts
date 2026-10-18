@@ -21,6 +21,8 @@ export const MCP_TOOL_CATALOG: Array<{ name: string; description: string }> = [
   { name: "create_record", description: "新建记录" },
   { name: "update_record", description: "更新记录" },
   { name: "delete_record", description: "删除记录" },
+  { name: "lock_record", description: "锁定记录（写保护，锁定后不可改不可删）" },
+  { name: "unlock_record", description: "解锁记录（留痕）" },
   { name: "create_view", description: "新建视图" },
   { name: "update_view", description: "更新视图配置" },
   { name: "delete_view", description: "删除视图" },

@@ -1167,6 +1167,15 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     return c.json({ ok: true });
   });
 
+  app.post("/api/records/:recordId/lock", async (c) => {
+    const located = await store.locateRecord(c.req.param("recordId"));
+    const user = await requireBase(c, located.baseId, "editor");
+    const body = z.object({ locked: z.boolean() }).parse(await readBody(c));
+    return c.json(
+      await store.setRecordLock(c.req.param("recordId"), body.locked, { userId: user.id, userName: user.name }),
+    );
+  });
+
   app.get("/api/records/:recordId/comments", async (c) => {
     const located = await store.locateRecord(c.req.param("recordId"));
     await requireBase(c, located.baseId, "viewer");

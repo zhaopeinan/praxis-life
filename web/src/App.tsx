@@ -1634,6 +1634,12 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               })
               .catch(fail);
           }}
+          onToggleLock={(recordId, locked) => {
+            api
+              .setRecordLock(recordId, locked)
+              .then(() => reloadTable())
+              .catch(fail);
+          }}
         />
       )}
       {dialog === "detail-page" && payload && (
@@ -1792,7 +1798,12 @@ function FieldDialog({
     lookupLinkFieldId?: string;
     lookupTargetFieldId?: string;
     buttonLabel?: string;
-    buttonAction?: { type: "add_comment"; body: string } | { type: "set_field"; fieldId: string; value: string } | { type: "open_url"; url: string };
+    buttonAction?:
+      | { type: "add_comment"; body: string }
+      | { type: "set_field"; fieldId: string; value: string }
+      | { type: "open_url"; url: string }
+      | { type: "lock_record" }
+      | { type: "unlock_record" };
     symmetricFieldName?: string;
   }) => Promise<void>;
 }) {
@@ -1805,7 +1816,7 @@ function FieldDialog({
   const [lookupTargetFieldId, setLookupTargetFieldId] = useState("");
   const [symmetricFieldName, setSymmetricFieldName] = useState("");
   const [buttonLabel, setButtonLabel] = useState("执行");
-  const [buttonActionType, setButtonActionType] = useState<"add_comment" | "set_field" | "open_url">("add_comment");
+  const [buttonActionType, setButtonActionType] = useState<"add_comment" | "set_field" | "open_url" | "lock_record" | "unlock_record">("add_comment");
   const [buttonComment, setButtonComment] = useState("按钮已点击");
   const [buttonSetFieldId, setButtonSetFieldId] = useState(fields?.[0]?.id ?? "");
   const [buttonSetValue, setButtonSetValue] = useState("");
@@ -1833,7 +1844,11 @@ function FieldDialog({
                   ? { type: "set_field" as const, fieldId: buttonSetFieldId, value: buttonSetValue }
                   : buttonActionType === "open_url"
                     ? { type: "open_url" as const, url: buttonUrl }
-                    : { type: "add_comment" as const, body: buttonComment };
+                    : buttonActionType === "lock_record"
+                      ? { type: "lock_record" as const }
+                      : buttonActionType === "unlock_record"
+                        ? { type: "unlock_record" as const }
+                        : { type: "add_comment" as const, body: buttonComment };
             await onSubmit({
               name,
               type,
@@ -1941,6 +1956,8 @@ function FieldDialog({
                   { value: "add_comment", label: "添加评论" },
                   { value: "set_field", label: "设置字段" },
                   { value: "open_url", label: "打开链接" },
+                  { value: "lock_record", label: "锁定记录（写保护）" },
+                  { value: "unlock_record", label: "解锁记录" },
                 ]}
               />
             </label>
@@ -4200,6 +4217,13 @@ function ImportDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: (c
   );
 }
 
+const HISTORY_ACTION_LABELS: Record<string, string> = {
+  create: "创建",
+  update: "更新",
+  lock: "🔒 锁定（写保护）",
+  unlock: "🔓 解锁",
+};
+
 function RecordDetailDialog({
   recordId,
   tableId,
@@ -4212,24 +4236,27 @@ function RecordDetailDialog({
   onChange,
   onDelete,
   onOpenDocument,
+  onToggleLock,
 }: {
   recordId: string;
   tableId: string;
   baseId?: string | null;
   fields: Field[];
-  record: { id: string; fields: Record<string, unknown> } | null;
+  record: { id: string; fields: Record<string, unknown>; lockedAt?: number | null; lockedBy?: string | null } | null;
   canEdit: boolean;
   fullScreen?: boolean;
   onClose: () => void;
   onChange: (recordId: string, fieldName: string, value: unknown) => void;
   onDelete?: () => void;
   onOpenDocument?: (documentId: string) => void;
+  onToggleLock?: (recordId: string, locked: boolean) => void;
 }) {
   const [comments, setComments] = useState<Array<{ id: string; userName: string; body: string; createdAt: number }>>([]);
   const [history, setHistory] = useState<Array<{ id: string; action: string; userName: string | null; createdAt: number }>>([]);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [docs, setDocs] = useState<RecordDocumentLink[]>([]);
+  const locked = Boolean(record?.lockedAt);
   const [layout, setLayout] = useState<{
     style: "single" | "multi" | "grouped";
     fieldIds: string[];
@@ -4281,7 +4308,11 @@ function RecordDetailDialog({
             allFields={fields}
             record={record as unknown as PublicRecord}
             value={(record.fields[field.name] ?? null) as DisplayValue}
-            readOnly={!canEdit || ["formula", "lookup", "auto_number", "created_time", "updated_time", "created_by"].includes(field.type)}
+            readOnly={
+              !canEdit ||
+              locked ||
+              ["formula", "lookup", "auto_number", "created_time", "updated_time", "created_by"].includes(field.type)
+            }
             onChange={(value) => onChange(recordId, field.name, value)}
           />
         </div>
@@ -4308,7 +4339,26 @@ function RecordDetailDialog({
         </div>
       )}
       <div className="dialog-actions">
-        {canEdit && onDelete && (
+        {record && (
+          <span className="fine" style={{ marginRight: "auto" }}>
+            {locked
+              ? `🔒 已锁定（写保护${record.lockedBy ? ` · ${record.lockedBy}` : ""}）`
+              : "未锁定"}
+          </span>
+        )}
+        {canEdit && record && onToggleLock && (
+          <button
+            type="button"
+            onClick={() => {
+              if (locked && !window.confirm("解锁这条记录？解锁后可继续修改，操作会留痕。")) return;
+              if (!locked && !window.confirm("锁定这条记录？锁定期间字段不可修改、记录不可删除，操作会留痕。")) return;
+              onToggleLock(recordId, !locked);
+            }}
+          >
+            {locked ? "🔓 解锁记录" : "🔒 锁定记录"}
+          </button>
+        )}
+        {canEdit && onDelete && !locked && (
           <button
             type="button"
             className="danger-text"
@@ -4412,7 +4462,7 @@ function RecordDetailDialog({
         {history.map((item) => (
           <li key={item.id}>
             <div>
-              <strong>{item.action}</strong>
+              <strong>{HISTORY_ACTION_LABELS[item.action] ?? item.action}</strong>
               <span>
                 {item.userName ?? "系统"} · {new Date(item.createdAt).toLocaleString()}
               </span>
