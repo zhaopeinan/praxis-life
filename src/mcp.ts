@@ -468,7 +468,7 @@ const automationTrigger = z.union([
 
 const automationAction = z.union([
   z.object({ type: z.literal("set_field"), fieldId: z.string(), value: z.string() }),
-  z.object({ type: z.literal("create_record"), fields: z.record(z.string()) }),
+  z.object({ type: z.literal("create_record"), fields: z.record(z.string()), tableId: z.string().optional() }),
   z.object({ type: z.literal("add_comment"), body: z.string() }),
   z.object({ type: z.literal("notify"), message: z.string(), userId: z.string().optional() }),
   z.object({
@@ -492,7 +492,7 @@ const automationAction = z.union([
 
 server.tool(
   "create_automation",
-  "创建自动化。触发含 record_created/updated/field_equals/button/webhook/schedule；动作含 set_field/create_record/add_comment/notify/http_request/send_email/feishu_bot/feishu_digest",
+  "创建自动化。触发含 record_created/updated/field_equals/button/webhook/schedule；动作含 set_field/create_record/add_comment/notify/http_request/send_email/feishu_bot/feishu_digest。日期可写相对值：today、today+3、today-90、week_start、week_end、month_start、month_end、now±Nh（set_field 取值与 conditions 的比较值都支持）；create_record 可用 tableId 指定同库的目标表（表 id 或表名），fields 的值支持 {字段名} 插值以带出当前记录内容",
   {
     tableId: z.string(),
     name: z.string(),
@@ -510,7 +510,7 @@ server.tool(
 
 server.tool(
   "update_automation",
-  "更新自动化（名称/启停/触发/动作/条件）",
+  "更新自动化（名称/启停/触发/动作/条件）。日期相对值与 create_record 的 tableId、{字段名} 插值规则同 create_automation",
   {
     automationId: z.string(),
     name: z.string().optional(),

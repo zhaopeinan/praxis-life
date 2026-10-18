@@ -157,7 +157,7 @@ const AutomationTriggerSchema = z.discriminatedUnion("type", [
 
 const AutomationActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("set_field"), fieldId: z.string(), value: z.string() }),
-  z.object({ type: z.literal("create_record"), fields: z.record(z.string()) }),
+  z.object({ type: z.literal("create_record"), fields: z.record(z.string()), tableId: z.string().optional() }),
   z.object({ type: z.literal("add_comment"), body: z.string() }),
   z.object({ type: z.literal("notify"), message: z.string(), userId: z.string().optional() }),
   z.object({

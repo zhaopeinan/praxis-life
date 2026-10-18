@@ -368,6 +368,13 @@ export type TableAcl = {
 export type AutomationCondition = {
   fieldId: string;
   op: FilterOp;
+  /**
+   * 比较值。除普通文本/数字外，日期时间字段还支持相对取值，求值时才解析：
+   * today、today+N、today-N（天数）、week_start、week_end、month_start、month_end、
+   * now、now+Nh、now-Nh（小时，输出「YYYY-MM-DD HH:MM」）。
+   * 例：未来 2 天内到期 = gte today + lte today+2；距今超过 90 天未动 = lt today-90。
+   * 注意日期比较按 YYYY-MM-DD 文本比较，空值会被视为「小于任何日期」，需要排除空值请追加 is_not_empty 条件。
+   */
   value?: string;
 };
 
@@ -380,8 +387,13 @@ export type AutomationTrigger =
   | { type: "schedule"; cron: string };
 
 export type AutomationAction =
+  /** value 支持绝对日期 YYYY-MM-DD，也支持 today / today+N / today-N 等相对日期（见 AutomationCondition） */
   | { type: "set_field"; fieldId: string; value: string }
-  | { type: "create_record"; fields: Record<string, string> }
+  /**
+   * 新建记录。默认写入当前表；tableId 填同库另一张表的 id 或名称时写入该表。
+   * fields 的值支持 {字段名} / {recordId} / {tableId} 插值，可把当前记录的内容带进新记录。
+   */
+  | { type: "create_record"; fields: Record<string, string>; tableId?: string }
   | { type: "add_comment"; body: string }
   | { type: "notify"; message: string; userId?: string }
   | { type: "http_request"; url: string; method?: "GET" | "POST" | "PUT" | "PATCH"; headers?: Record<string, string>; body?: string }

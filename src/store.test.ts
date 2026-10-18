@@ -1752,5 +1752,167 @@ assert.match(feishuAutoOk.lastDetail, /已发出/);
 assert.ok(runCalls.length >= 1);
 globalThis.fetch = runFetch;
 
+// —— 引擎增强：相对日期取值、条件相对比较、跨表 create_record ——
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const dayOffset = (days: number) => {
+  const d = new Date();
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+  return `${next.getFullYear()}-${pad2(next.getMonth() + 1)}-${pad2(next.getDate())}`;
+};
+
+const engineTable = await json(`/api/bases/${bases.data[0].id}/tables`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({
+    name: "引擎增强验证",
+    fields: [
+      { name: "标题", type: "text" },
+      { name: "重检日期", type: "date" },
+    ],
+  }),
+});
+assert.equal(engineTable.status, 201);
+const engineTableId = engineTable.data.id;
+const engineDateId = engineTable.data.fields.find((field: { name: string }) => field.name === "重检日期").id;
+
+// 直接写记录时同样接受相对日期（此时还没有自动化，避免被覆盖）
+const relativeDirect = await json(`/api/tables/${engineTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "直接写相对日期", 重检日期: "today" } }),
+});
+assert.equal(relativeDirect.status, 201);
+assert.equal(relativeDirect.data.record.fields["重检日期"], dayOffset(0));
+
+// set_field 支持 today+N 相对日期
+const relativeAuto = await json(`/api/tables/${engineTableId}/automations`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({
+    name: "相对日期写入",
+    trigger: { type: "record_created" },
+    actions: [{ type: "set_field", fieldId: engineDateId, value: "today+3" }],
+  }),
+});
+assert.equal(relativeAuto.status, 201);
+const relativeRecord = await json(`/api/tables/${engineTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "相对日期" } }),
+});
+assert.equal(relativeRecord.status, 201);
+assert.equal(relativeRecord.data.record.fields["重检日期"], dayOffset(3));
+
+// 关掉上面这条自动化，避免覆盖下面条件用例的日期
+const relativeOff = await json(`/api/automations/${relativeAuto.data.id}`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ enabled: false }),
+});
+assert.equal(relativeOff.status, 200);
+
+// 条件求值支持相对日期：只对「未来 2 天内到期」的记录加评论
+const windowAuto = await json(`/api/tables/${engineTableId}/automations`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({
+    name: "未来两天内提醒",
+    trigger: { type: "record_created" },
+    conditions: [
+      { fieldId: engineDateId, op: "gte", value: "today" },
+      { fieldId: engineDateId, op: "lte", value: "today+2" },
+    ],
+    actions: [{ type: "add_comment", body: "未来两天内到期" }],
+  }),
+});
+assert.equal(windowAuto.status, 201);
+const soonRecord = await json(`/api/tables/${engineTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "两天内", 重检日期: "today+1" } }),
+});
+const lateRecord = await json(`/api/tables/${engineTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "五天后", 重检日期: "today+5" } }),
+});
+const soonComments = await json(`/api/records/${soonRecord.data.record.id}/comments`, { cookie: ada2 });
+const lateComments = await json(`/api/records/${lateRecord.data.record.id}/comments`, { cookie: ada2 });
+assert.equal(soonComments.data.length, 1);
+assert.equal(lateComments.data.length, 0);
+
+// 「超过 N 天未动」用 lt today-N 表达
+const staleAuto = await json(`/api/tables/${engineTableId}/automations`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({
+    name: "三个月未动",
+    trigger: { type: "record_created" },
+    conditions: [{ fieldId: engineDateId, op: "lt", value: "today-90" }],
+    actions: [{ type: "add_comment", body: "已超三个月未动" }],
+  }),
+});
+assert.equal(staleAuto.status, 201);
+const staleRecord = await json(`/api/tables/${engineTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "很久没动", 重检日期: "today-120" } }),
+});
+const soonCommentsAfter = await json(`/api/records/${soonRecord.data.record.id}/comments`, { cookie: ada2 });
+const staleComments = await json(`/api/records/${staleRecord.data.record.id}/comments`, { cookie: ada2 });
+assert.equal(soonCommentsAfter.data.length, 1);
+assert.equal(staleComments.data.length, 1);
+
+// create_record 可指定同库目标表，并把当前记录字段插值带过去
+const crossAuto = await json(`/api/tables/${engineTableId}/automations`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({
+    name: "归档到项目表",
+    trigger: { type: "record_created" },
+    conditions: [{ fieldId: engineDateId, op: "is_empty" }],
+    actions: [{ type: "create_record", tableId: "项目", fields: { 名称: "{标题} · 归档", 状态: "进行中" } }],
+  }),
+});
+assert.equal(crossAuto.status, 201);
+const projectsBefore = await json(`/api/tables/${iterations.id}`, { cookie: ada2 });
+const crossRecord = await json(`/api/tables/${engineTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "跨表推演" } }),
+});
+assert.equal(crossRecord.status, 201);
+const projectsAfter = await json(`/api/tables/${iterations.id}`, { cookie: ada2 });
+assert.equal(projectsAfter.data.records.length, projectsBefore.data.records.length + 1);
+assert.ok(
+  projectsAfter.data.records.some(
+    (record: { fields: Record<string, string> }) => record.fields["名称"] === "跨表推演 · 归档",
+  ),
+);
+
+// 跨库目标表被拒绝：动作记为失败，但记录写入不受影响（otherBase 是前面用工程模板另建的库）
+const foreignTableId = otherBase.data.tables[0].id;
+const foreignAuto = await json(`/api/tables/${engineTableId}/automations`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({
+    name: "跨库归档",
+    trigger: { type: "record_created" },
+    conditions: [{ fieldId: engineDateId, op: "is_empty" }],
+    actions: [{ type: "create_record", tableId: foreignTableId, fields: { 标题: "不该出现" } }],
+  }),
+});
+assert.equal(foreignAuto.status, 201);
+const foreignCreate = await json(`/api/tables/${engineTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "跨库尝试" } }),
+});
+assert.equal(foreignCreate.status, 201);
+const engineRuns = await json(`/api/tables/${engineTableId}/automation-runs`, { cookie: ada2 });
+const foreignRun = engineRuns.data.find((item: { automationId: string }) => item.automationId === foreignAuto.data.id);
+assert.equal(foreignRun.status, "failed");
+assert.match(foreignRun.detail, /同一多维表格/);
+
 console.log("duowei tests passed");
 

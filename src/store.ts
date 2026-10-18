@@ -1610,8 +1610,11 @@ export class Store {
 
     if (field.type === "date") {
       const text = String(raw).trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new DomainError(`「${field.name}」需要 YYYY-MM-DD 日期`);
-      return { fields, fieldId: field.id, stored: text, type: field.type, name: field.name };
+      const ymd = (resolveDateToken(text) ?? text).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+        throw new DomainError(`「${field.name}」需要 YYYY-MM-DD 日期，或 today / today+3 / today-90 这样的相对日期`);
+      }
+      return { fields, fieldId: field.id, stored: ymd, type: field.type, name: field.name };
     }
 
     if (field.type === "email") {
@@ -2053,8 +2056,17 @@ export class Store {
       return { type: action.type, status: "ok", detail: `已设置「${field.name}」` };
     }
     if (action.type === "create_record") {
-      await this.createRecord(tableId, action.fields, { skipAutomation: true });
-      return { type: action.type, status: "ok", detail: "已新建记录" };
+      const target = action.tableId ? await this.resolveAutomationTargetTable(tableId, action.tableId) : null;
+      const input: Record<string, string> = {};
+      for (const [key, value] of Object.entries(action.fields)) {
+        input[key] = value.includes("{") ? await this.interpolateAutomationText(value, record, fields) : value;
+      }
+      await this.createRecord(target?.id ?? tableId, input, { skipAutomation: true });
+      return {
+        type: action.type,
+        status: "ok",
+        detail: target && target.id !== tableId ? `已在「${target.name}」新建记录` : "已新建记录",
+      };
     }
     if (action.type === "add_comment") {
       await this.addComment(
@@ -2492,6 +2504,28 @@ export class Store {
       text = text.replaceAll(`{${field.name}}`, displayText(publicRec.fields[field.name]));
     }
     return text;
+  }
+
+  /** 解析 create_record 的目标表：支持同库内的表 id 或表名，跨库直接拒绝 */
+  private async resolveAutomationTargetTable(sourceTableId: string, target: string): Promise<{ id: string; name: string }> {
+    const source = await this.requireTable(sourceTableId);
+    const key = target.trim();
+    const byId = await this.db.execute({
+      sql: "SELECT id, base_id, name FROM tables WHERE id = ?",
+      args: [key],
+    });
+    const row = byId.rows[0];
+    if (row) {
+      if (asString(row.base_id) !== source.baseId) throw new DomainError("自动化只能在同一多维表格内新建记录");
+      return { id: asString(row.id), name: asString(row.name) };
+    }
+    const byName = await this.db.execute({
+      sql: "SELECT id, base_id, name FROM tables WHERE base_id = ? AND name = ?",
+      args: [source.baseId, key],
+    });
+    const named = byName.rows[0];
+    if (!named) throw new DomainError(`找不到目标表「${key}」`);
+    return { id: asString(named.id), name: asString(named.name) };
   }
 
   async sendFeishuDigest(
@@ -5652,7 +5686,8 @@ export class Store {
 }
 
 function matchesCondition(value: DisplayValue | undefined, condition: AutomationCondition): boolean {
-  return matchesFilter(value, { fieldId: condition.fieldId, op: condition.op, value: condition.value });
+  const expected = condition.value == null ? undefined : (resolveDateToken(condition.value) ?? condition.value);
+  return matchesFilter(value, { fieldId: condition.fieldId, op: condition.op, value: expected });
 }
 
 
@@ -5667,6 +5702,34 @@ function addDaysYmd(ymd: string, days: number): string {
   const [y, m, d] = ymd.split("-").map(Number);
   const next = new Date(y, (m ?? 1) - 1, (d ?? 1) + days);
   return localYmd(next);
+}
+
+/**
+ * 相对日期 token 求值：today、today+N、today-N、week_start、week_end、month_start、month_end、
+ * now、now+Nh、now-Nh。普通文本返回 null，由调用方决定是否回退原文。
+ * 一周按周一起算；date 字段取前十位即可，时间相关判断可用 now±Nh 的「YYYY-MM-DD HH:MM」。
+ */
+function resolveDateToken(text: string, now = new Date()): string | null {
+  const key = text.trim().toLowerCase();
+  if (!key) return null;
+  if (key === "today") return localYmd(now);
+  if (key === "now") return formatTs(now.getTime());
+  const day = key.match(/^today([+-])(\d{1,4})$/);
+  if (day) return addDaysYmd(localYmd(now), Number(day[2]) * (day[1] === "+" ? 1 : -1));
+  const hour = key.match(/^now([+-])(\d{1,4})h$/);
+  if (hour) return formatTs(now.getTime() + Number(hour[2]) * (hour[1] === "+" ? 1 : -1) * 3_600_000);
+  if (key === "week_start" || key === "week_end") {
+    const weekday = now.getDay();
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (weekday === 0 ? -6 : 1 - weekday));
+    const target = key === "week_end" ? new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6) : monday;
+    return localYmd(target);
+  }
+  if (key === "month_start" || key === "month_end") {
+    return localYmd(
+      key === "month_start" ? new Date(now.getFullYear(), now.getMonth(), 1) : new Date(now.getFullYear(), now.getMonth() + 1, 0),
+    );
+  }
+  return null;
 }
 
 /** Accept every:N, daily:HH:MM, weekly:D:HH:MM, hourly, or plain minutes. */
