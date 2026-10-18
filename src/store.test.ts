@@ -2066,5 +2066,49 @@ assert.equal(disclosureDoc.status, 201);
 assert.match(disclosureDoc.data.bodyMd, /模板 A · 仅工具性润色/);
 assert.match(disclosureDoc.data.bodyMd, /模板 C · 方法学中使用 AI/);
 
+/* ——— 按钮动作 lock_record / unlock_record 可经 API 建字段（上一轮遗漏的 schema 补齐）——— */
+const lockButtonTable = await json(`/api/bases/${bases.data[0].id}/tables`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ name: "锁定按钮验证", fields: [{ name: "标题", type: "text" }] }),
+});
+assert.equal(lockButtonTable.status, 201);
+const lockButton = await json(`/api/tables/${lockButtonTable.data.id}/fields`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ name: "锁定", type: "button", buttonLabel: "锁定", buttonAction: { type: "lock_record" } }),
+});
+assert.equal(lockButton.status, 201);
+assert.equal(lockButton.data.config.buttonAction.type, "lock_record");
+const unlockButton = await json(`/api/tables/${lockButtonTable.data.id}/fields`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ name: "解锁", type: "button", buttonLabel: "解锁", buttonAction: { type: "unlock_record" } }),
+});
+assert.equal(unlockButton.status, 201);
+const lockTarget = await json(`/api/tables/${lockButtonTable.data.id}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "待锁定" } }),
+});
+assert.equal(lockTarget.status, 201);
+const clickLock = await json(`/api/records/${lockTarget.data.record.id}/buttons/${lockButton.data.id}`, {
+  method: "POST",
+  cookie: ada2,
+});
+assert.equal(clickLock.status, 200);
+const lockedWrite = await json(`/api/records/${lockTarget.data.record.id}`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "锁定后不可写" } }),
+});
+assert.equal(lockedWrite.status, 400);
+assert.match(String(lockedWrite.data.error), /锁定/);
+const clickUnlock = await json(`/api/records/${lockTarget.data.record.id}/buttons/${unlockButton.data.id}`, {
+  method: "POST",
+  cookie: ada2,
+});
+assert.equal(clickUnlock.status, 200);
+
 console.log("duowei tests passed");
 

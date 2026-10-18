@@ -44,6 +44,8 @@ const FieldDraftSchema = z.object({
       z.object({ type: z.literal("set_field"), fieldId: z.string(), value: z.string() }),
       z.object({ type: z.literal("open_url"), url: z.string() }),
       z.object({ type: z.literal("add_comment"), body: z.string() }),
+      z.object({ type: z.literal("lock_record") }),
+      z.object({ type: z.literal("unlock_record") }),
     ])
     .optional(),
   symmetricFieldName: z.string().optional(),
