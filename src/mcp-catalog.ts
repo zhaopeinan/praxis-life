@@ -98,7 +98,7 @@ export const MCP_TOOL_CATALOG: Array<{ name: string; description: string }> = [
   { name: "upload_file", description: "上传附件（base64，≤8MB）" },
   { name: "get_upload_meta", description: "附件元信息" },
   { name: "delete_upload", description: "删除附件" },
-  { name: "list_document_templates", description: "文档模板（实验前思考/复盘/研究笔记）" },
+  { name: "list_document_templates", description: "文档模板（思考/复盘/笔记/速报/放弃备忘录/分类学/初稿/披露/投稿信/回应信）" },
   { name: "list_documents", description: "列出 base 下的文档与文件夹" },
   { name: "get_document", description: "读取文档正文与挂靠记录" },
   { name: "create_document", description: "新建文档/文件夹（可套模板）" },

@@ -1493,11 +1493,11 @@ server.tool("delete_upload", "删除附件", { uploadId: z.string() }, async ({ 
   }),
 );
 
-/* ——— 文档（Markdown 长文）：实验前思考 / 实验后复盘 / 研究笔记 ——— */
+/* ——— 文档（Markdown 长文）：内置模板见 types.ts 的 DOC_TEMPLATES ——— */
 
 server.tool(
   "list_document_templates",
-  "列出可一键套用的文档模板（实验前思考 / 实验后复盘 / 研究笔记），含模板正文骨架",
+  "列出可一键套用的文档模板（实验前思考 / 实验后复盘 / 研究笔记 / 可行性速报 / 放弃备忘录 / 分类学说明 / 论文初稿 / 披露声明 / Cover Letter / 回应信），含模板正文骨架",
   {},
   async () =>
     run(async () =>
@@ -1535,14 +1535,18 @@ server.tool(
 
 server.tool(
   "create_document",
-  "在某个多维表格下新建文档或文件夹。template 会带入对应模板的标题与正文骨架（experiment-plan 实验前思考 / experiment-review 实验后复盘 / research-note 研究笔记）；kind 为 folder 时创建文件夹（只能挂在文件夹下）。文档是 Markdown 长文，适合写实验假设、复盘与研究笔记。",
+  "在某个多维表格下新建文档或文件夹。template 会带入对应模板的标题与正文骨架（实验前思考 / 实验后复盘 / 研究笔记 / 可行性速报 / 放弃备忘录 / 分类学说明 / 论文初稿 / 披露声明 / Cover Letter / 回应信，id 用 list_document_templates 查）；kind 为 folder 时创建文件夹（只能挂在文件夹下）。文档是 Markdown 长文，适合写实验假设、复盘、速报、披露声明与投稿信。",
   {
     baseId: z.string(),
     title: z.string().optional().describe("缺省时用模板标题；文件夹默认「新建文件夹」"),
     parentId: z.string().nullable().optional().describe("父文件夹 id，null 表示放在根目录"),
     kind: z.enum(["doc", "folder"]).optional(),
     bodyMd: z.string().optional().describe("直接指定正文，优先于模板"),
-    template: z.enum(["experiment-plan", "experiment-review", "research-note"]).nullable().optional(),
+    template: z
+      .enum(DOC_TEMPLATES.map((item) => item.id) as [string, ...string[]])
+      .nullable()
+      .optional()
+      .describe("模板 id，取自 list_document_templates"),
   },
   async ({ baseId, title, parentId, kind, bodyMd, template }) =>
     run(async () => {

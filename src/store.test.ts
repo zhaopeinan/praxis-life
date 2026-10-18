@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { Accounts } from "./accounts.js";
 import { Store, shouldRunSchedule } from "./store.js";
+import { DOC_TEMPLATES } from "./types.js";
 import { createApp } from "./server.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "duowei-"));
@@ -1976,6 +1977,38 @@ assert.equal(shouldRunSchedule("daily:09:00", 0, at(2026, 10, 19, 9, 0)), true);
 assert.equal(shouldRunSchedule("daily:09:00", 0, at(2026, 10, 19, 9, 30)), false);
 assert.equal(shouldRunSchedule("weekly:1:09:00", 0, at(2026, 10, 19, 9, 0)), true);
 assert.equal(shouldRunSchedule("weekly:1:09:00", 0, at(2026, 10, 20, 9, 0)), false);
+
+/* ——— 内置文档模板：科研方法 24 讲扩展（第 03 / 07 / 17 / 19 / 20 / 21 讲 P1）——— */
+const templateIds = DOC_TEMPLATES.map((template) => template.id);
+assert.equal(new Set(templateIds).size, templateIds.length);
+for (const id of [
+  "feasibility-report",
+  "abandon-memo",
+  "taxonomy-note",
+  "paper-draft",
+  "disclosure-statement",
+  "cover-letter",
+  "response-letter",
+]) {
+  assert.ok(templateIds.includes(id), `缺少文档模板 ${id}`);
+}
+const paperDraftDoc = await json(`/api/bases/${research.data.id}/documents`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ template: "paper-draft" }),
+});
+assert.equal(paperDraftDoc.status, 201);
+assert.equal(paperDraftDoc.data.title, "论文初稿");
+assert.match(paperDraftDoc.data.bodyMd, /① 标题与一句话贡献/);
+assert.match(paperDraftDoc.data.bodyMd, /⑧ 结论/);
+const disclosureDoc = await json(`/api/bases/${research.data.id}/documents`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ template: "disclosure-statement" }),
+});
+assert.equal(disclosureDoc.status, 201);
+assert.match(disclosureDoc.data.bodyMd, /模板 A · 仅工具性润色/);
+assert.match(disclosureDoc.data.bodyMd, /模板 C · 方法学中使用 AI/);
 
 console.log("duowei tests passed");
 
