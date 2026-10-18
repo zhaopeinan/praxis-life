@@ -235,6 +235,14 @@ function evalExpr(expression: string, fields: Record<string, DisplayValue>, ctx?
   expr = expr.replace(/\{([^}]+)\}/g, (_, name: string) => serialize(fields[name.trim()] ?? null));
 
   const trimmed = expr.trim();
+
+  // 结构化表达式：算术（+ - * /）与比较（= == != <> < <= > >=），支持括号、数字、字符串与布尔。
+  // 让「本年度值 − 上年度值」「摘要修订轮次 < 当前工序序号」「TABLECOUNT(…) != 3」这类
+  // 同行/跨表表达式可以求值；解析失败则按原文回退（普通文本原样返回）。
+  // 必须放在「整串带引号」的启发式之前，否则 `"a" < "b"` 会被误判成一个字符串。
+  const parsed = evaluateExpression(trimmed);
+  if (parsed !== NOT_AN_EXPRESSION) return parsed;
+
   if (/^".*"$/.test(trimmed) || /^'.*'$/.test(trimmed)) return trimmed.slice(1, -1);
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
   if (/^true$/i.test(trimmed)) return true;
@@ -251,6 +259,161 @@ function evalExpr(expression: string, fields: Record<string, DisplayValue>, ctx?
   if (typeof result === "number" && Number.isFinite(result)) return result;
   if (typeof result === "boolean") return result;
   return result == null ? null : String(result);
+}
+
+const NOT_AN_EXPRESSION = Symbol("not-an-expression") as unknown as DisplayValue;
+type ExprToken = { kind: "number"; value: number } | { kind: "string"; value: string } | { kind: "op"; value: string };
+
+function tokenizeExpression(text: string): ExprToken[] | null {
+  const tokens: ExprToken[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (/\s/.test(ch)) {
+      i += 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      let value = "";
+      while (j < text.length && text[j] !== ch) {
+        value += text[j];
+        j += 1;
+      }
+      if (j >= text.length) return null;
+      tokens.push({ kind: "string", value });
+      i = j + 1;
+      continue;
+    }
+    const num = text.slice(i).match(/^-?\d+(\.\d+)?/);
+    if (num && /[\d.]/.test(ch)) {
+      tokens.push({ kind: "number", value: Number(num[0]) });
+      i += num[0].length;
+      continue;
+    }
+    const op = text.slice(i).match(/^(<=|>=|<>|!=|==|=|<|>|\+|-|\*|\/|\(|\))/);
+    if (!op) return null;
+    tokens.push({ kind: "op", value: op[0] });
+    i += op[0].length;
+  }
+  return tokens;
+}
+
+/** 求值算术 / 比较表达式；不是合法表达式时返回 NOT_AN_EXPRESSION，由调用方回退。 */
+function evaluateExpression(text: string): DisplayValue | typeof NOT_AN_EXPRESSION {
+  if (!/[<>=!+\-*/()]/.test(text)) return NOT_AN_EXPRESSION;
+  // 裸日期 / 时间戳原样保留，别把 `2026-10-18` 拆成减法算出 1998。
+  if (/^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}(:\d{2})?)?$/.test(text)) return NOT_AN_EXPRESSION;
+  const tokens = tokenizeExpression(text);
+  if (!tokens || !tokens.length) return NOT_AN_EXPRESSION;
+  let pos = 0;
+  const peek = (): ExprToken | null => tokens[pos] ?? null;
+  const isOp = (token: ExprToken | null, value: string): boolean => token?.kind === "op" && token.value === value;
+
+  const compareOperand = (v: DisplayValue): number | string => {
+    if (typeof v === "number") return v;
+    if (typeof v === "boolean") return v ? 1 : 0;
+    if (v == null) return "";
+    const asNum = asNumber(String(v));
+    if (asNum != null && String(asNum) === String(v).trim()) return asNum;
+    return String(v);
+  };
+  const compare = (op: string, left: DisplayValue, right: DisplayValue): boolean => {
+    const a = compareOperand(left);
+    const b = compareOperand(right);
+    if (op === "=" || op === "==") return typeof a === typeof b ? a === b : String(a) === String(b);
+    if (op === "!=" || op === "<>") return typeof a === typeof b ? a !== b : String(a) !== String(b);
+    if (typeof a === "number" && typeof b === "number") {
+      if (op === "<") return a < b;
+      if (op === "<=") return a <= b;
+      if (op === ">") return a > b;
+      return a >= b;
+    }
+    const sa = String(a);
+    const sb = String(b);
+    if (op === "<") return sa < sb;
+    if (op === "<=") return sa <= sb;
+    if (op === ">") return sa > sb;
+    return sa >= sb;
+  };
+
+  // expr := cmp; cmp := sum ((< <= > >= = == != <>)) sum; sum := term ((+|-) term)*; term := factor ((*|/) factor)*
+  function parseCmp(): DisplayValue {
+    const left = parseSum();
+    const token = peek();
+    if (token?.kind === "op" && ["<", "<=", ">", ">=", "=", "==", "!=", "<>"].includes(token.value)) {
+      pos += 1;
+      const right = parseSum();
+      return compare(token.value, left, right);
+    }
+    return left;
+  }
+  function parseSum(): DisplayValue {
+    let value = parseTerm();
+    while (true) {
+      const token = peek();
+      if (!isOp(token, "+") && !isOp(token, "-")) return value;
+      pos += 1;
+      const right = parseTerm();
+      const a = asNumber(typeof value === "string" || typeof value === "number" ? value : null) ?? 0;
+      const b = asNumber(typeof right === "string" || typeof right === "number" ? right : null) ?? 0;
+      value = isOp(token, "+") ? a + b : a - b;
+    }
+  }
+  function parseTerm(): DisplayValue {
+    let value = parseFactor();
+    while (true) {
+      const token = peek();
+      if (!isOp(token, "*") && !isOp(token, "/")) return value;
+      pos += 1;
+      const right = parseFactor();
+      const a = asNumber(typeof value === "string" || typeof value === "number" ? value : null) ?? 0;
+      const b = asNumber(typeof right === "string" || typeof right === "number" ? right : null) ?? 0;
+      value = isOp(token, "*") ? a * b : b === 0 ? null : a / b;
+    }
+  }
+  function parseFactor(): DisplayValue {
+    const token = peek();
+    if (!token) throw new Error("unexpected end");
+    if (token.kind === "number") {
+      pos += 1;
+      return token.value;
+    }
+    if (token.kind === "string") {
+      pos += 1;
+      return token.value;
+    }
+    if (token.kind === "op") {
+      if (token.value === "(") {
+        pos += 1;
+        const value = parseCmp();
+        if (!isOp(peek(), ")")) throw new Error("missing )");
+        pos += 1;
+        return value;
+      }
+      if (token.value === "-") {
+        pos += 1;
+        const inner = parseFactor();
+        const n = asNumber(typeof inner === "string" || typeof inner === "number" ? inner : null) ?? 0;
+        return -n;
+      }
+      if (token.value === "+") {
+        pos += 1;
+        return parseFactor();
+      }
+    }
+    throw new Error("unexpected token");
+  }
+
+  try {
+    const value = parseCmp();
+    if (pos !== tokens.length) return NOT_AN_EXPRESSION;
+    if (value == null) return null;
+    if (typeof value === "number" && !Number.isFinite(value)) return null;
+    return value;
+  } catch {
+    return NOT_AN_EXPRESSION;
+  }
 }
 
 function injectCurrentValue(expr: string, value: DisplayValue): string {

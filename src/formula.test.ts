@@ -75,6 +75,41 @@ assert.equal(
   }),
   2,
 );
+assert.equal(
+  evalFormula('TABLECOUNT("需求", "状态", "进行中")', {}, {
+    tables: { 需求: [{ 状态: "进行中" }, { 状态: "完成" }, { 状态: "进行中" }] },
+  }),
+  2,
+);
+
+/* ——— 跨字段比较 / 同行算术（第 17 / 19 / 24 讲 P1）——— */
+assert.equal(evalFormula('IF({摘要修订轮次} < {当前工序序号}, "滞后", "跟上")', { 摘要修订轮次: 3, 当前工序序号: 5 }), "滞后");
+assert.equal(evalFormula('IF({摘要修订轮次} < {当前工序序号}, "滞后", "跟上")', { 摘要修订轮次: 5, 当前工序序号: 5 }), "跟上");
+assert.equal(evalFormula("{本年度值} - {上年度值}", { 本年度值: 12, 上年度值: 9 }), 3);
+assert.equal(evalFormula("{本年度值}-{上年度值}", { 本年度值: 12, 上年度值: 9 }), 3);
+assert.equal(evalFormula("{范围匹配} * {读者匹配} * {周期评分}", { 范围匹配: 4, 读者匹配: 5, 周期评分: 3 }), 60);
+assert.equal(evalFormula("ROUND({通过} / {总数} * 100, 1)", { 通过: 7, 总数: 9 }), 77.8);
+// 日期与字符串比较按字典序（YYYY-MM-DD 文本可比大小）
+assert.equal(evalFormula('IF({重检日期} < "2026-10-01", "过期", "在期")', { 重检日期: "2026-09-12" }), "过期");
+assert.equal(evalFormula('IF({重检日期} < "2026-10-01", "过期", "在期")', { 重检日期: "2026-10-18" }), "在期");
+// 比较结果可直接参与布尔函数；跨表计数比较（第 20 讲）
+assert.equal(evalFormula("AND({a} > 3, {b} < 5)", { a: 4, b: 4 }), true);
+assert.equal(evalFormula("AND({a} > 3, {b} < 5)", { a: 2, b: 4 }), false);
+assert.equal(evalFormula("OR({a} = {b}, {a} != {b})", { a: 1, b: 2 }), true);
+assert.equal(
+  evalFormula('TABLECOUNT("日志", "段落卡") != TABLECOUNT("段落卡", "标题")', {}, {
+    tables: { 日志: [{ 段落卡: "P1" }, { 段落卡: "P2" }], 段落卡: [{ 标题: "P1" }] },
+  }),
+  true,
+);
+// 字符串相等比较（含 <> 写法）
+assert.equal(evalFormula('{状态} = "已合并"', { 状态: "已合并" }), true);
+assert.equal(evalFormula('{状态} <> "已合并"', { 状态: "待合并" }), true);
+// 非表达式文本仍按原文回退，不受影响
+assert.equal(evalFormula("hello world", {}), "hello world");
+assert.equal(evalFormula("{备注}", { 备注: "纯文本 3 < 5 描述" }), "纯文本 3 < 5 描述");
+// 除零返回 null，而非 Infinity
+assert.equal(evalFormula("{a} / {b}", { a: 1, b: 0 }), null);
 
 clearFormulaCache();
 const cached1 = evalFormulaCached("{a}+{b}", { a: 1, b: 2 }, { recordId: "r1", fieldId: "f1", updatedAt: 100 });
