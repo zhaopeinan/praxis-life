@@ -121,6 +121,8 @@ export type FieldConfig = {
     targetFieldId: string;
     map: Record<string, string[]>;
   };
+  /** text / long_text / email / url / phone: value must be unique within the table (e.g. DOI) */
+  unique?: boolean;
 };
 
 export type GeoPoint = {
@@ -286,6 +288,8 @@ export type FieldDraft = {
     targetFieldId: string;
     map: Record<string, string[]>;
   };
+  /** text / long_text / email / url / phone: value must be unique within the table */
+  unique?: boolean;
 };
 
 export type RecordQuery = {

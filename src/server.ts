@@ -55,6 +55,7 @@ const FieldDraftSchema = z.object({
       map: z.record(z.array(z.string())),
     })
     .optional(),
+  unique: z.boolean().optional(),
 });
 
 const FilterSchema = z.object({
@@ -1120,6 +1121,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
           })
           .nullable()
           .optional(),
+        unique: z.boolean().optional(),
       })
       .parse(await readBody(c));
     return c.json(await store.updateField(c.req.param("fieldId"), body));

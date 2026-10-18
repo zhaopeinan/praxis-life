@@ -213,6 +213,7 @@ export const api = {
       buttonLabel?: string;
       buttonAction?: { type: string; fieldId?: string; value?: string; url?: string; body?: string };
       symmetricFieldName?: string;
+      unique?: boolean;
     },
   ) => request<Field>(`/api/tables/${tableId}/fields`, { method: "POST", body: JSON.stringify(body) }),
   updateField: (
@@ -225,6 +226,7 @@ export const api = {
       buttonLabel?: string;
       buttonAction?: { type: string; fieldId?: string; value?: string; url?: string; body?: string };
       optionCascade?: { targetFieldId: string; map: Record<string, string[]> } | null;
+      unique?: boolean;
     },
   ) => request<Field>(`/api/fields/${fieldId}`, { method: "PATCH", body: JSON.stringify(body) }),
   changeFieldType: (fieldId: string, type: string) =>

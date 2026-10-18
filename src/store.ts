@@ -123,6 +123,8 @@ const FIELD_TYPE_SET = new Set<FieldType>([
   "group",
 ]);
 const LINK_TYPES = new Set(["link", "duplex_link"]);
+/** Field types that support the「唯一值」constraint (第 06 讲 DOI 查重). */
+const UNIQUE_FIELD_TYPES = new Set<FieldType>(["text", "long_text", "email", "url", "phone"]);
 const VIEW_PROTECTIONS = new Set<ViewProtection>(["public", "locked", "personal"]);
 
 /** Serialize field-type changes on very large tables (Feishu-like constraint). */
@@ -170,6 +172,32 @@ function parseJson<T>(value: unknown, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+/** 唯一值比较口径：trim + 大小写不敏感（DOI 大小写不敏感） */
+function normalizeUniqueValue(value: unknown): string {
+  if (value == null) return "";
+  return String(value).trim().toLowerCase();
+}
+
+/** 查重报错时的记录标签：优先名为「标题」的文本字段，其次第一个文本类字段，最后退化为记录 id */
+function recordLabelFromRow(fields: Field[], values: Record<string, unknown>, fallbackId: string): string {
+  const candidates = fields.filter(
+    (field) => field.type === "text" || field.type === "long_text" || field.type === "single_select",
+  );
+  const titleField =
+    candidates.find((field) => field.name === "标题") ??
+    candidates.find((field) => field.type === "text") ??
+    candidates[0];
+  const raw = titleField ? values[titleField.id] : undefined;
+  let text = "";
+  if (titleField && (titleField.type === "single_select") && raw != null) {
+    text = titleField.config.options?.find((item) => item.id === raw)?.name ?? "";
+  } else if (typeof raw === "string") {
+    text = raw.trim();
+  }
+  if (!text) return fallbackId;
+  return text.length > 40 ? `${text.slice(0, 40)}…` : text;
 }
 
 /** 接口回显用的密钥提示：只露头尾，中间打码 */
@@ -846,6 +874,7 @@ export class Store {
         map: draft.optionCascade.map,
       };
     }
+    if (draft.unique && UNIQUE_FIELD_TYPES.has(draft.type)) config.unique = true;
 
     const field: Field = {
       id: nid("f"),
@@ -923,6 +952,7 @@ export class Store {
       optionCascade?: FieldDraft["optionCascade"] | null;
       buttonLabel?: string;
       buttonAction?: FieldDraft["buttonAction"];
+      unique?: boolean;
     },
   ): Promise<Field> {
     const field = await this.requireField(fieldId);
@@ -962,6 +992,14 @@ export class Store {
           targetFieldId: patch.optionCascade.targetFieldId,
           map: patch.optionCascade.map,
         };
+      }
+    }
+    if (patch.unique !== undefined && UNIQUE_FIELD_TYPES.has(field.type)) {
+      if (patch.unique) {
+        config.unique = true;
+      } else {
+        const { unique: _removed, ...rest } = config;
+        config = rest;
       }
     }
     await this.db.execute({
@@ -1088,6 +1126,7 @@ export class Store {
       }
     }
     this.assertOptionCascades(fields, values);
+    await this.assertUniqueFields(fields, values);
     const id = nid("r");
     await this.db.execute({
       sql: "INSERT INTO records (id, table_id, values_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
@@ -1157,6 +1196,7 @@ export class Store {
       }
     }
     this.assertOptionCascades(fields, values);
+    await this.assertUniqueFields(fields, values, new Set(changedFieldIds), recordId);
     const updatedAt = Date.now();
     await this.writeValues(recordId, values, updatedAt);
     this.usage.bump("record_writes");
@@ -2120,6 +2160,7 @@ export class Store {
       const values = { ...record.values };
       if (resolved.stored == null) delete values[resolved.fieldId];
       else values[resolved.fieldId] = resolved.stored;
+      await this.assertUniqueFields(fields, values, new Set([resolved.fieldId]), record.id);
       const updatedAt = Date.now();
       await this.writeValues(record.id, values, updatedAt);
       record.values = values;
@@ -4363,6 +4404,42 @@ export class Store {
         if (!allowed.includes(name)) {
           throw new DomainError(`「${target.name}」选项「${name}」不在「${source.name}=${sourceName}」允许范围内`);
         }
+      }
+    }
+  }
+
+  /**
+   * 「唯一值」字段（第 06 讲 DOI 查重）：写入前检查同表内是否已有相同值。
+   * 比较为 trim + 大小写不敏感；空值不参与查重；onlyFieldIds 限定本次写入涉及的字段。
+   */
+  private async assertUniqueFields(
+    fields: Field[],
+    values: Record<string, unknown>,
+    onlyFieldIds?: Set<string>,
+    excludeRecordId?: string,
+  ): Promise<void> {
+    const uniqueFields = fields.filter(
+      (field) =>
+        field.config.unique &&
+        UNIQUE_FIELD_TYPES.has(field.type) &&
+        (!onlyFieldIds || onlyFieldIds.has(field.id)),
+    );
+    if (!uniqueFields.length) return;
+    for (const field of uniqueFields) {
+      const incoming = values[field.id];
+      const needle = normalizeUniqueValue(incoming);
+      if (!needle) continue;
+      const rows = await this.db.execute({
+        sql: "SELECT id, values_json FROM records WHERE table_id = ? ORDER BY created_at ASC",
+        args: [field.tableId],
+      });
+      for (const row of rows.rows) {
+        const id = asString(row.id);
+        if (excludeRecordId && id === excludeRecordId) continue;
+        const rowValues = parseJson<Record<string, unknown>>(row.values_json, {});
+        if (normalizeUniqueValue(rowValues[field.id]) !== needle) continue;
+        const label = recordLabelFromRow(fields, rowValues, id);
+        throw new DomainError(`「${field.name}」的值已存在（记录：${label}），请勿重复录入`);
       }
     }
   }

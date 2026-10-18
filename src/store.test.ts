@@ -2066,6 +2066,114 @@ assert.equal(disclosureDoc.status, 201);
 assert.match(disclosureDoc.data.bodyMd, /模板 A · 仅工具性润色/);
 assert.match(disclosureDoc.data.bodyMd, /模板 C · 方法学中使用 AI/);
 
+/* ——— 字段「唯一值」：DOI 查重（第 06 讲 P1，记录创建/更新时的唯一性校验）——— */
+const doiTable = await json(`/api/bases/${bases.data[0].id}/tables`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({
+    name: "唯一值验证",
+    fields: [
+      { name: "标题", type: "text" },
+      { name: "DOI", type: "text", unique: true },
+      { name: "备注", type: "long_text" },
+    ],
+  }),
+});
+assert.equal(doiTable.status, 201);
+const doiTableId = doiTable.data.id;
+const doiField = doiTable.data.fields.find((field: { name: string }) => field.name === "DOI");
+assert.equal(doiField.config.unique, true);
+
+// 唯一值只在文本类字段上生效：数字字段带 unique 不写入配置
+const numField = await json(`/api/tables/${doiTableId}/fields`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ name: "计数", type: "number", unique: true }),
+});
+assert.equal(numField.status, 201);
+assert.equal(numField.data.config.unique, undefined);
+
+const firstDoi = await json(`/api/tables/${doiTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "Attention Is All You Need", DOI: "10.5555/3295222.3295349" } }),
+});
+assert.equal(firstDoi.status, 201);
+
+// 同 DOI 再次新建：拒绝，并带上已有记录标题；大小写与首尾空格不敏感
+const dupDoi = await json(`/api/tables/${doiTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "重复条目", DOI: " 10.5555/3295222.3295349 " } }),
+});
+assert.equal(dupDoi.status, 400);
+assert.match(String(dupDoi.data.error), /「DOI」的值已存在（记录：Attention Is All You Need）/);
+
+// 空值不参与查重：多条空 DOI 可以共存
+const emptyA = await json(`/api/tables/${doiTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "暂无 DOI A" } }),
+});
+const emptyB = await json(`/api/tables/${doiTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "暂无 DOI B", DOI: "" } }),
+});
+assert.equal(emptyA.status, 201);
+assert.equal(emptyB.status, 201);
+
+// 更新到已占用的 DOI：拒绝；保持自身原值或只改其他字段：放行
+const secondDoi = await json(`/api/tables/${doiTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "BERT", DOI: "10.18653/v1/N19-1423" } }),
+});
+assert.equal(secondDoi.status, 201);
+const stealDoi = await json(`/api/records/${secondDoi.data.record.id}`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { DOI: "10.5555/3295222.3295349" } }),
+});
+assert.equal(stealDoi.status, 400);
+assert.match(String(stealDoi.data.error), /已存在（记录：Attention Is All You Need）/);
+const keepOwn = await json(`/api/records/${secondDoi.data.record.id}`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { DOI: "10.18653/v1/N19-1423", 备注: "保持自身值" } }),
+});
+assert.equal(keepOwn.status, 200);
+const relabel = await json(`/api/records/${secondDoi.data.record.id}`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "BERT（改标题）" } }),
+});
+assert.equal(relabel.status, 200);
+
+// CSV 导入同样查重：撞上已有 DOI 时报错并指出记录
+const csvDup = await json(`/api/tables/${doiTableId}/import.csv`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ csv: "标题,DOI\nCSV 重复,10.5555/3295222.3295349\n" }),
+});
+assert.equal(csvDup.status, 400);
+assert.match(String(csvDup.data.error), /已存在（记录：Attention Is All You Need）/);
+
+// 关闭唯一值后重复值放行，可再通过 MCP 式 PATCH 重新打开
+const offUnique = await json(`/api/fields/${doiField.id}`, {
+  method: "PATCH",
+  cookie: ada2,
+  body: JSON.stringify({ unique: false }),
+});
+assert.equal(offUnique.status, 200);
+assert.equal(offUnique.data.config.unique, undefined);
+const nowAllowed = await json(`/api/tables/${doiTableId}/records`, {
+  method: "POST",
+  cookie: ada2,
+  body: JSON.stringify({ fields: { 标题: "重复条目（放行）", DOI: "10.5555/3295222.3295349" } }),
+});
+assert.equal(nowAllowed.status, 201);
+
 /* ——— 按钮动作 lock_record / unlock_record 可经 API 建字段（上一轮遗漏的 schema 补齐）——— */
 const lockButtonTable = await json(`/api/bases/${bases.data[0].id}/tables`, {
   method: "POST",

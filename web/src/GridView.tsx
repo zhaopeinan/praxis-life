@@ -100,6 +100,7 @@ export function GridView({
   onRenameField,
   onEditOptions,
   onChangeType,
+  onToggleUnique,
   onDeleteField,
   onOpenRecord,
   onDuplicate,
@@ -123,6 +124,7 @@ export function GridView({
   onRenameField: (fieldId: string, name: string) => void;
   onEditOptions: (field: Field) => void;
   onChangeType?: (field: Field) => void;
+  onToggleUnique?: (field: Field, unique: boolean) => void;
   onDeleteField: (field: Field) => void;
   onOpenRecord?: (recordId: string) => void;
   onDuplicate?: (record: PublicRecord) => void;
@@ -210,6 +212,7 @@ export function GridView({
                     onRename={onRenameField}
                     onEditOptions={onEditOptions}
                     onChangeType={onChangeType}
+                    onToggleUnique={onToggleUnique}
                     onDelete={onDeleteField}
                   />
                 )}
@@ -344,12 +347,14 @@ function FieldMenu({
   onRename,
   onEditOptions,
   onChangeType,
+  onToggleUnique,
   onDelete,
 }: {
   field: Field;
   onRename: (fieldId: string, name: string) => void;
   onEditOptions: (field: Field) => void;
   onChangeType?: (field: Field) => void;
+  onToggleUnique?: (field: Field, unique: boolean) => void;
   onDelete: (field: Field) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -403,6 +408,22 @@ function FieldMenu({
               编辑选项
             </button>
           )}
+          {onToggleUnique &&
+            (field.type === "text" ||
+              field.type === "long_text" ||
+              field.type === "email" ||
+              field.type === "url" ||
+              field.type === "phone") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onToggleUnique(field, !field.config.unique);
+                }}
+              >
+                {field.config.unique ? "取消唯一值" : "设为唯一值"}
+              </button>
+            )}
           {onChangeType && (
             <button
               type="button"

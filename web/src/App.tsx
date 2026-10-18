@@ -1222,6 +1222,9 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 setOptionField(field);
                 setDialog("change-type");
               }}
+              onToggleUnique={(field, uniqueFlag) =>
+                api.updateField(field.id, { unique: uniqueFlag }).then(() => reloadTable()).catch(fail)
+              }
               onDeleteField={(field) => {
                 if (!window.confirm(`删除字段「${field.name}」？已填写的内容会一起去掉。`)) return;
                 api.deleteField(field.id).then(() => reloadTable()).catch(fail);
@@ -1805,6 +1808,7 @@ function FieldDialog({
       | { type: "lock_record" }
       | { type: "unlock_record" };
     symmetricFieldName?: string;
+    unique?: boolean;
   }) => Promise<void>;
 }) {
   const [name, setName] = useState("");
@@ -1824,9 +1828,11 @@ function FieldDialog({
   const [max, setMax] = useState(5);
   const [currency, setCurrency] = useState("CNY");
   const [prefix, setPrefix] = useState("");
+  const [unique, setUnique] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAllTypes, setShowAllTypes] = useState(false);
   const selectable = type === "single_select" || type === "multi_select";
+  const uniqueCapable = type === "text" || type === "long_text" || type === "email" || type === "url" || type === "phone";
   const linkFields = (fields ?? []).filter((field) => field.type === "link" || field.type === "duplex_link");
   const typeOptions = showAllTypes
     ? FIELD_TYPES
@@ -1863,6 +1869,7 @@ function FieldDialog({
               buttonLabel: type === "button" ? buttonLabel : undefined,
               buttonAction,
               symmetricFieldName: type === "duplex_link" ? symmetricFieldName || undefined : undefined,
+              unique: uniqueCapable ? unique : undefined,
             });
             onClose();
           } catch (err) {
@@ -2008,6 +2015,12 @@ function FieldDialog({
           <label>
             前缀
             <input value={prefix} onChange={(event) => setPrefix(event.target.value)} />
+          </label>
+        )}
+        {uniqueCapable && (
+          <label className="check-line">
+            <input type="checkbox" checked={unique} onChange={(event) => setUnique(event.target.checked)} />
+            唯一值（禁止重复，如 DOI 查重）
           </label>
         )}
         {error && <p className="form-error">{error}</p>}

@@ -242,7 +242,7 @@ server.tool(
 
 server.tool(
   "create_field",
-  "给数据表添加字段。支持人员/评分/进度/货币/公式/关联等类型。",
+  "给数据表添加字段。支持人员/评分/进度/货币/公式/关联等类型；文本类字段可设 unique 唯一值（如 DOI 查重）。",
   {
     tableId: z.string(),
     name: z.string(),
@@ -253,6 +253,7 @@ server.tool(
     max: z.number().optional(),
     currency: z.string().optional(),
     prefix: z.string().optional(),
+    unique: z.boolean().optional(),
   },
   async (args) =>
     run(async () => {
@@ -263,7 +264,7 @@ server.tool(
 
 server.tool(
   "update_field",
-  "重命名字段，或更新选项/公式/关联等配置",
+  "重命名字段，或更新选项/公式/关联/唯一值等配置",
   {
     fieldId: z.string(),
     name: z.string().optional(),
@@ -273,6 +274,7 @@ server.tool(
     max: z.number().optional(),
     currency: z.string().optional(),
     prefix: z.string().optional(),
+    unique: z.boolean().optional(),
   },
   async ({ fieldId, ...patch }) =>
     run(async () => {
