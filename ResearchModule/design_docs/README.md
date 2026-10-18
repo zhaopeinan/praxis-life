@@ -35,7 +35,7 @@
 - **字段**：28 种，含自动编号（可做 `H-` / `exp-` / `ck-` 业务编号）、关联与双向关联、查找引用、公式（跨表聚合 `TABLEROWS` / `TABLESUM` / `TABLECOUNT`）、按钮（改字段值 / 打开链接 / 写评论）。
 - **视图**：grid 表格、kanban 看板、calendar 日历、gallery 画册、form 表单、gantt 甘特；过滤器 11 种操作符、排序、分组（≤3 层）、隐藏字段、行高、颜色规则、日期字段绑定、甘特依赖与进度字段、视图保护。
 - **记录**：评论、变更历史（`list_record_history`）、关注、单记录分享、记录详情页布局（单栏/多栏/分组，1–3 列）。
-- **自动化**：6 类触发器（`record_created` / `record_updated` / `field_equals` / `button` / `webhook` / `schedule`）× 9 类动作（`set_field` / `create_record` / `add_comment` / `notify` / `http_request` / `send_email` / `feishu_bot` / `feishu_digest` / `run_agent`），带运行记录与手动试跑。
+- **自动化**：6 类触发器（`record_created` / `record_updated` / `field_equals` / `button` / `webhook` / `schedule`）× 9 类动作（`set_field` / `create_record` / `add_comment` / `notify` / `http_request` / `send_email` / `feishu_bot` / `feishu_digest` / `run_agent`），带运行记录与手动试跑；动作取值与条件比较值支持 `today+N` / `today-N` / `week_start` 等相对日期，`create_record` 可用 `tableId` 指定同库目标表并做 `{字段名}` 插值。
 - **文档**：文件夹、内置模板（实验前思考 / 实验后复盘 / 研究笔记）、文档 ↔ 记录挂靠（带 label）、历史版本自动归档与回滚、Markdown 渲染。
 - **智能体**：站内 LLM 智能体，`tools`（多轮工具调用）/ `prompt`（单次生成）两种模式，6 个工具（`list_tables` / `get_table_schema` / `query_records` / `create_record` / `update_record` / `add_comment`），按触发者身份鉴权，带逐步运行日志。
 - **MCP**：stdio 版与 HTTP 版（`/api/mcp/tools`），约 120 个工具，`dwa_` 令牌按空间授权（owner / editor / viewer）。
@@ -51,7 +51,7 @@
 
 另有三条自动化自身的约束（源码核对，`src/store.ts`），会直接决定设计长什么样：
 
-- **动作只能作用在触发记录上**：`set_field` 改不了别的记录，`create_record` 只能建在触发器绑定的表里；跨表建档走 `run_agent` 或人工补录。
+- **动作多数只能作用在触发记录上**：`set_field` 改不了别的记录（但取值可用 `today+N` 等相对日期）；`create_record` 默认建在触发器绑定的表，也可用 `tableId` 指定同一库内的另一张表；跨库建档才需要走 `run_agent` 或人工补录。
 - **动作之间没有条件分支**，也不读取上一动作的输出：推送只发固定文案，数字与清单在表内看。
 - **`field_equals` 是「当前值等于」而非「值刚变为」**：字段保持该值期间每次更新都会重新命中，只配提醒类动作。`schedule` 触发的自动化以绑定表第一条记录为上下文（`run_agent` / `feishu_digest` 例外），表内无记录时会被整条跳过。
 - `record_updated` / `field_equals` 触发器与 `create_record` / `notify` 动作**不在前端编辑器里**，需经 MCP / REST 配置——仍算 P0。
