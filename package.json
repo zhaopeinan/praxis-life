@@ -10,7 +10,7 @@
     "dev:web": "vite",
     "start": "tsx src/listen.ts",
     "mcp": "tsx src/mcp.ts",
-    "test": "tsx src/formula.test.ts && tsx src/store.test.ts && tsx src/export.test.ts && tsx src/usage.test.ts",
+    "test": "tsx src/formula.test.ts && tsx src/store.test.ts && tsx src/export.test.ts && tsx src/usage.test.ts && tsx src/config-ledger.test.ts",
     "typecheck": "tsc --noEmit",
     "build:feishu-index": "tsx scripts/build-feishu-index.mts",
     "scrape:feishu": "tsx scripts/scrape-feishu-bitable.mts",
@@ -34,6 +34,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "tsx": "^4.20.5",
+    "yaml": "^2.9.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {

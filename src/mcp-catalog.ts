@@ -112,4 +112,5 @@ export const MCP_TOOL_CATALOG: Array<{ name: string; description: string }> = [
   { name: "link_document_record", description: "把文档挂靠到记录" },
   { name: "unlink_document_record", description: "解除文档与记录的挂靠" },
   { name: "list_record_documents", description: "记录关联的文档" },
+  { name: "check_config_ledger", description: "配置台账对账：仓库 YAML 目录 vs 台账（漏登记/幽灵配置/seed 漂移）" },
 ];

@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { accounts, init, store } from "./context.js";
 import { assertBaseRole } from "./access.js";
+import { compareConfigLedger, ledgerRowsFromPayload, scanConfigDirectory, scanConfigFiles } from "./config-ledger.js";
 import { createTemplate, TEMPLATES, type TemplateId } from "./templates.js";
 import { FIELD_TYPES, FILTER_OPS, DOC_TEMPLATES, type Field, type MemberRole, type PublicUser, type ViewConfig, type ViewType } from "./types.js";
 
@@ -1680,6 +1681,35 @@ server.tool(
       const located = await store.locateRecord(recordId);
       await assertBaseRole(accounts, user, located.baseId, "viewer");
       return store.listRecordDocuments(recordId);
+    }),
+);
+
+server.tool(
+  "check_config_ledger",
+  "配置台账对账（第 12 讲）：把仓库里的 YAML 配置与「配置台账」表对一遍，输出三张清单——漏登记（仓库里有、台账没有）、幽灵配置（台账有、仓库里没有）、seed 漂移（两边都有但值不一致），另附 seed 只有一边填、配置文件路径不一致与配置自身告警（种子多来源、字段名不合口径、没写 experiment_id）。仓库不在本机时，由调用方读文件后用 files 传路径与正文。只读，不写任何记录",
+  {
+    tableId: z.string().describe("「配置台账」表 id 或表名"),
+    root: z.string().optional().describe("仓库根目录绝对路径（本机）；与 files 二选一"),
+    configDir: z.string().optional().describe("配置目录（仓库相对路径，多个用逗号分隔），默认 configs"),
+    files: z
+      .array(z.object({ path: z.string(), content: z.string() }))
+      .optional()
+      .describe("仓库不在本机时：调用方读好的配置文件清单（仓库相对路径 + 正文）"),
+    idField: z.string().optional().describe("实验编号字段名，默认「实验编号」"),
+    pathField: z.string().optional().describe("配置文件路径字段名，默认「配置文件路径」"),
+    seedField: z.string().optional().describe("seed 字段名，默认「seed」"),
+  },
+  async ({ tableId, root, configDir, files, idField, pathField, seedField }) =>
+    run(async () => {
+      await allowTable(tableId, "viewer");
+      const table = await store.getTable(tableId);
+      const { rows, notes } = ledgerRowsFromPayload(table, { idField, pathField, seedField });
+      if (files?.length) {
+        return compareConfigLedger(scanConfigFiles(files, { root: root ?? null, configDir }), rows, { notes });
+      }
+      if (!root) throw new Error("请给 root（本机上仓库根目录的绝对路径）或 files（调用方读好的文件清单）");
+      const scan = scanConfigDirectory(root, { configDir, ledgerPaths: rows.map((row) => row.path) });
+      return compareConfigLedger(scan, rows, { notes });
     }),
 );
 
