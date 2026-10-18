@@ -13,3 +13,6 @@ dist
 dist-web
 generated/
 node_modules
+
+# 书稿 PDF 原件（第三方版权内容，仅作本地设计输入）
+ResearchModule/design_principle
