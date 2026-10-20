@@ -14,7 +14,8 @@
  *   --base <名称>    目标空间名（默认「科研方法」）
  *   --create-base    空间不存在时新建（仅管理员/用户令牌可用；Agent 令牌调用会被 403）
  *   --only <k1,k2>   只构建指定表，表 key：prompts / matrix / hypotheses / library / runs
- *   --dry-run        只打印将要执行的写请求，不落库
+ *   --dry-run        只打印将要执行的写请求，不落库（预演时读回走内存影子状态）
+ *   --verify         只读回读校验：把线上落库与 spec 声明逐项比对，不一致则以退出码 1 结束
  *
  * 幂等：表/字段/视图/自动化/种子记录一律按名字判重；已存在则跳过，视图配置每次 PATCH 收敛。
  * 视图类型创建后不可更改（`PATCH /api/views/:id` 只收 name / config），因此：
@@ -25,8 +26,6 @@
  * 规格来源：ResearchModule/design_docs/_各讲落地要点.md 与第 01/06/09/15 讲文档。
  * 若干处与设计文档的偏差（前端能力表达不了的过滤组合等）在 spec 的 note 字段里写明。
  */
-import { randomUUID } from "node:crypto";
-
 // ---------------------------------------------------------------- 参数与环境
 
 const BASE_URL = (process.env.DUOWEI_BASE_URL ?? "http://47.122.123.1").replace(/\/+$/, "");
@@ -40,6 +39,7 @@ const opt = (name: string, fallback: string) => {
 const BASE_NAME = opt("--base", "科研方法");
 const CREATE_BASE = flag("--create-base");
 const DRY_RUN = flag("--dry-run");
+const VERIFY = flag("--verify");
 const ONLY = opt("--only", "")
   .split(",")
   .map((item) => item.trim())
@@ -852,10 +852,80 @@ const warn = (message: string) => {
   todo.push(message);
 };
 
+/**
+ * dry-run 的内存影子库：预演时写请求不落库，但后续步骤还要读回刚建的表/字段/视图，
+ * 拿假 id 去真实例上查只会 404。这里用影子状态承接建表流程，让预演能一路走完。
+ */
+type DryTable = {
+  id: string;
+  name: string;
+  fields: Array<{ id: string; name: string; type: string }>;
+  views: Array<{ id: string; name: string; type: string }>;
+  records: Array<{ id: string; fields: Record<string, any> }>;
+};
+const dryTables = new Map<string, DryTable>();
+const dryViewOwner = new Map<string, string>();
+const dryBases: Array<{ id: string; name: string; tables: Array<{ id: string; name: string }> }> = [];
+let drySeq = 0;
+const dryId = (prefix: string) => `${prefix}_dry${++drySeq}`;
+
+function dryRunWrite(method: string, path: string, body: any): any {
+  let m: RegExpMatchArray | null;
+  if (method === "POST" && (m = path.match(/^\/api\/bases$/))) {
+    const base = { id: dryId("b"), name: String(body?.name ?? ""), tables: [] };
+    dryBases.push(base);
+    return { id: base.id };
+  }
+  if (method === "POST" && (m = path.match(/^\/api\/bases\/([^/]+)\/tables$/))) {
+    const id = dryId("t");
+    const table: DryTable = {
+      id,
+      name: String(body?.name ?? ""),
+      fields: (body?.fields ?? []).map((field: any) => ({ id: dryId("f"), name: field.name, type: field.type })),
+      views: [{ id: dryId("v"), name: String(body?.defaultViewName ?? "表格"), type: "grid" }],
+      records: [],
+    };
+    dryTables.set(id, table);
+    const base = dryBases.find((item) => item.id === m![1]);
+    base?.tables.push({ id, name: table.name });
+    return { id };
+  }
+  if (method === "POST" && (m = path.match(/^\/api\/tables\/([^/]+)\/fields$/))) {
+    const id = dryId("f");
+    dryTables.get(m[1])?.fields.push({ id, name: body?.name, type: body?.type });
+    return { id };
+  }
+  if (method === "POST" && (m = path.match(/^\/api\/tables\/([^/]+)\/views$/))) {
+    const id = dryId("v");
+    dryTables.get(m[1])?.views.push({ id, name: body?.name, type: body?.type });
+    dryViewOwner.set(id, m[1]);
+    return { id };
+  }
+  if (method === "DELETE" && (m = path.match(/^\/api\/views\/([^/]+)$/))) {
+    const tableId = dryViewOwner.get(m[1]);
+    const table = tableId ? dryTables.get(tableId) : undefined;
+    if (table) table.views = table.views.filter((view) => view.id !== m[1]);
+    dryViewOwner.delete(m[1]);
+    return { ok: true };
+  }
+  if (method === "POST" && (m = path.match(/^\/api\/tables\/([^/]+)\/records$/))) {
+    const id = dryId("r");
+    dryTables.get(m[1])?.records.push({ id, fields: body?.fields ?? {} });
+    return { id };
+  }
+  // 其余写请求（视图 config 收敛、自动化创建等）不改变影子状态的结构，返回通用成功体。
+  return { __dryRun: true, id: dryId("x") };
+}
+
 async function api(method: string, path: string, body?: unknown): Promise<any> {
-  if (DRY_RUN && method !== "GET") {
-    log(`    [dry-run] ${method} ${path}`);
-    return { __dryRun: true, id: `dry_${randomUUID().slice(0, 8)}` };
+  if (DRY_RUN) {
+    if (method !== "GET") {
+      log(`    [dry-run] ${method} ${path}`);
+      return dryRunWrite(method, path, body);
+    }
+    if (path === "/api/bases" && dryBases.length) return dryBases;
+    const m = path.match(/^\/api\/tables\/([^/]+)(\/automations)?$/);
+    if (m && dryTables.has(m[1])) return m[2] ? [] : dryTables.get(m[1]);
   }
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
@@ -887,7 +957,7 @@ type TableState = {
   id: string;
   name: string;
   fields: Array<{ id: string; name: string; type: string }>;
-  views: Array<{ id: string; name: string; type: string }>;
+  views: Array<{ id: string; name: string; type: string; config?: Record<string, any> }>;
   records: Array<{ id: string; fields: Record<string, any> }>;
 };
 
@@ -897,7 +967,12 @@ async function loadTable(tableId: string): Promise<TableState> {
     id: payload.id,
     name: payload.name,
     fields: (payload.fields ?? []).map((field: any) => ({ id: field.id, name: field.name, type: field.type })),
-    views: (payload.views ?? []).map((view: any) => ({ id: view.id, name: view.name, type: view.type })),
+    views: (payload.views ?? []).map((view: any) => ({
+      id: view.id,
+      name: view.name,
+      type: view.type,
+      config: view.config,
+    })),
     records: (payload.records ?? []).map((record: any) => ({ id: record.id, fields: record.fields ?? {} })),
   };
 }
@@ -987,6 +1062,45 @@ function viewDraftPayload(view: ViewSpec): Record<string, unknown> {
   };
 }
 
+/** 视图配置的期望值：建视图与校验共用同一套构造逻辑，避免两边口径漂移。 */
+function expectedViewConfig(state: TableState, view: ViewSpec): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  if (view.filters?.length) {
+    config.filters = view.filters.map((filter) => ({
+      fieldId: fieldIdOf(state, filter.field),
+      op: filter.op,
+      ...(filter.value === undefined ? {} : { value: filter.value }),
+    }));
+    config.conjunction = view.conjunction ?? "and";
+  }
+  if (view.sorts?.length) {
+    config.sorts = view.sorts.map((sort) => ({
+      fieldId: fieldIdOf(state, sort.field),
+      direction: sort.direction,
+    }));
+  }
+  if (view.groups?.length) {
+    config.groups = view.groups.map((name) => ({ fieldId: fieldIdOf(state, name) }));
+  }
+  if (view.hiddenFields?.length) {
+    config.hiddenFieldIds = view.hiddenFields.map((name) => fieldIdOf(state, name));
+  }
+  if (view.rowHeight) config.rowHeight = view.rowHeight;
+  if (view.groupField) config.groupFieldId = fieldIdOf(state, view.groupField);
+  if (view.dateField) config.dateFieldId = fieldIdOf(state, view.dateField);
+  if (view.colorRules?.length) {
+    config.colorRules = view.colorRules.map((rule, index) => ({
+      id: `cr_${index + 1}`,
+      fieldId: fieldIdOf(state, rule.field),
+      op: rule.op,
+      ...(rule.value === undefined ? {} : { value: rule.value }),
+      color: rule.color,
+      target: rule.target ?? "row",
+    }));
+  }
+  return config;
+}
+
 async function ensureViews(state: TableState, views: ViewSpec[]): Promise<void> {
   for (const view of views) {
     const matched = state.views.find((item) => item.name === view.name);
@@ -1005,40 +1119,7 @@ async function ensureViews(state: TableState, views: ViewSpec[]): Promise<void> 
       const created = await api("POST", `/api/tables/${state.id}/views`, viewDraftPayload(view));
       viewId = created.id;
     }
-    const config: Record<string, unknown> = {};
-    if (view.filters?.length) {
-      config.filters = view.filters.map((filter) => ({
-        fieldId: fieldIdOf(state, filter.field),
-        op: filter.op,
-        ...(filter.value === undefined ? {} : { value: filter.value }),
-      }));
-      config.conjunction = view.conjunction ?? "and";
-    }
-    if (view.sorts?.length) {
-      config.sorts = view.sorts.map((sort) => ({
-        fieldId: fieldIdOf(state, sort.field),
-        direction: sort.direction,
-      }));
-    }
-    if (view.groups?.length) {
-      config.groups = view.groups.map((name) => ({ fieldId: fieldIdOf(state, name) }));
-    }
-    if (view.hiddenFields?.length) {
-      config.hiddenFieldIds = view.hiddenFields.map((name) => fieldIdOf(state, name));
-    }
-    if (view.rowHeight) config.rowHeight = view.rowHeight;
-    if (view.groupField) config.groupFieldId = fieldIdOf(state, view.groupField);
-    if (view.dateField) config.dateFieldId = fieldIdOf(state, view.dateField);
-    if (view.colorRules?.length) {
-      config.colorRules = view.colorRules.map((rule, index) => ({
-        id: `cr_${index + 1}`,
-        fieldId: fieldIdOf(state, rule.field),
-        op: rule.op,
-        ...(rule.value === undefined ? {} : { value: rule.value }),
-        color: rule.color,
-        target: rule.target ?? "row",
-      }));
-    }
+    const config = expectedViewConfig(state, view);
     if (Object.keys(config).length) await api("PATCH", `/api/views/${viewId}`, { config });
   }
   state.views = (await loadTable(state.id)).views;
@@ -1105,6 +1186,85 @@ async function ensureSeedRecords(state: TableState, records: Array<Record<string
   }
 }
 
+// ---------------------------------------------------------------- 回读校验
+
+/** 回读线上实例，与 spec 声明逐项比对；`--verify` 只读不写。 */
+async function verifyTables(selected: TableSpec[], baseId: string): Promise<number> {
+  let mismatches = 0;
+  const fail = (message: string) => {
+    mismatches += 1;
+    log(`    ! ${message}`);
+  };
+  const bases: Array<{ id: string; name: string; tables: Array<{ id: string; name: string }> }> = await api("GET", "/api/bases");
+  const base = bases.find((item) => item.id === baseId);
+  const totals = { fields: 0, views: 0, automations: 0, seeds: 0 };
+
+  for (const spec of selected) {
+    log(`\n[表] ${spec.name}`);
+    const listed = base?.tables.find((table) => table.name === spec.name);
+    if (!listed) {
+      fail("表不存在");
+      continue;
+    }
+    const state = await loadTable(listed.id);
+    const declaredFields = [...spec.fields, ...(spec.links ?? [])];
+
+    for (const field of declaredFields) {
+      const actual = state.fields.find((item) => item.name === field.name);
+      if (!actual) fail(`字段缺失：${field.name}`);
+      else if (actual.type !== field.type) fail(`字段类型不符：${field.name}（期望 ${field.type} / 实际 ${actual.type}）`);
+    }
+
+    for (const view of spec.views) {
+      const actual = state.views.find((item) => item.name === view.name);
+      if (!actual) {
+        fail(`视图缺失：${view.name}`);
+        continue;
+      }
+      if (actual.type !== view.type) fail(`视图类型不符：${view.name}（期望 ${view.type} / 实际 ${actual.type}）`);
+      for (const [key, value] of Object.entries(expectedViewConfig(state, view))) {
+        const got = actual.config?.[key];
+        if (JSON.stringify(got) !== JSON.stringify(value)) {
+          fail(
+            `视图配置不符：${view.name}.${key}（期望 ${JSON.stringify(value)} / 实际 ${JSON.stringify(got)}）`,
+          );
+        }
+      }
+    }
+
+    const automations: Array<{ name: string }> = await api("GET", `/api/tables/${state.id}/automations`);
+    for (const automation of spec.automations) {
+      if (!automations.some((item) => item.name === automation.name)) fail(`自动化缺失：${automation.name}`);
+    }
+
+    for (const record of spec.seedRecords ?? []) {
+      const name = String(record["名称"] ?? "");
+      if (!state.records.some((item) => String(item.fields["名称"] ?? "") === name)) fail(`种子记录缺失：${name}`);
+    }
+
+    totals.fields += state.fields.length;
+    totals.views += state.views.length;
+    totals.automations += automations.length;
+    totals.seeds += state.records.length;
+    log(
+      `  · 字段 ${state.fields.length} / 视图 ${state.views.length} / 自动化 ${automations.length} / 种子 ${state.records.length}`,
+    );
+    const extras = {
+      fields: state.fields.filter((field) => !declaredFields.some((item) => item.name === field.name)).map((f) => f.name),
+      views: state.views.filter((view) => !spec.views.some((item) => item.name === view.name)).map((v) => v.name),
+      automations: automations.filter((item) => !spec.automations.some((a) => a.name === item.name)).map((a) => a.name),
+    };
+    if (extras.fields.length) {
+      log(`  · 声明外字段（含本批延后未建的 ${(spec.deferred ?? []).length} 个）：${extras.fields.join("、")}`);
+    }
+    if (extras.views.length) log(`  · 声明外视图：${extras.views.join("、")}`);
+    if (extras.automations.length) log(`  · 声明外自动化：${extras.automations.join("、")}`);
+  }
+
+  log(`\n合计：字段 ${totals.fields} / 视图 ${totals.views} / 自动化 ${totals.automations} / 种子 ${totals.seeds}`);
+  return mismatches;
+}
+
 // ---------------------------------------------------------------- 主流程
 
 async function main() {
@@ -1114,6 +1274,12 @@ async function main() {
   log(`空间 id：${baseId}`);
 
   const selected = SPEC.filter((table) => !ONLY.length || ONLY.includes(table.key));
+
+  if (VERIFY) {
+    const mismatches = await verifyTables(selected, baseId);
+    log(mismatches ? `\n校验不通过：${mismatches} 项与声明不一致。` : "\n校验通过：线上落库与声明一致。");
+    process.exit(mismatches ? 1 : 0);
+  }
 
   // 阶段一：建表 + 建非关联字段
   for (const spec of selected) {
