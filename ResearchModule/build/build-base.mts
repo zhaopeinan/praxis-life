@@ -568,7 +568,12 @@ const SPEC: TableSpec[] = [
       { name: "作者", type: "text" },
       { name: "年份", type: "number" },
       { name: "发表处", type: "text" },
-      { name: "DOI", type: "text", unique: true, note: "文本唯一值约束（2026-10-19 落地），需要新版服务端，否则唯一性会被静默忽略。" },
+      {
+        name: "DOI",
+        type: "text",
+        unique: true,
+        note: "文本唯一值约束：需要支持 unique 的服务端（2026-10-19 起）。旧服务端会静默忽略，建完务必用 --verify 确认，或看构建日志里有没有「字段属性收敛：DOI → unique」。",
+      },
       { name: "链接", type: "url" },
       { name: "PDF", type: "attachment" },
       { name: "种子论文", type: "checkbox" },
@@ -1175,11 +1180,19 @@ async function ensureAutomations(state: TableState, automations: AutomationSpec[
   if (!automations.length) return;
   const existing: Array<{ id: string; name: string }> = await api("GET", `/api/tables/${state.id}/automations`);
   for (const automation of automations) {
+    // 两类「没完全落地」的提醒属于声明本身的缺陷，无论这次新不新建都要报，
+    // 否则重跑一次待办清单就少几条，看起来像已修好。
     if (automation.manualTodo) {
       warn(`自动化「${automation.name}」未完全落地：${automation.manualTodo}`);
       for (const action of automation.actions) {
         if (action.type === "run_agent") throw new Error(`自动化「${automation.name}」含 run_agent，需要真实 agentId`);
       }
+    }
+    if (automation.conjunction === "or" && automation.conditions?.length) {
+      // 条件默认 AND 求值：OR 语义靠现有的自动化条件表达不了，只能拆成多条或退化表达。这里只提醒，不静默改语义。
+      warn(
+        `自动化「${automation.name}」原文条件是 OR 语义（${automation.conditions.length} 条），系统条件为 AND 求值，当前等价近似。`,
+      );
     }
     if (existing.some((item) => item.name === automation.name)) {
       log(`    · 自动化已存在：${automation.name}`);
@@ -1202,11 +1215,6 @@ async function ensureAutomations(state: TableState, automations: AutomationSpec[
       op: condition.op,
       ...(condition.value === undefined ? {} : { value: condition.value }),
     }));
-    if (automation.conjunction === "or" && conditions?.length) {
-      // 条件默认 AND 求值；OR 语义靠自动化条件的 conjunction 不存在的现状拆不开，
-      // 因此这类条件用多条自动化或退化表达——这里只提醒，不静默改变语义。
-      warn(`自动化「${automation.name}」原文条件是 OR 语义（${conditions.length} 条），系统条件为 AND 求值，当前等价近似。`);
-    }
     log(`    + 自动化：${automation.name}`);
     await api("POST", `/api/tables/${state.id}/automations`, {
       name: automation.name,
