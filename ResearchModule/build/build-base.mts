@@ -956,7 +956,7 @@ async function api(method: string, path: string, body?: unknown): Promise<any> {
 type TableState = {
   id: string;
   name: string;
-  fields: Array<{ id: string; name: string; type: string }>;
+  fields: Array<{ id: string; name: string; type: string; config?: Record<string, any> }>;
   views: Array<{ id: string; name: string; type: string; config?: Record<string, any> }>;
   records: Array<{ id: string; fields: Record<string, any> }>;
 };
@@ -966,7 +966,12 @@ async function loadTable(tableId: string): Promise<TableState> {
   return {
     id: payload.id,
     name: payload.name,
-    fields: (payload.fields ?? []).map((field: any) => ({ id: field.id, name: field.name, type: field.type })),
+    fields: (payload.fields ?? []).map((field: any) => ({
+      id: field.id,
+      name: field.name,
+      type: field.type,
+      config: field.config,
+    })),
     views: (payload.views ?? []).map((view: any) => ({
       id: view.id,
       name: view.name,
@@ -1039,14 +1044,55 @@ function fieldDraft(field: FieldSpec): Record<string, unknown> {
   return draft;
 }
 
+const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/** 字段属性的期望值：建字段、属性收敛与校验共用同一套口径，键名与线上 config 对齐。 */
+function expectedFieldConfig(field: FieldSpec): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  if (field.options) config.options = field.options;
+  if (field.max) config.max = field.max;
+  if (field.prefix) config.prefix = field.prefix;
+  if (field.formula) config.formula = field.formula;
+  if (field.unique) config.unique = true;
+  if (field.linkTable) config.linkTableId = tableIds.get(field.linkTable);
+  return config;
+}
+
+/** 线上 config 里的可比对值：选项只比有序名字（选项 id 与配色由服务端分配，不属于声明项）。 */
+function actualFieldConfigValue(config: Record<string, any>, key: string): unknown {
+  if (key === "options") return (config.options ?? []).map((option: any) => option.name);
+  return config[key];
+}
+
+/** 已存在的字段需要收敛哪些属性；返回可直接 PATCH 的请求体片段，空对象表示已一致。 */
+function fieldAttributePatch(field: FieldSpec, actualConfig: Record<string, any>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(expectedFieldConfig(field))) {
+    if (!sameJson(actualFieldConfigValue(actualConfig, key), value)) patch[key] = value;
+  }
+  return patch;
+}
+
 async function ensureFields(state: TableState, fields: FieldSpec[]): Promise<void> {
   for (const field of fields) {
-    if (state.fields.some((item) => item.name === field.name)) {
-      log(`    · 字段已存在：${field.name}`);
+    const existing = state.fields.find((item) => item.name === field.name);
+    if (!existing) {
+      log(`    + 字段：${field.name}（${field.type}）`);
+      await api("POST", `/api/tables/${state.id}/fields`, fieldDraft(field));
       continue;
     }
-    log(`    + 字段：${field.name}（${field.type}）`);
-    await api("POST", `/api/tables/${state.id}/fields`, fieldDraft(field));
+    log(`    · 字段已存在：${field.name}`);
+    if (existing.type !== field.type) {
+      warn(`字段「${state.name}.${field.name}」已存在但类型是 ${existing.type}，声明要的是 ${field.type}；类型不自动改，需人工确认。`);
+      continue;
+    }
+    // 字段属性（唯一值、选项、编号前缀、公式等）在建表/建字段时可能被旧版服务端静默忽略——
+    // 例如 `文献库.DOI` 的 unique 在旧服务端上不会落库。所以已存在的字段也要比对属性，不一致就 PATCH 收敛。
+    const patch = fieldAttributePatch(field, existing.config ?? {});
+    if (Object.keys(patch).length) {
+      log(`    ! 字段属性收敛：${field.name} → ${Object.keys(patch).join("、")}`);
+      await api("PATCH", `/api/fields/${existing.id}`, patch);
+    }
   }
   state.fields = (await loadTable(state.id)).fields;
 }
@@ -1199,6 +1245,12 @@ async function verifyTables(selected: TableSpec[], baseId: string): Promise<numb
   const base = bases.find((item) => item.id === baseId);
   const totals = { fields: 0, views: 0, automations: 0, seeds: 0 };
 
+  // 校验模式不建表，关联字段的 linkTableId 期望值要靠这张映射算出来，先一次性填好（避免依赖表顺序）。
+  for (const spec of selected) {
+    const listed = base?.tables.find((table) => table.name === spec.name);
+    if (listed) tableIds.set(spec.key, listed.id);
+  }
+
   for (const spec of selected) {
     log(`\n[表] ${spec.name}`);
     const listed = base?.tables.find((table) => table.name === spec.name);
@@ -1211,8 +1263,20 @@ async function verifyTables(selected: TableSpec[], baseId: string): Promise<numb
 
     for (const field of declaredFields) {
       const actual = state.fields.find((item) => item.name === field.name);
-      if (!actual) fail(`字段缺失：${field.name}`);
-      else if (actual.type !== field.type) fail(`字段类型不符：${field.name}（期望 ${field.type} / 实际 ${actual.type}）`);
+      if (!actual) {
+        fail(`字段缺失：${field.name}`);
+        continue;
+      }
+      if (actual.type !== field.type) {
+        fail(`字段类型不符：${field.name}（期望 ${field.type} / 实际 ${actual.type}）`);
+        continue;
+      }
+      for (const [key, value] of Object.entries(expectedFieldConfig(field))) {
+        const got = actualFieldConfigValue(actual.config ?? {}, key);
+        if (!sameJson(got, value)) {
+          fail(`字段属性不符：${field.name}.${key}（期望 ${JSON.stringify(value)} / 实际 ${JSON.stringify(got)}）`);
+        }
+      }
     }
 
     for (const view of spec.views) {
