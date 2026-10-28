@@ -59,20 +59,20 @@ export function createRecallTool(options: {
         });
       } catch (error) {
         if (abort.aborted) throw error;
-        throw new Error("连不上白泽中枢，这次没查到以前的记录。", { cause: error });
+        throw new Error("连不上知行Bot中枢，这次没查到以前的记录。", { cause: error });
       }
       if (!response.ok) {
         await response.body?.cancel();
-        throw new Error(`白泽中枢拒绝了这次召回（${response.status}），请稍后重试。`);
+        throw new Error(`知行Bot中枢拒绝了这次召回（${response.status}），请稍后重试。`);
       }
       let body: unknown;
       try {
         body = await response.json();
       } catch {
-        throw new Error("白泽中枢的召回结果格式不对，这次没查到以前的记录。");
+        throw new Error("知行Bot中枢的召回结果格式不对，这次没查到以前的记录。");
       }
       const parsed = RecallResponse.safeParse(body);
-      if (!parsed.success) throw new Error("白泽中枢的召回结果格式不对，这次没查到以前的记录。");
+      if (!parsed.success) throw new Error("知行Bot中枢的召回结果格式不对，这次没查到以前的记录。");
       abort.throwIfAborted();
       if (options.live()?.runId !== run.runId) throw new Error("这轮运行已经结束，召回结果已作废。");
       options.recalls.set(callId, parsed.data);

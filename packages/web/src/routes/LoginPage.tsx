@@ -21,7 +21,7 @@ export const LoginPage = () => {
           <span className="wordmark-badge" aria-hidden="true">
             白
           </span>
-          白泽
+          知行Bot
         </p>
         <form
           onSubmit={(e) => {

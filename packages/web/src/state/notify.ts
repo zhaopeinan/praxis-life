@@ -9,7 +9,7 @@ const TITLE: Record<Notice["kind"], string> = {
   failed: "没办成",
 };
 
-const PAGE_TITLE = "白泽 Bot";
+const PAGE_TITLE = "知行Bot";
 
 // 桌面壳的主进程自己连推送、自己弹原生通知，壳里的 Web 再弹就是两条。
 export const inDesktopShell = (): boolean =>

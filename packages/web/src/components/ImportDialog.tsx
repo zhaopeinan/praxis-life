@@ -39,11 +39,11 @@ export const ImportDialog = ({ onClose }: { onClose: () => void }) => {
     if (started) return;
     const reading = templateFromLink(link);
     if (reading.kind === "too_long") {
-      setRequest({ kind: "failed", message: "链接太长，不像白泽的分享链接" });
+      setRequest({ kind: "failed", message: "链接太长，不像知行Bot的分享链接" });
       return;
     }
     if (reading.kind === "unrecognized") {
-      setRequest({ kind: "failed", message: "认不出这条链接，确认是白泽分享出来的整条链接" });
+      setRequest({ kind: "failed", message: "认不出这条链接，确认是知行Bot 分享出来的整条链接" });
       return;
     }
     setRequest({ kind: "importing" });

@@ -7,7 +7,7 @@ const edit = (draftId: string, after: string): BrandEdit =>
 
 const book = (version: number, voice: string, edits: BrandEdit[]): BrandBook =>
   BrandBook.parse({
-    facts: "白泽做企业 Bot",
+    facts: "知行Bot 做企业 Bot",
     voice,
     taboo: "",
     assetsDir: null,

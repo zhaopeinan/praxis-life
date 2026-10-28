@@ -525,7 +525,7 @@ async function provision(session: Session, intent: ProvisionIntent = SILENT): Pr
   provisioning = outcome;
   if ((await outcome) === "login-required" && phase === "running") {
     logLine("agent-reconnect-login-required");
-    await showBox({ type: "info", message: "请先登录白泽，再在这台 Mac 上连接" });
+    await showBox({ type: "info", message: "请先登录知行Bot，再在这台 Mac 上连接" });
   }
 }
 
@@ -586,7 +586,7 @@ async function showUpgradeRequired(): Promise<void> {
   if (phase !== "running") return;
   const { response } = await showBox({
     type: "warning",
-    message: "这台 Mac 上的白泽版本太旧，控制面不再接受它连接，请更新白泽",
+    message: "这台 Mac 上的知行Bot版本太旧，控制面不再接受它连接，请更新知行Bot",
     buttons: updater === null ? ["知道了"] : ["检查更新", "知道了"],
     defaultId: 0,
     cancelId: updater === null ? 0 : 1,
@@ -606,7 +606,7 @@ async function refreshPending(session: Session): Promise<void> {
     const count = [...bots.items, ...groups.items].reduce((sum, item) => sum + item.pendingApprovals, 0);
     const label = count === 0 ? "" : String(count);
     tray?.setTitle(label);
-    tray?.setToolTip(count === 0 ? "白泽" : `白泽 · ${count} 件等你确认`);
+    tray?.setToolTip(count === 0 ? "知行Bot" : `知行Bot · ${count} 件等你确认`);
     if (process.platform === "darwin") app.dock?.setBadge(label);
     logLine(`pending-count ${count}`);
   } catch (error) {
@@ -647,10 +647,10 @@ export function connectPush(session: Session, origin = uiOrigin): void {
 function showNotice(notice: DesktopNotice): void {
   if (!Notification.isSupported()) return;
   const titles: Record<NotifyKind, string> = {
-    confirm: "白泽要你确认",
-    result: "白泽做完了",
-    stuck: "白泽卡住了",
-    failed: "白泽没办成",
+    confirm: "知行Bot要你确认",
+    result: "知行Bot做完了",
+    stuck: "知行Bot卡住了",
+    failed: "知行Bot没办成",
   };
   const notification = new Notification({
     title: titles[notice.kind],
@@ -731,7 +731,7 @@ async function createWindows(session: Session, mainPath = ""): Promise<void> {
       minWidth: 960,
       minHeight: 640,
       show: false,
-      title: "白泽",
+      title: "知行Bot",
       titleBarStyle: "default",
       webPreferences: {
         contextIsolation: true,
@@ -784,13 +784,13 @@ async function createWindows(session: Session, mainPath = ""): Promise<void> {
 }
 
 function settingsHtml(current: string): string {
-  return `<!doctype html><html><meta charset="utf-8"><title>白泽设置</title><style>
+  return `<!doctype html><html><meta charset="utf-8"><title>知行Bot设置</title><style>
     :root{--bg:#f5f4ef;--fg:#17212b;--muted:#66717c;--accent:#176b72;--line:#d6d8d5;--white:#fff}
     body{margin:0;padding:28px;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
     h1{margin:0 0 8px;font-size:20px}p{margin:0 0 20px;color:var(--muted)}label{display:block;font-weight:600}
     input{box-sizing:border-box;width:100%;margin:8px 0 20px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--white);font:inherit}
     button{border:0;border-radius:8px;padding:10px 18px;background:var(--accent);color:var(--white);font:600 14px inherit;cursor:pointer}
-  </style><body><h1>控制面地址</h1><p>保存后白泽会重启并连接新地址。</p><form><label>地址<input type="url" required value=${JSON.stringify(current)}></label><button>保存并重启</button></form>
+  </style><body><h1>控制面地址</h1><p>保存后知行Bot会重启并连接新地址。</p><form><label>地址<input type="url" required value=${JSON.stringify(current)}></label><button>保存并重启</button></form>
   <script>document.querySelector('form').addEventListener('submit',event=>{event.preventDefault();location.href='baize-settings://save?origin='+encodeURIComponent(document.querySelector('input').value)})</script></body></html>`;
 }
 
@@ -799,7 +799,7 @@ function openSettings(): void {
     settingsWindow.focus();
     return;
   }
-  settingsWindow = new BrowserWindow({ width: 520, height: 300, resizable: false, title: "白泽设置" });
+  settingsWindow = new BrowserWindow({ width: 520, height: 300, resizable: false, title: "知行Bot设置" });
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });
@@ -837,10 +837,10 @@ function setOpenAtLogin(value: boolean): OpenAtLogin {
   return next;
 }
 
-// 主窗口跳到别的源上 preload 照样会注入，只认白泽自己页面发来的调用。
+// 主窗口跳到别的源上 preload 照样会注入，只认知行Bot自己页面发来的调用。
 function fromUi(event: IpcMainInvokeEvent): void {
   const url = event.senderFrame?.url;
-  if (url === undefined || new URL(url).origin !== uiOrigin) throw new Error("只接受白泽页面的请求");
+  if (url === undefined || new URL(url).origin !== uiOrigin) throw new Error("只接受知行Bot页面的请求");
 }
 
 function installBridge(): void {
@@ -956,11 +956,11 @@ async function main(): Promise<void> {
   uiOrigin = uiServer.origin;
   const session = electronSession.defaultSession;
   tray = new Tray(trayImage());
-  tray.setToolTip("白泽");
+  tray.setToolTip("知行Bot");
   tray.on("click", () => (menubarWindow?.isVisible() ? menubarWindow.hide() : showMenubar()));
   const appUpdater = createAppUpdater();
   updater = appUpdater;
-  app.setAboutPanelOptions({ applicationName: "白泽", applicationVersion: app.getVersion() });
+  app.setAboutPanelOptions({ applicationName: "知行Bot", applicationVersion: app.getVersion() });
   installMenu(appUpdater.checkNow);
   installBridge();
   await createWindows(session);
@@ -1009,7 +1009,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => ap
 
 void main().catch((error: unknown) => {
   const message = errorText(error);
-  process.stderr.write(`白泽启动失败：${message}\n`);
-  dialog.showErrorBox("白泽启动失败", message);
+  process.stderr.write(`知行Bot启动失败：${message}\n`);
+  dialog.showErrorBox("知行Bot启动失败", message);
   app.exit(1);
 });

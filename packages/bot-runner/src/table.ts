@@ -319,7 +319,7 @@ export async function createTableSession(options: {
   });
   const register = (gateway: typeof options.gateway): void =>
     runtime.registerProvider(GATEWAY_PROVIDER_ID, {
-      name: "白泽模型网关",
+      name: "知行Bot模型网关",
       baseUrl: gateway.baseUrl,
       apiKey: gateway.apiKey,
       api: "openai-completions",

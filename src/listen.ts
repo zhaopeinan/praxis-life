@@ -13,7 +13,7 @@ const server = serve({ fetch: app.fetch, port, hostname }, (info) => {
   console.log(`知行人生 API http://${info.address}:${info.port}`);
 });
 
-// 白泽的三条 WebSocket（/assistant/agent、/assistant/api/ws、/assistant/api/live/*）在这里升级分发。
+// 知行Bot的三条 WebSocket（/assistant/agent、/assistant/api/ws、/assistant/api/live/*）在这里升级分发。
 const baize = baizeHandles();
 if (baize) {
   server.on("upgrade", (request, socket, head) => {

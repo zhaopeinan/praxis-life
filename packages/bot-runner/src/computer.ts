@@ -56,14 +56,14 @@ export function switchComputerTool(options: { readonly live: () => SwitchCompute
         });
       } catch (error) {
         if (abort.aborted) throw error;
-        throw new Error("连不上白泽中枢，这次没换成电脑。", { cause: error });
+        throw new Error("连不上知行Bot中枢，这次没换成电脑。", { cause: error });
       }
       if (!response.ok) {
         await response.body?.cancel();
-        throw new Error(`白泽中枢拒绝了这次换电脑（${response.status}），这一轮继续在当前这台上做。`);
+        throw new Error(`知行Bot中枢拒绝了这次换电脑（${response.status}），这一轮继续在当前这台上做。`);
       }
       const parsed = SwitchComputerResponse.safeParse(await response.json().catch(() => null));
-      if (!parsed.success) throw new Error("白泽中枢的回应格式不对，这次没换成电脑。");
+      if (!parsed.success) throw new Error("知行Bot中枢的回应格式不对，这次没换成电脑。");
       if (parsed.data.result === "refused") throw new Error(parsed.data.text);
       return {
         content: [

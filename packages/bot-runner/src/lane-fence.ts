@@ -21,7 +21,7 @@ export interface LaneSessionFence {
   toolSettled(runId: RunId, callId: string): void;
 }
 
-const DISCONNECTED_REASON = "和白泽断开了，这一步先不做";
+const DISCONNECTED_REASON = "和知行Bot断开了，这一步先不做";
 const CHANGED_HOLDER_REASON = "这个群已经换到另一台电脑上了";
 const UNCONFIRMED_REASON = "工作记录没有确认，这一步先不做";
 

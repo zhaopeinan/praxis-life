@@ -100,8 +100,8 @@ export const PrivacyPage = ({ user }: { user: User }) => {
       <section className="privacy-storage" data-testid="privacy-storage">
         <p className="group-label">存在哪、留多久</p>
         <p className="tools-intro">
-          东西放在两处：控制面数据库，和干活那台电脑上的数据目录。Mac 上的白泽 App 在 ~/Library/Application
-          Support/白泽/bots，远程电脑在 /home/node/.baize/bots。
+          东西放在两处：控制面数据库，和干活那台电脑上的数据目录。Mac 上的知行Bot App 在 ~/Library/Application
+          Support/ZhixingBot/bots，远程电脑在 /home/node/.baize/bots。
         </p>
         {STORAGE.map((item) => (
           <div className="row-card" key={item.what} data-testid="privacy-storage-item">
@@ -120,7 +120,7 @@ export const PrivacyPage = ({ user }: { user: User }) => {
             <b>删除账号</b>
             <small data-testid="privacy-delete-note">
               Bot、项目、对话、例行、授权一起删掉，连着的电脑会断开。删了找不回来。电脑上的数据目录和 App
-              存的连接凭据不会跟着删。要在 Mac 上清干净，先退出白泽 App，再删掉整个 ~/Library/Application Support/白泽
+              存的连接凭据不会跟着删。要在 Mac 上清干净，先退出知行Bot App，再删掉整个 ~/Library/Application Support/ZhixingBot
               目录，连接凭据和 App 设置都在这里，不在 bots 下面。
             </small>
           </span>

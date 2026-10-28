@@ -33,7 +33,7 @@ export type UpdateEffect =
   | { readonly type: "inform"; readonly level: "info" | "error"; readonly text: string };
 
 export const UNSIGNED_TEXT = "这个版本没有正式签名，不能自动更新";
-export const DEV_TEXT = "开发运行的白泽不检查更新";
+export const DEV_TEXT = "开发运行的知行Bot不检查更新";
 export const LATEST_TEXT = "当前已是最新版本";
 export const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 

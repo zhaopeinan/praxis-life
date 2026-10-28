@@ -4207,7 +4207,7 @@ function UsageDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** 白泽 Bot 的模型网关：上游地址、API key、plan/fast 两个用途的模型名。key 只写不读，留空表示不换。 */
+/** 知行Bot 的模型网关：上游地址、API key、plan/fast 两个用途的模型名。key 只写不读，留空表示不换。 */
 function ModelGatewayDialog({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState<{ upstreamBaseUrl: string; planModel: string; fastModel: string; hasApiKey: boolean } | null>(null);
   const [apiKey, setApiKey] = useState("");

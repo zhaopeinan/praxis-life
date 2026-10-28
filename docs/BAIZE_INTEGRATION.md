@@ -1,15 +1,15 @@
-# 白泽 Bot 集成说明（知行人生 × 白泽）
+# 知行Bot 集成说明（知行人生 × 知行Bot）
 
-白泽 Bot（多 Bot 协作助理，原独立仓库 SmartStudio/baize-bot）已整体并入本仓库，
+知行Bot（多 Bot 协作助理，原独立仓库 SmartStudio/baize-bot）已整体并入本仓库，
 作为知行人生的「AI 助理」子系统运行。本文档是合并后的架构与运维手册；
-白泽自身的设计文档归档在 [docs/baize/](baize/)（含原 CLAUDE.md 约定）。
+知行Bot自身的设计文档归档在 [docs/baize/](baize/)（含原 CLAUDE.md 约定）。
 
 ## 架构一图
 
 ```
 浏览器  http://47.122.123.1/
   ├── /                知行人生 Web + API（React SPA, SQLite data/duowei.db）
-  └── /assistant/      白泽 Web（React SPA 构建时带前缀）+ 白泽 API
+  └── /assistant/      知行Bot Web（React SPA 构建时带前缀）+ 知行Bot API
         │              同一个 Hono 应用、同一个 duowei_session 会话
         ├── /assistant/agent          电脑代理 WebSocket（Bot 运行时通道）
         ├── /assistant/api/ws         浏览器推送 WebSocket
@@ -18,24 +18,24 @@
 
 Podman 容器（阿里云）：
   duowei            合并应用（:8787，--env-file baize.env，挂 baize-net）
-  baize-postgres    白泽库（PG 16，卷 /opt/duowei/pgdata，宿主 127.0.0.1:5435）
+  baize-postgres    知行Bot库（PG 16，卷 /opt/duowei/pgdata，宿主 127.0.0.1:5435）
   baize-remote      远程电脑（chromium+xvfb+bwrap，Bot 的活在这跑；独立 setup）
 ```
 
 账号统一：知行人生会话是唯一登录态。用户首次进 /assistant 时按知行人生用户 id
-provisioning 出白泽用户行（`provisionExternalUser`），主助理随之自动建好。
-白泽自带的注册/登录/OAuth 路由在合并模式下全部关闭。
+provisioning 出知行Bot用户行（`provisionExternalUser`），主助理随之自动建好。
+知行Bot自带的注册/登录/OAuth 路由在合并模式下全部关闭。
 
 ## 本地开发
 
 ```bash
 pnpm install
-docker compose up -d                 # 本机 PG（5434，给白泽用；知行人生用 SQLite 不用库）
-pnpm dev:full                        # 8787（合并后端，含白泽）+ 5174（知行人生 Vite）
-# 白泽 Web 单独调试：BAIZE_BASE=/assistant VITE_BAIZE_BASE=/assistant pnpm --filter @baize/web dev
+docker compose up -d                 # 本机 PG（5434，给知行Bot用；知行人生用 SQLite 不用库）
+pnpm dev:full                        # 8787（合并后端，含知行Bot）+ 5174（知行人生 Vite）
+# 知行Bot Web 单独调试：BAIZE_BASE=/assistant VITE_BAIZE_BASE=/assistant pnpm --filter @baize/web dev
 ```
 
-后端起白泽要这些环境（写在 .env 里，scripts/dev.mjs 会读）：
+后端起知行Bot要这些环境（写在 .env 里，scripts/dev.mjs 会读）：
 
 ```
 BAIZE_ENABLED=1
@@ -52,9 +52,9 @@ plan/fast 模型名，存进知行人生自己的库（app_settings 表），网
 
 ```bash
 pnpm check              # typecheck + lint + 全部测试
-pnpm -r typecheck       # 白泽 7 包各自编译选项下 typecheck
+pnpm -r typecheck       # 知行Bot 7 包各自编译选项下 typecheck
 pnpm --filter @baize/control-plane test   # 需要本机 docker PG（每个测试文件临时建库）
-pnpm build:web          # 双前端构建（白泽 Web 自动带 /assistant 前缀）
+pnpm build:web          # 双前端构建（知行Bot Web 自动带 /assistant 前缀）
 ```
 
 ## 生产部署（阿里云）
@@ -67,7 +67,7 @@ scripts/setup-baize-remote.sh         # 远程电脑容器（Bot 运行时；镜
 模型网关在部署后由管理员登录知行人生，在顶栏「模型网关」页填写（上游地址、API key、
 plan/fast 模型名），不写配置文件、不用重启。
 
-- 回滚：与旧版相同（`duowei:rollback` 镜像 + 容器参数不变）；白泽新增物全是增量，
+- 回滚：与旧版相同（`duowei:rollback` 镜像 + 容器参数不变）；知行Bot新增物全是增量，
   回滚到旧镜像时 BAIZE_ENABLED 不在旧 env 里，应用按旧行为跑。
 - 备份：SQLite 打包之外，`baize-pg-*.dump`（pg_dump -Fc）落在同一数据目录。
 - 资源：chromium+xvfb 建议 ≥4G 内存；setup 脚本低于 4G 会告警。
@@ -90,7 +90,7 @@ bwrap 沙箱在容器里要 seccomp 配置（已在 setup 里挂载）；podman 
 | 现象 | 先看 |
 |---|---|
 | /assistant 404 | 应用容器 env-file 是否带 BAIZE_ENABLED=1；迁移是否跑过 |
-| /assistant/api/* 全 401 | 知行人生会话失效（白泽只认 duowei_session） |
+| /assistant/api/* 全 401 | 知行人生会话失效（知行Bot只认 duowei_session） |
 | 登录知行人生后 /assistant 白屏 | 镜像里 packages/web/dist 是否存在（build:web 是否跑过） |
 | Bot 干活 502 | 知行人生「模型网关」页是否已配上游/key/模型名（保存后 2 秒内生效） |
 | 电脑一直离线 | baize-remote 容器状态与日志；launch.json 被读后删是正常行为 |

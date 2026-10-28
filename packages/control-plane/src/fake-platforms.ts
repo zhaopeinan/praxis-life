@@ -227,7 +227,7 @@ export async function startFakePlatforms(): Promise<FakePlatforms> {
   const xGet = (path: string, authorization: string | null, res: ServerResponse): void => {
     if (path === "/2/users/me") {
       if (bearerPlatform(authorization) !== "x") reply(res, 401, { title: "Unauthorized" });
-      else reply(res, 200, { data: { id: "42", name: "白泽", username: HANDLES.x } }, READ_HEADERS);
+      else reply(res, 200, { data: { id: "42", name: "知行Bot", username: HANDLES.x } }, READ_HEADERS);
       return;
     }
     const status = /^\/2\/media\/upload\?(.*)$/.exec(path);

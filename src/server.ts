@@ -251,7 +251,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
   /** 前端按需点亮「AI 助理」入口：BAIZE_ENABLED 才显示。 */
   app.get("/api/features", (c) => c.json({ baize: baizeConfig() !== null }));
 
-  /** 白泽模型网关配置（管理员）。apiKey 只写不读：GET 只回 hasApiKey。 */
+  /** 知行Bot模型网关配置（管理员）。apiKey 只写不读：GET 只回 hasApiKey。 */
   const MODEL_GATEWAY_KEY = "model_gateway";
   app.get("/api/admin/model-gateway", async (c) => {
     await requireAdmin(c);
@@ -1862,7 +1862,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     return user;
   }
 
-  // 白泽 Bot 子系统：BAIZE_ENABLED=1 时才真正注册，挂在 /assistant 下，须在静态伺服之前。
+  // 知行Bot 子系统：BAIZE_ENABLED=1 时才真正注册，挂在 /assistant 下，须在静态伺服之前。
   mountBaize(app, accounts, store);
 
   const webRoot = resolveWebRoot();
@@ -1876,7 +1876,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     );
     app.notFound(async (c) => {
       if (c.req.path.startsWith("/api")) return c.json({ error: "未找到接口" }, 404);
-      // /assistant 的前端路由刷新：白泽的 SPA index.html（/assistant/api 除外，那是接口要 JSON 404）。
+      // /assistant 的前端路由刷新：知行Bot的 SPA index.html（/assistant/api 除外，那是接口要 JSON 404）。
       const baizeIndex = baizeIndexHtml();
       if (
         baizeIndex !== null &&
@@ -1895,7 +1895,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
   return app;
 }
 
-/** 白泽 Web 的 index.html 路径；BAIZE_ENABLED 且构建产物存在才给。 */
+/** 知行Bot Web 的 index.html 路径；BAIZE_ENABLED 且构建产物存在才给。 */
 function baizeIndexHtml(): string | null {
   const handles = baizeHandles();
   if (handles === null || handles.webDir === null) return null;

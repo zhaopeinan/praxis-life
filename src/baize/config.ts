@@ -1,5 +1,5 @@
 /**
- * 白泽 Bot 子系统的环境配置。知行人生本身只用 DUOWEI_* 变量，这里全部 BAIZE_ 前缀，避免撞名。
+ * 知行Bot 子系统的环境配置。知行人生本身只用 DUOWEI_* 变量，这里全部 BAIZE_ 前缀，避免撞名。
  * 不设 BAIZE_ENABLED=1 时整个挂载不发生（测试、纯知行人生部署都不受影响）。
  */
 import { existsSync } from "node:fs";
@@ -10,7 +10,7 @@ export type BaizeConfig = {
   readonly dbUrl: string;
   readonly toolSecretKey: string;
   readonly credentialsKey: string;
-  /** 白泽 Web 构建产物目录；不存在时 /assistant 只出 API，不伺服页面。 */
+  /** 知行Bot Web 构建产物目录；不存在时 /assistant 只出 API，不伺服页面。 */
   readonly webDir: string | null;
 };
 
@@ -26,7 +26,7 @@ export function baizeConfig(): BaizeConfig | null {
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} 未设置：白泽子系统（BAIZE_ENABLED=1）起不来`);
+  if (!value) throw new Error(`${name} 未设置：知行Bot子系统（BAIZE_ENABLED=1）起不来`);
   return value;
 }
 

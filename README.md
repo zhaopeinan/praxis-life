@@ -184,7 +184,7 @@ Actively developed open source. Capability map vs. Feishu-style bitable: [`docs/
 - **人机共管** — 注册 MCP Agent（`dwa_…`）、按表授权、可审批启用
 - **可上线的鉴权** — 不开放自助注册；图形验证码；可选邮箱验证码；锁定与角色模型
 - **多种部署** — 本地开发、Node 生产、Docker Compose
-- **AI 助理（白泽 Bot）** — 内置多 Bot 协作助理：主助理带 Bot 小队，说一句话派活，审批/草稿/例行任务/牌桌全套；与知行人生共用登录态，挂在 `/assistant/`；不开 `BAIZE_ENABLED` 时零影响。详见 [docs/BAIZE_INTEGRATION.md](docs/BAIZE_INTEGRATION.md)
+- **AI 助理（知行Bot）** — 内置多 Bot 协作助理：主助理带 Bot 小队，说一句话派活，审批/草稿/例行任务/牌桌全套；与知行人生共用登录态，挂在 `/assistant/`；不开 `BAIZE_ENABLED` 时零影响。详见 [docs/BAIZE_INTEGRATION.md](docs/BAIZE_INTEGRATION.md)
 
 ### 环境要求
 

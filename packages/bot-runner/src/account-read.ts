@@ -36,13 +36,13 @@ const PARAMS = Type.Object({
   accountId: Type.String({ description: "用哪个号的身份读，照工具描述里的 accountId 抄" }),
   path: Type.String({
     description:
-      "平台接口的相对路径，可以带查询串。GitHub 如 repos/<owner>/<repo>/issues?state=open，X 如 2/tweets/search/recent?query=白泽",
+      "平台接口的相对路径，可以带查询串。GitHub 如 repos/<owner>/<repo>/issues?state=open，X 如 2/tweets/search/recent?query=知行Bot",
   }),
 });
 
 const describe = (accounts: readonly AccountConfig[]): string => {
   const head =
-    "以用户连上的 GitHub 或 X 账号的身份读平台接口，只读不写，经白泽控制面转发，回平台的原始回包（多半是 JSON）。" +
+    "以用户连上的 GitHub 或 X 账号的身份读平台接口，只读不写，经知行Bot控制面转发，回平台的原始回包（多半是 JSON）。" +
     "查 issue、看仓库、搜推文用它；发帖、评论、回复一律走 create_draft。" +
     "在电脑浏览器里登录的号读不了接口，但能起草，批了由电脑上的浏览器发。";
   if (accounts.length === 0) return `${head}\n现在没有接口授权的 GitHub 或 X 账号，要读就请用户去账号页连一个。`;
@@ -164,7 +164,7 @@ export function createAccountReadTool(options: {
         });
       } catch (error) {
         if (signal?.aborted === true) throw error;
-        throw new Error(`连不上白泽的账号代理，没读成：${error instanceof Error ? error.message : String(error)}`, {
+        throw new Error(`连不上知行Bot的账号代理，没读成：${error instanceof Error ? error.message : String(error)}`, {
           cause: error,
         });
       }

@@ -386,7 +386,7 @@ export class AgentHub {
       (candidate) => candidate.kind === "local" && this.isOnline(candidate.computerId),
     );
     if (connection === undefined) {
-      throw new DiscoveryError("这条连接只在本机用，探测要你的电脑开着白泽", 409);
+      throw new DiscoveryError("这条连接只在本机用，探测要你的电脑开着知行Bot", 409);
     }
     const requestId = randomUUID();
     const result = await new Promise<McpDiscoveryResult | "disconnected">((resolve) => {
@@ -413,7 +413,7 @@ export class AgentHub {
       )
         this.#settleDiscovery(requestId, "disconnected");
     });
-    if (result === "disconnected") throw new DiscoveryError("本机电脑断开了，请打开白泽后重试");
+    if (result === "disconnected") throw new DiscoveryError("本机电脑断开了，请打开知行Bot后重试");
     if (!result.ok) throw new DiscoveryError(DISCOVERY_FAILURE_MESSAGES[result.reason]);
     return result.operations;
   }

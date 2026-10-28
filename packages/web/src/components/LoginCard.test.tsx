@@ -63,7 +63,7 @@ describe("登录卡写在哪台电脑上登录", () => {
   });
 
   it("电脑不在线：主机名后面隔空格再接「不在线」", () => {
-    expect(card("none", { status: "offline" }).note).toBe("远程电脑 mac-mini 不在线，打开电脑上的白泽后再点登录。");
+    expect(card("none", { status: "offline" }).note).toBe("远程电脑 mac-mini 不在线，打开电脑上的知行Bot后再点登录。");
   });
 
   it("过期：主机名后面是全角逗号，不留空格", () => {

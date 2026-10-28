@@ -67,9 +67,9 @@ type Props = {
 };
 
 const PERMISSION_TEXT: Record<NotifyPermission, string> = {
-  default: "浏览器还没允许白泽发通知。允许之后，上面那个开关开着才弹得出系统通知。",
+  default: "浏览器还没允许知行Bot发通知。允许之后，上面那个开关开着才弹得出系统通知。",
   granted: "已开启，Bot 找你时浏览器会弹系统通知。",
-  denied: "浏览器拒绝了白泽的通知。要收通知，到地址栏左边的网站设置里把「通知」改成允许。",
+  denied: "浏览器拒绝了知行Bot的通知。要收通知，到地址栏左边的网站设置里把「通知」改成允许。",
   unsupported: "这个浏览器发不了系统通知。",
 };
 
@@ -146,8 +146,8 @@ const OpenAtLoginRow = () => {
       <p className="group-label">桌面 App</p>
       <div className="row-card">
         <span>
-          <b>开机时启动白泽</b>
-          <small>登录这台 Mac 后自动打开白泽，连上这台电脑，Bot 不用等你开 App。</small>
+          <b>开机时启动知行Bot</b>
+          <small>登录这台 Mac 后自动打开知行Bot，连上这台电脑，Bot 不用等你开 App。</small>
           {item.error === null ? null : (
             <small className="grant-error" role="alert" data-testid="open-at-login-error">
               {item.error}
@@ -158,7 +158,7 @@ const OpenAtLoginRow = () => {
           type="button"
           role="switch"
           aria-checked={item.value === "on"}
-          aria-label="开机时启动白泽"
+          aria-label="开机时启动知行Bot"
           className={`switch${item.value === "on" ? " is-on" : ""}`}
           data-testid="open-at-login-switch"
           disabled={item.value === "unknown"}

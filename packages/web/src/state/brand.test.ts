@@ -5,7 +5,7 @@ import type { ReadyState } from "./types.js";
 
 const book = (version: number, voice: string) =>
   BrandBook.parse({
-    facts: "白泽明理",
+    facts: "知行Bot 明理",
     voice,
     taboo: "",
     assetsDir: null,

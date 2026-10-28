@@ -1,7 +1,7 @@
 /**
- * 把白泽 Bot 控制面嵌进知行人生的同一个 Hono 应用：
- * - 一切白泽路由挂在 /assistant 前缀下（HTTP 由子应用承接，WS 由 listen.ts 升级分发）；
- * - 账号统一：知行人生的 duowei_session 是唯一会话，首次访问按需 provisioning 出白泽用户行；
+ * 把知行Bot 控制面嵌进知行人生的同一个 Hono 应用：
+ * - 一切知行Bot路由挂在 /assistant 前缀下（HTTP 由子应用承接，WS 由 listen.ts 升级分发）；
+ * - 账号统一：知行人生的 duowei_session 是唯一会话，首次访问按需 provisioning 出知行Bot用户行；
  * - BAIZE_ENABLED 不设时这里什么都不做，知行人生单独跑不受影响。
  */
 import { Hono } from "hono";
@@ -39,14 +39,14 @@ export function mountBaize(app: Hono, accounts: Accounts, store: Store): void {
 
   const boot = bootBaize(app, accounts, store);
 
-  // 知行人生会话 → 白泽用户。白泽子应用自己的认证中间件在 external 模式下只验这个 user 存在。
-  // health 和例行 webhook 是白泽的公开面，不拦（子应用内部也各认一份白名单）。
+  // 知行人生会话 → 知行Bot用户。知行Bot子应用自己的认证中间件在 external 模式下只验这个 user 存在。
+  // health 和例行 webhook 是知行Bot的公开面，不拦（子应用内部也各认一份白名单）。
   const publicHook = new RegExp(`^${BAIZE_PATH_PREFIX}/api/hooks/[^/]+$`);
   app.use(`${BAIZE_PATH_PREFIX}/api/*`, async (c, next) => {
     if (c.req.path === `${BAIZE_PATH_PREFIX}/api/health` || publicHook.test(c.req.path)) return next();
     const current = await boot;
     const provisionExternalUser = provision;
-    if (current === null || provisionExternalUser === null) return c.json({ error: "白泽子系统没起来" }, 503);
+    if (current === null || provisionExternalUser === null) return c.json({ error: "知行Bot子系统没起来" }, 503);
     const duo = await accounts.userFromSecret(readSecret(c));
     if (duo === null || duo.kind === "agent") return c.json({ error: "请先登录" }, 401);
     if (duo.disabled) return c.json({ error: "账号已停用" }, 403);
@@ -55,7 +55,7 @@ export function mountBaize(app: Hono, accounts: Accounts, store: Store): void {
     await next();
   });
 
-  // 白泽 Web 构建产物。文件不存在的路径落到 notFound，由它回 index.html 做 SPA 兜底。
+  // 知行Bot Web 构建产物。文件不存在的路径落到 notFound，由它回 index.html 做 SPA 兜底。
   if (config.webDir) {
     app.use(
       `${BAIZE_PATH_PREFIX}/*`,
@@ -100,7 +100,7 @@ function bootBaize(app: Hono, accounts: Accounts, store: Store): Promise<Handles
       };
       return handles;
     } catch (error) {
-      console.error("白泽子系统启动失败", error);
+      console.error("知行Bot子系统启动失败", error);
       await sql.end().catch(() => undefined);
       return null;
     }
@@ -112,7 +112,7 @@ function bootBaize(app: Hono, accounts: Accounts, store: Store): Promise<Handles
 export async function baizeReady(): Promise<void> {
   if (booting === null) return;
   const current = await booting;
-  if (current === null) throw new Error("白泽子系统启动失败，见日志");
+  if (current === null) throw new Error("知行Bot子系统启动失败，见日志");
 }
 
 /** listen.ts 在 baizeReady() 之后调用，boot 必然已落定。 */

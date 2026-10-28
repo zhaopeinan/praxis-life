@@ -64,7 +64,7 @@ export async function uploadAttachment(
     return uploaded;
   } catch {
     // 网络异常和服务器正文可能包含凭据或请求查询串，工具只返回固定文案。
-    throw new Error("配图传到白泽失败，过一会儿再起草");
+    throw new Error("配图传到知行Bot失败，过一会儿再起草");
   }
 }
 
@@ -100,6 +100,6 @@ export async function downloadAttachment(live: (() => AttachmentLive) | undefine
     }
     return Buffer.concat(parts, size);
   } catch {
-    throw new Error("配图从白泽下载失败，请稍后重试");
+    throw new Error("配图从知行Bot下载失败，请稍后重试");
   }
 }

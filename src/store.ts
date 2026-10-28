@@ -448,7 +448,7 @@ export class Store {
         portal_json TEXT NOT NULL DEFAULT '{}',
         integrations_json TEXT NOT NULL DEFAULT '{}'
       )`,
-      // 全站键值配置（管理员可写）。目前放白泽模型网关：key='model_gateway'，
+      // 全站键值配置（管理员可写）。目前放知行Bot模型网关：key='model_gateway'，
       // value 是 JSON { upstreamBaseUrl, apiKey, planModel, fastModel }。apiKey 只写不读。
       `CREATE TABLE IF NOT EXISTS app_settings (
         key TEXT PRIMARY KEY,

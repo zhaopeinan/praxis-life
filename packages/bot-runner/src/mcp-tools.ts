@@ -104,7 +104,7 @@ async function callProxy(
     });
   } catch (error) {
     if (signal?.aborted === true) throw error;
-    throw new Error(`工具连接「${connection.name}」连不上白泽工具代理：${describeMcpFailure(error)}`, {
+    throw new Error(`工具连接「${connection.name}」连不上知行Bot工具代理：${describeMcpFailure(error)}`, {
       cause: error,
     });
   }
@@ -113,11 +113,11 @@ async function callProxy(
     const parsed = ApiError.safeParse(body);
     const reason = parsed.success ? parsed.data.error : "没有返回错误说明";
     throw new Error(
-      `工具「${request.tool}」调用失败，白泽工具代理回 ${response.status}：${redactCredential(reason, `Bearer ${live.gateway.apiKey}`)}`,
+      `工具「${request.tool}」调用失败，知行Bot工具代理回 ${response.status}：${redactCredential(reason, `Bearer ${live.gateway.apiKey}`)}`,
     );
   }
   const parsed = McpProxyCallResponse.safeParse(body);
-  if (!parsed.success) throw new Error(`工具「${request.tool}」调用失败：白泽工具代理返回的内容格式不正确`);
+  if (!parsed.success) throw new Error(`工具「${request.tool}」调用失败：知行Bot工具代理返回的内容格式不正确`);
   return parsed.data;
 }
 

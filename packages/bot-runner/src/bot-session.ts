@@ -93,7 +93,7 @@ export interface BotSession {
 }
 
 const gatewayProvider = (gateway: Gateway) => ({
-  name: "白泽模型网关",
+  name: "知行Bot模型网关",
   baseUrl: gateway.baseUrl,
   apiKey: gateway.apiKey,
   api: "openai-completions" as const,
@@ -339,7 +339,7 @@ async function openSession(spec: SessionSpec) {
     // noExtensions 让 resource loader 丢掉整套 enabledExtensions（`core/resource-loader.js` 257、383、403-405）：
     // 自动发现的 agentDir/extensions 和 cwd/.pi/extensions（`core/package-manager.js` 2055、2037）、settings 里
     // 写的扩展路径（2000、2006）、settings 里装的包带的扩展（710-718）、内置扩展（739-743）都在这套里。
-    // 还能进来的只有命令行的 additionalExtensionPaths（白泽没传）和这里的 extensionFactories，后者走
+    // 还能进来的只有命令行的 additionalExtensionPaths（知行Bot没传）和这里的 extensionFactories，后者走
     // loadFinalExtensionSet 另一条路（560-566），不受它影响。
     noExtensions: true,
     extensionFactories: [spec.extension],
@@ -372,7 +372,7 @@ export async function createBotSession(options: BotSessionOptions): Promise<BotS
     settings: options.settings,
     skillsDir,
     systemPrompt:
-      "你是白泽 Bot，在主人的电脑上替主人干活。说中文，回答先给结论再给依据。能用工具查到的就查，不猜。不确定要不要做的事先问，牵涉花钱、发出去、删东西的操作要走审批。",
+      "你是知行Bot，在主人的电脑上替主人干活。说中文，回答先给结论再给依据。能用工具查到的就查，不猜。不确定要不要做的事先问，牵涉花钱、发出去、删东西的操作要走审批。",
     appendSystemPrompt: [
       `你叫 ${options.name}${options.tags.length === 0 ? "" : `，标签 ${options.tags.join("、")}`}`,
       `共享区的绝对路径是 ${options.dirs.sharedDir}。要交给用户或别的 Bot 的文件放在这里，读写共享区无需审批。`,

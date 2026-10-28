@@ -22,7 +22,7 @@ export function menuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] {
   const loginItem: MenuItemConstructorOptions[] = deps.packaged
     ? [
         {
-          label: "开机时启动白泽",
+          label: "开机时启动知行Bot",
           type: "checkbox",
           checked: deps.openAtLogin(),
           click: (item) => deps.setOpenAtLogin(item.checked),
@@ -31,9 +31,9 @@ export function menuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] {
     : [];
   return [
     {
-      label: "白泽",
+      label: "知行Bot",
       submenu: [
-        { role: "about", label: "关于白泽" },
+        { role: "about", label: "关于知行Bot" },
         { label: `版本 ${deps.version}`, enabled: false },
         { label: "检查更新…", click: deps.checkForUpdates },
         { type: "separator" },
@@ -42,7 +42,7 @@ export function menuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] {
         { label: "控制面设置…", click: deps.openSettings },
         ...loginItem,
         { type: "separator" },
-        { role: "quit", label: "退出白泽" },
+        { role: "quit", label: "退出知行Bot" },
       ],
     },
     { role: "editMenu" },

@@ -27,7 +27,7 @@ export const loginFlowNote = (flow: LoginFlow | undefined, where: string): { tex
     case "closed":
       return { text: "登录页已收起，要登再点一次。", alert: false };
     case "offline":
-      return { text: `${beforeChinese(where)}不在线，打开电脑上的白泽后再点登录。`, alert: true };
+      return { text: `${beforeChinese(where)}不在线，打开电脑上的知行Bot后再点登录。`, alert: true };
     case "refused":
       return { text: `登录窗口没打开：${flow.message}`, alert: true };
     case "failed":

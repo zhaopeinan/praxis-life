@@ -523,7 +523,7 @@ export function createApp(deps: AppDeps): Hono<Env> & { closeMcpClients(): Promi
     if (!body.ok) return c.json({ error: body.error }, 400);
     const { attempt } = body.value;
     if (!agents.canDeliver(account.computerId))
-      return c.json({ error: "账号所在的电脑不在线，打开电脑上的白泽后再点登录" }, 409);
+      return c.json({ error: "账号所在的电脑不在线，打开电脑上的知行Bot后再点登录" }, 409);
     const queued = await db.transaction((tx) =>
       enqueueDownlink(tx, account.computerId, {
         type: "browser_login",
@@ -532,7 +532,7 @@ export function createApp(deps: AppDeps): Hono<Env> & { closeMcpClients(): Promi
         attempt,
       }),
     );
-    if (!queued) return c.json({ error: "账号所在的电脑不在线，打开电脑上的白泽后再点登录" }, 409);
+    if (!queued) return c.json({ error: "账号所在的电脑不在线，打开电脑上的知行Bot后再点登录" }, 409);
     await agents.flushOutbox(account.computerId);
     return c.json(LoginAccountResponse.parse({ account, attempt }), 202);
   });
@@ -657,7 +657,7 @@ export function createApp(deps: AppDeps): Hono<Env> & { closeMcpClients(): Promi
     if (computer.kind !== "remote") return c.json({ error: "只有云电脑能开终端" }, 400);
     const liveId = LiveId.parse(randomUUID());
     if (!agents.sendLive(computer.id, { t: "terminal_open", liveId }))
-      return c.json({ error: "云电脑不在线，等它连上白泽后再开终端" }, 409);
+      return c.json({ error: "云电脑不在线，等它连上知行Bot后再开终端" }, 409);
     return c.json(OpenTerminalResponse.parse({ liveId }), 202);
   });
 

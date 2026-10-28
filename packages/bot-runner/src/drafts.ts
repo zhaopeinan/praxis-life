@@ -277,7 +277,7 @@ async function specOf(
  * 上行报文没有回音，拒了模型也以为改成了。
  */
 async function editOnHub(live: (() => AttachmentLive) | undefined, draftId: DraftId, body: DraftEditRequest) {
-  if (live === undefined) throw new Error("草稿没改：白泽的连接配置还没下发，过一会儿再调。");
+  if (live === undefined) throw new Error("草稿没改：知行Bot的连接配置还没下发，过一会儿再调。");
   const { hub, gateway, laneHeaders } = live();
   let response: Response;
   try {
@@ -289,7 +289,7 @@ async function editOnHub(live: (() => AttachmentLive) | undefined, draftId: Draf
       redirect: "error",
     });
   } catch {
-    throw new Error("草稿没改：连不上白泽，过一会儿再调。");
+    throw new Error("草稿没改：连不上知行Bot，过一会儿再调。");
   }
   if (response.ok) {
     await response.body?.cancel();
@@ -297,7 +297,7 @@ async function editOnHub(live: (() => AttachmentLive) | undefined, draftId: Draf
   }
   const json: unknown = await response.json().catch(() => null);
   const error = typeof json === "object" && json !== null ? (json as { error?: unknown }).error : undefined;
-  throw new Error(`草稿没改：${typeof error === "string" ? error : `白泽回了 ${response.status}`}`);
+  throw new Error(`草稿没改：${typeof error === "string" ? error : `知行Bot回了 ${response.status}`}`);
 }
 
 export function createDraftTools(options: {

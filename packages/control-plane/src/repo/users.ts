@@ -51,7 +51,7 @@ export async function findUserByEmail(db: Db, email: string): Promise<User | nul
 }
 
 /**
- * 嵌进宿主（知行人生）时的 provisioning：宿主用户 id 直接当白泽用户 id（两边 id 都只是字符串），
+ * 嵌进宿主（知行人生）时的 provisioning：宿主用户 id 直接当知行Bot用户 id（两边 id 都只是字符串），
  * 首次见到才建行。密码哈希是不可能有账号匹配的占位串——合并模式下登录路由根本不开。
  * 并发首访撞主键/邮箱唯一约束时认输重查，谁插进去算谁的。
  */

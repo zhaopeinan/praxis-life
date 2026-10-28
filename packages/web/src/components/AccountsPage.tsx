@@ -310,7 +310,7 @@ const ComputersSection = ({ computers, ready }: { computers: Record<string, Comp
       {pairing.status === "shown" ? (
         <div className="row-card computer-pairing" data-testid="computer-pairing" role="status">
           <span>
-            <b>远程电脑建好了，把这串交给那台电脑上的白泽代理</b>
+            <b>远程电脑建好了，把这串交给那台电脑上的知行Bot 代理</b>
             <small>只显示这一次。关掉就看不到了，丢了只能重置。</small>
             <code data-testid="computer-pairing-id">{pairing.pairing.computerId}</code>
             <code data-testid="computer-pairing-token">{pairing.pairing.token}</code>
@@ -328,7 +328,7 @@ const ComputersSection = ({ computers, ready }: { computers: Record<string, Comp
         <div className="row-card">
           <span>
             <b>加一台远程电脑</b>
-            <small>合上本机它也照样跑。在那台电脑上装白泽代理，用这里给的 token 连上来。</small>
+            <small>合上本机它也照样跑。在那台电脑上装知行Bot 代理，用这里给的 token 连上来。</small>
             {pairing.status === "failed" ? (
               <small className="grant-error" role="alert" data-testid="computer-add-error">
                 没建成：{pairing.message}

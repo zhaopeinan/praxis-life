@@ -220,6 +220,7 @@ fi
 
 step "白泽：确保 Postgres 容器（${BAIZE_PG_CONTAINER}，只绑 127.0.0.1:${BAIZE_PG_PORT_HOST}）"
 remote "set -e
+        mkdir -p $BAIZE_PG_VOLUME
         podman network exists $BAIZE_NETWORK || podman network create $BAIZE_NETWORK >/dev/null
         if ! podman container exists $BAIZE_PG_CONTAINER; then
           podman run -d --name $BAIZE_PG_CONTAINER --restart unless-stopped \

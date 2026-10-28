@@ -12,7 +12,7 @@ const offer = Message.parse({
   body: {
     kind: "routine_offer",
     botId: "bot-assistant",
-    name: "白泽开源推广周报",
+    name: "知行Bot 开源推广周报",
     instruction: "读上周的数据写周报",
     cron: "0 18 * * 5",
     executorBotId: "bot-assistant",
