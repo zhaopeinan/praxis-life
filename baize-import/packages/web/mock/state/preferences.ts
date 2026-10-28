@@ -1,0 +1,93 @@
+import { Preference, type BotId, type MessageId } from "@baize/shared";
+import { at, groups, nextSuffix, skills } from "./store.js";
+
+export const preferences = new Map<string, Preference>();
+
+// 照 U12：小服一开始记着 5 条，在单聊里再教一句就是第 6 条。
+const SEEDED: { botId: string; text: string; private: boolean }[] = [
+  { botId: "bot_service", text: "回客户先称呼对方名字", private: false },
+  { botId: "bot_service", text: "交期只说确定的日子，不说「尽快」", private: false },
+  { botId: "bot_service", text: "退款超过 500 元先问我", private: false },
+  { botId: "bot_service", text: "Lisa 喜欢先看结论", private: true },
+  { botId: "bot_service", text: "工单标题别超过 15 个字", private: false },
+];
+
+export const seedPreferences = (): void => {
+  preferences.clear();
+  SEEDED.forEach((seed, index) => {
+    const preference = Preference.parse({
+      id: `prf_seed_${index + 1}`,
+      botId: seed.botId,
+      text: seed.text,
+      sourceMessageId: null,
+      private: seed.private,
+      createdAt: at(index),
+    });
+    preferences.set(preference.id, preference);
+  });
+};
+
+// 分享包偏好有 50 条上限，界面要能碰到上限，教一句一条太慢，测试从这里直接种。
+export const seedManyPreferences = (botId: BotId, count: number): void => {
+  for (let n = 1; n <= count; n += 1) {
+    const preference = Preference.parse({
+      id: `prf_${nextSuffix()}`,
+      botId,
+      text: `第 ${n} 条记住的偏好`,
+      sourceMessageId: null,
+      private: false,
+      createdAt: at(n),
+    });
+    preferences.set(preference.id, preference);
+  }
+};
+
+export const preferencesOf = (botId: string): Preference[] =>
+  [...preferences.values()].filter((preference) => preference.botId === botId);
+
+// 真运行器里是 Bot 自己判断要不要调 remember_preference；mock 只认「以后」开头的一句。
+// 这一步只提议，要记的话还没进偏好表，点了卡上的「记住」才由 rememberPreference 写。
+export const learnFrom = (text: string): string | null => {
+  const trimmed = text.trim();
+  return trimmed.startsWith("以后") ? trimmed.slice(0, 200) : null;
+};
+
+export const rememberPreference = (
+  botId: BotId,
+  text: string,
+  isPrivate: boolean,
+  sourceMessageId: MessageId | null,
+): Preference => {
+  const preference = Preference.parse({
+    id: `prf_${nextSuffix()}`,
+    botId,
+    text,
+    sourceMessageId,
+    private: isPrivate,
+    createdAt: new Date().toISOString(),
+  });
+  preferences.set(preference.id, preference);
+  return preference;
+};
+
+export const forgetPreference = (id: string): Preference | null => {
+  const preference = preferences.get(id);
+  if (preference === undefined) return null;
+  preferences.delete(id);
+  return preference;
+};
+
+export const markPreferencePrivate = (id: string, isPrivate: boolean): Preference | null => {
+  const preference = preferences.get(id);
+  if (preference === undefined) return null;
+  const next = Preference.parse({ ...preference, private: isPrivate });
+  preferences.set(id, next);
+  return next;
+};
+
+export const profileOf = (botId: string) => ({
+  preferences: preferencesOf(botId).length,
+  skills: [...skills.values()].filter((skill) => skill.botId === botId).length,
+  projects: [...groups.values()].filter((group) => group.kind === "team" && group.botIds.some((id) => id === botId))
+    .length,
+});

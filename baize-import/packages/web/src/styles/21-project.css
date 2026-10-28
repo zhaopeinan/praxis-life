@@ -1,0 +1,329 @@
+.project-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  align-items: flex-start;
+  margin-bottom: var(--space-7);
+}
+
+.project-head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-head h1 {
+  margin: 0 0 var(--space-3);
+  color: var(--fg-1);
+  font: var(--type-title);
+}
+
+.project-goal,
+.project-cadence {
+  margin: 0 0 var(--space-2);
+  color: var(--fg-2);
+}
+
+.project-cadence {
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+.project-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: center;
+  margin-top: var(--space-5);
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+.project-progress b {
+  color: var(--fg-1);
+  font: var(--type-metric);
+  font-variant-numeric: tabular-nums;
+}
+
+.project-progress progress {
+  flex: 1;
+  min-width: var(--space-12);
+  max-width: calc(var(--space-12) * 3);
+}
+
+.project-up {
+  color: var(--success);
+}
+
+.project-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+.project-metrics li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: baseline;
+}
+
+.project-metrics b {
+  color: var(--fg-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.project-metric-name {
+  display: inline-flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  min-width: calc(var(--space-12) * 2);
+  color: var(--fg-2);
+}
+
+.project-metric-goal {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--fg-3);
+}
+
+.project-open-group {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-3);
+  align-items: center;
+  height: var(--control-h-md);
+  padding: 0 var(--space-6);
+}
+
+/* 对话区随内容收缩，话长了封顶在里面滚，不会把等你和成果顶到屏幕外。 */
+.project-thread {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(var(--space-12) * 3);
+  margin: var(--space-4) 0 var(--space-8);
+}
+
+.project-latest {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-3) var(--space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.project-turn-me {
+  align-self: flex-end;
+  max-width: 80%;
+  margin: 0;
+}
+
+.project-turn-bot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--fg-1);
+}
+
+.project-turn-who {
+  display: inline-flex;
+  gap: var(--space-3);
+  align-items: center;
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+.project-turn-note {
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+.project-older {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-3);
+  align-items: center;
+  align-self: flex-start;
+  padding: var(--space-3) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-3);
+  font: var(--type-caption);
+  cursor: pointer;
+}
+
+.project-older:hover {
+  color: var(--fg-1);
+}
+
+.project-block {
+  margin-bottom: var(--space-8);
+  padding: var(--space-7);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.project-block-head {
+  display: flex;
+  gap: var(--space-4);
+  align-items: baseline;
+  min-width: 0;
+  padding-bottom: var(--space-5);
+}
+
+.project-block-head h3 {
+  flex: none;
+  margin: 0;
+  color: var(--fg-1);
+  font: var(--type-heading);
+}
+
+.project-working,
+.project-block-count {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-4);
+  font: var(--type-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-fold {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-1);
+}
+
+.project-fold > summary {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  color: var(--fg-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.project-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-fold[open] > summary {
+  margin-bottom: var(--space-5);
+}
+
+/* 周复盘收着是成果里的一行，点开在这一行下面接正文，不跳走。 */
+.project-review {
+  border-top: 1px solid var(--border-1);
+}
+
+.project-review:first-child {
+  border-top: 0;
+}
+
+.project-review > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.project-review > summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-review > summary > svg:last-child {
+  color: var(--fg-3);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.project-review[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+
+/* 复盘是 Bot 写的，一长串链接或命令会撑出成果栏；正文、链接、行内代码都折，代码围栏照旧在自己里面横向滚。 */
+.project-review-body {
+  min-width: 0;
+  padding: 0 var(--space-3) var(--space-5);
+  color: var(--fg-1);
+  overflow-wrap: anywhere;
+}
+
+/* 任务卡上的目标入口和编辑表单 */
+.task-goal {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-3);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.task-goal:hover {
+  color: var(--fg-1);
+}
+
+.task-goal-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-end;
+}
+
+.task-goal-form .field {
+  min-width: 0;
+}
+
+.task-goal-form .field input {
+  width: 9rem;
+  max-width: 100%;
+}
+
+.task-goal-form select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.task-goal-actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.task-goal-actions .primary-button {
+  height: var(--control-h-sm);
+  padding: 0 var(--space-5);
+  font: var(--type-caption);
+}
+
+.task-goal-switch {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+.task-goal-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--danger);
+  font: var(--type-caption);
+}
+
+.archive-group-confirm {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.archive-group-confirm:hover:not(:disabled) {
+  background: var(--danger-soft);
+}

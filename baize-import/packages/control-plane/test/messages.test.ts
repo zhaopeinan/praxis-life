@@ -1,0 +1,469 @@
+import {
+  ApiError,
+  ContentPlanId,
+  CreateBotResponse,
+  CreateGroupResponse,
+  DraftId,
+  MessageId,
+  MessageListResponse,
+  MessageResponse,
+  RunId,
+  SendMessageResponse,
+  type Message,
+} from "@baize/shared";
+import { randomUUID } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { accounts, contentPlans, drafts, messages, publications } from "../src/db/schema.js";
+import { newId } from "../src/ids.js";
+import { appendMessage } from "../src/repo/messages.js";
+import { helloAgent } from "./helpers/agent.js";
+import { startTestServer, type TestServer } from "./helpers/client.js";
+import { createTestDb, type TestDb } from "./helpers/db.js";
+import { PASSWORD, makeComputer, makeUser } from "./helpers/fixtures.js";
+import { connectPush } from "./helpers/ws.js";
+
+let database: TestDb;
+let server: TestServer;
+
+beforeAll(async () => {
+  database = await createTestDb();
+  server = await startTestServer(database.db);
+});
+
+afterAll(async () => {
+  await server.close();
+  await database.close();
+});
+
+async function loggedInClient() {
+  const user = await makeUser(database.db);
+  const client = server.client();
+  expect((await client.login(user.email, PASSWORD)).status).toBe(200);
+  return client;
+}
+
+async function clientWithGroup() {
+  const client = await loggedInClient();
+  const created = CreateBotResponse.parse(await (await client.post("/api/bots", {})).json());
+  return { client, groupId: created.group.id };
+}
+
+describe("发消息", () => {
+  it("存下用户消息并回 201", async () => {
+    const { client, groupId } = await clientWithGroup();
+    const response = await client.post(`/api/groups/${groupId}/messages`, { text: "看看电脑里有哪些文件" });
+
+    expect(response.status).toBe(201);
+    const { message } = SendMessageResponse.parse(await response.json());
+    expect(message.groupId).toBe(groupId);
+    expect(message.body).toEqual({ kind: "user", text: "看看电脑里有哪些文件" });
+  });
+
+  it("推一条 ServerPush message 给这个用户的全部连接", async () => {
+    const { client, groupId } = await clientWithGroup();
+    const cookie = client.cookie ?? "";
+    const one = await connectPush(server.server.port, cookie);
+    const two = await connectPush(server.server.port, cookie);
+
+    try {
+      const { message } = SendMessageResponse.parse(
+        await (await client.post(`/api/groups/${groupId}/messages`, { text: "派个活" })).json(),
+      );
+
+      for (const push of [await one.next(), await two.next()]) {
+        expect(push.type).toBe("message");
+        expect(push.type === "message" ? push.message : null).toEqual(message);
+      }
+    } finally {
+      one.close();
+      two.close();
+    }
+  });
+
+  it("不推给别的用户", async () => {
+    const { client, groupId } = await clientWithGroup();
+    const bystander = await loggedInClient();
+    const own = CreateBotResponse.parse(await (await bystander.post("/api/bots", {})).json());
+    const listener = await connectPush(server.server.port, bystander.cookie ?? "");
+
+    try {
+      await client.post(`/api/groups/${groupId}/messages`, { text: "只给我自己看" });
+      await bystander.post(`/api/groups/${own.group.id}/messages`, { text: "我自己的" });
+
+      // 后发的自己那条先到，说明前面别人那条根本没进这条连接，不靠超时。
+      const push = await listener.next();
+      expect(push.type === "message" ? push.message.body : null).toEqual({
+        kind: "user",
+        text: "我自己的",
+      });
+    } finally {
+      listener.close();
+    }
+  });
+
+  it("空文本返回 400", async () => {
+    const { client, groupId } = await clientWithGroup();
+    const response = await client.post(`/api/groups/${groupId}/messages`, { text: "" });
+    expect(response.status).toBe(400);
+    ApiError.parse(await response.json());
+  });
+});
+
+/** 一个有电脑、账号、单 Bot 群和一份内容计划的用户，能往库里直接塞草稿和发布记录。 */
+async function publisher() {
+  const user = await makeUser(database.db);
+  const computer = await makeComputer(database.db, user.id);
+  const client = server.client();
+  expect((await client.login(user.email, PASSWORD)).status).toBe(200);
+  const created = CreateBotResponse.parse(await (await client.post("/api/bots", {})).json());
+  const groupId = created.group.id;
+  const accountId = newId();
+  await database.db.insert(accounts).values({
+    id: accountId,
+    ownerId: user.id,
+    computerId: computer.computerId,
+    platform: "x",
+    via: "api",
+    handle: "@page",
+    login: "valid",
+    tier: "confirm_publish",
+  });
+  const planId = ContentPlanId.parse(newId());
+  await database.db
+    .insert(contentPlans)
+    .values({ id: planId, ownerId: user.id, groupId, botId: created.bot.id, title: "一周内容" });
+  const draft = async (label: string, inPlan: boolean): Promise<DraftId> => {
+    const id = DraftId.parse(newId());
+    await database.db.insert(drafts).values({
+      id,
+      ownerId: user.id,
+      groupId,
+      botId: created.bot.id,
+      planId: inPlan ? planId : null,
+      accountId,
+      platform: "x",
+      content: { kind: "post", title: label, text: label, images: [], github: null },
+      contentHash: label,
+    });
+    return id;
+  };
+  const publish = async (draftId: string | null, minutesAgo: number): Promise<string> => {
+    const id = newId();
+    await database.db.insert(publications).values({
+      id,
+      ownerId: user.id,
+      draftId,
+      groupId,
+      accountId,
+      platform: "x",
+      url: `https://x.com/i/status/${id}`,
+      externalId: id,
+      publishedAt: new Date(Date.now() - minutesAgo * 60_000),
+    });
+    return id;
+  };
+  return { client, groupId, planId, draft, publish };
+}
+
+describe("读消息", () => {
+  it("按时间正序返回，翻页用 before 往前取", async () => {
+    const { client, groupId } = await clientWithGroup();
+    // 直接写库排状态。走 POST 的话派活那一步还会在中间插系统消息，这里只想验翻页。
+    for (const text of ["一", "二", "三", "四", "五"]) {
+      await appendMessage(database.db, groupId, { kind: "user", text });
+    }
+
+    const page = MessageListResponse.parse(await (await client.get(`/api/groups/${groupId}/messages?limit=2`)).json());
+    expect(page.messages.map(textOf)).toEqual(["四", "五"]);
+    expect(page.hasMore).toBe(true);
+
+    const older = MessageListResponse.parse(
+      await (await client.get(`/api/groups/${groupId}/messages?limit=2&before=${page.messages[0]?.id}`)).json(),
+    );
+    expect(older.messages.map(textOf)).toEqual(["二", "三"]);
+    expect(older.hasMore).toBe(true);
+
+    const oldest = MessageListResponse.parse(
+      await (await client.get(`/api/groups/${groupId}/messages?limit=2&before=${older.messages[0]?.id}`)).json(),
+    );
+    expect(oldest.messages.map(textOf)).toEqual(["一"]);
+    expect(oldest.hasMore, "翻到头了就没有更多").toBe(false);
+  });
+
+  it("新群是空的", async () => {
+    const { client, groupId } = await clientWithGroup();
+    const page = MessageListResponse.parse(await (await client.get(`/api/groups/${groupId}/messages`)).json());
+    expect(page).toEqual({
+      messages: [],
+      hasMore: false,
+      approvals: [],
+      handoffs: [],
+      drafts: [],
+      plans: [],
+      publications: [],
+    });
+  });
+
+  it("只带本页草稿的发布记录，计划卡下的草稿也算", async () => {
+    const { client, groupId, planId, draft, publish } = await publisher();
+    const older = await draft("上一页的稿子", false);
+    const onPage = await draft("本页的稿子", false);
+    const nested = await draft("计划里的稿子", true);
+    const unpublished = await draft("还没发的稿子", false);
+
+    await appendMessage(database.db, groupId, { kind: "draft", draftId: older });
+    await appendMessage(database.db, groupId, { kind: "user", text: "接着来" });
+    await appendMessage(database.db, groupId, { kind: "draft", draftId: onPage });
+    await appendMessage(database.db, groupId, { kind: "plan", planId });
+    await appendMessage(database.db, groupId, { kind: "draft", draftId: unpublished });
+
+    const olderPublication = await publish(older, 30);
+    const nestedPublication = await publish(nested, 20);
+    const onPagePublication = await publish(onPage, 10);
+    await publish(null, 5);
+
+    const page = MessageListResponse.parse(await (await client.get(`/api/groups/${groupId}/messages?limit=3`)).json());
+    expect(
+      page.publications.map((publication) => publication.id),
+      "本页的草稿卡和计划卡下的草稿，按发布时间升序；上一页的和没挂草稿的不带",
+    ).toEqual([nestedPublication, onPagePublication]);
+    expect(page.publications[1]?.draftId).toBe(onPage);
+
+    const previous = MessageListResponse.parse(
+      await (await client.get(`/api/groups/${groupId}/messages?limit=3&before=${page.messages[0]?.id}`)).json(),
+    );
+    expect(previous.publications.map((publication) => publication.id)).toEqual([olderPublication]);
+  });
+
+  it("本页的卡指到别人的草稿或计划，那边的发布记录也不带", async () => {
+    const me = await publisher();
+    const other = await publisher();
+    const mine = await me.draft("我的稿子", false);
+    const theirs = await other.draft("别人的稿子", false);
+    const theirsInPlan = await other.draft("别人计划里的稿子", true);
+    await appendMessage(database.db, me.groupId, { kind: "draft", draftId: mine });
+    await appendMessage(database.db, me.groupId, { kind: "draft", draftId: theirs });
+    await appendMessage(database.db, me.groupId, { kind: "plan", planId: other.planId });
+    const minePublication = await me.publish(mine, 10);
+    await other.publish(theirs, 20);
+    await other.publish(theirsInPlan, 15);
+
+    const page = MessageListResponse.parse(await (await me.client.get(`/api/groups/${me.groupId}/messages`)).json());
+    expect(
+      page.publications.map((publication) => publication.id),
+      "草稿卡和计划卡指到别人的也只回自己的发布记录",
+    ).toEqual([minePublication]);
+  });
+});
+
+describe("别人的群", () => {
+  it("读和写都返回 404", async () => {
+    const { client, groupId } = await clientWithGroup();
+    await appendMessage(database.db, groupId, { kind: "user", text: "私密" });
+
+    const stranger = await loggedInClient();
+    const read = await stranger.get(`/api/groups/${groupId}/messages`);
+    const write = await stranger.post(`/api/groups/${groupId}/messages`, { text: "插一句" });
+
+    expect(read.status).toBe(404);
+    ApiError.parse(await read.json());
+    expect(write.status).toBe(404);
+    ApiError.parse(await write.json());
+
+    const mine = MessageListResponse.parse(await (await client.get(`/api/groups/${groupId}/messages`)).json());
+    expect(mine.messages.map(textOf), "别人的写入不应当落进来").toEqual(["私密"]);
+  });
+
+  it("不存在的群返回 404", async () => {
+    const client = await loggedInClient();
+    const response = await client.get("/api/groups/00000000-0000-0000-0000-000000000000/messages");
+    expect(response.status).toBe(404);
+    ApiError.parse(await response.json());
+  });
+});
+
+describe("跨群改消息", () => {
+  it("拿别的群里那条消息的 id 发 bot_text，既改不动那条也不落进自己的群", async () => {
+    const victimOwner = await makeUser(database.db);
+    const victimClient = server.client();
+    expect((await victimClient.login(victimOwner.email, PASSWORD)).status).toBe(200);
+    const victimBot = CreateBotResponse.parse(await (await victimClient.post("/api/bots", {})).json());
+    const victimMessageId = MessageId.parse(randomUUID());
+    const victimBody = { kind: "bot", botId: victimBot.bot.id, text: "别人群里的正文", streaming: false } as const;
+    await database.db
+      .insert(messages)
+      .values({ id: victimMessageId, groupId: victimBot.group.id, body: victimBody, createdAt: new Date() });
+
+    const attackerOwner = await makeUser(database.db);
+    const computer = await makeComputer(database.db, attackerOwner.id);
+    const attackerClient = server.client();
+    expect((await attackerClient.login(attackerOwner.email, PASSWORD)).status).toBe(200);
+    const attackerBot = CreateBotResponse.parse(await (await attackerClient.post("/api/bots", {})).json());
+    const { agent } = await helloAgent(server.server.port, computer.computerId, computer.token);
+    const push = await connectPush(server.server.port, attackerClient.cookie ?? "");
+    const ownMessageId = MessageId.parse(randomUUID());
+    // 上行报文的 runId 要真属于这个 Bot 在这个群里，否则整条在归属校验那里就被丢掉，撞号这一关根本走不到。
+    // 直接插一行而不是发条消息派活：派活会在攻击者群里留下一条用户消息，最后那句「只该有后发那条」就不成立了。
+    const runId = RunId.parse(randomUUID());
+    await database.sql`
+      INSERT INTO runs (id, bot_id, group_id, computer_id, started_at)
+      VALUES (${runId}, ${attackerBot.bot.id}, ${attackerBot.group.id}, ${computer.computerId}, now())
+    `;
+
+    try {
+      agent.send({
+        type: "bot_text",
+        runId,
+        botId: attackerBot.bot.id,
+        groupId: attackerBot.group.id,
+        messageId: victimMessageId,
+        delta: "偷改",
+        done: true,
+      });
+      // 后发的这条能落地，它先推出来就说明上一条什么也没做，不靠超时。
+      agent.send({
+        type: "bot_text",
+        runId,
+        botId: attackerBot.bot.id,
+        groupId: attackerBot.group.id,
+        messageId: ownMessageId,
+        delta: "自己的正文",
+        done: true,
+      });
+
+      const pushes: Awaited<ReturnType<typeof push.next>>[] = [];
+      for (;;) {
+        const received = await push.next();
+        pushes.push(received);
+        // 等到收尾那一片再读库，不然读到的是刚插进去、正文还空着的空壳。
+        if (received.type === "message_delta" && received.messageId === ownMessageId && received.done) break;
+      }
+      const victimPage = MessageListResponse.parse(
+        await (await victimClient.get(`/api/groups/${victimBot.group.id}/messages`)).json(),
+      );
+      expect(victimPage.messages.find((m) => m.id === victimMessageId)?.body, "别人群里那条一个字都不该变").toEqual(
+        victimBody,
+      );
+
+      expect(
+        pushes.filter(
+          (p) =>
+            (p.type === "message" ? p.message.id : p.type === "message_delta" ? p.messageId : null) === victimMessageId,
+        ),
+        "撞号那条不该推出任何东西",
+      ).toEqual([]);
+
+      const attackerPage = MessageListResponse.parse(
+        await (await attackerClient.get(`/api/groups/${attackerBot.group.id}/messages`)).json(),
+      );
+      expect(
+        attackerPage.messages.map((m) => m.id),
+        "自己群里只该有后发那条，撞号那条整条丢掉",
+      ).toEqual([ownMessageId]);
+      expect(attackerPage.messages[0]?.body).toEqual({
+        kind: "bot",
+        botId: attackerBot.bot.id,
+        text: "自己的正文",
+        streaming: false,
+      });
+    } finally {
+      agent.close();
+      push.close();
+    }
+  });
+});
+
+describe("消息版本", () => {
+  it("同一条消息每改一次，推出去的 revision 加一，历史读到的是最后一版", async () => {
+    const owner = await makeUser(database.db);
+    const computer = await makeComputer(database.db, owner.id);
+    const client = server.client();
+    expect((await client.login(owner.email, PASSWORD)).status).toBe(200);
+    const created = CreateBotResponse.parse(await (await client.post("/api/bots", {})).json());
+    const { agent } = await helloAgent(server.server.port, computer.computerId, computer.token);
+    const push = await connectPush(server.server.port, client.cookie ?? "");
+    const runId = RunId.parse(randomUUID());
+    await database.sql`
+      INSERT INTO runs (id, bot_id, group_id, computer_id, started_at)
+      VALUES (${runId}, ${created.bot.id}, ${created.group.id}, ${computer.computerId}, now())
+    `;
+    const route = { runId, botId: created.bot.id, groupId: created.group.id };
+    const saying = MessageId.parse(randomUUID());
+    const tool = { ...route, callId: "call-1", tool: "read", view: { kind: "bash", command: "cat a.md" } as const };
+
+    try {
+      agent.send({ type: "bot_text", ...route, messageId: saying, delta: "先说第一段，", done: false });
+      agent.send({ type: "bot_text", ...route, messageId: saying, delta: "再说第二段。", done: false });
+      agent.send({ type: "bot_tool_call", ...tool, status: "running", durationMs: null });
+      agent.send({ type: "bot_tool_call", ...tool, status: "ok", durationMs: 12 });
+      // 文字还在流，run_done 把它收成定稿，这又是一次改写；花费卡最后落，看到它就说明前面的都推完了。
+      agent.send({ type: "run_done", ...route, steps: 1, inputTokens: 1, outputTokens: 1 });
+
+      const revisions: string[] = [];
+      let toolId: string | null = null;
+      for (;;) {
+        const received = await push.next();
+        if (received.type === "message_delta" && received.messageId === saying)
+          revisions.push(`delta:${received.revision}:${received.done}`);
+        if (received.type === "message" && received.message.id === saying)
+          revisions.push(`shell:${received.message.revision}`);
+        if (received.type === "message" && received.message.body.kind === "tool_call") {
+          toolId = received.message.id;
+          revisions.push(`tool:${received.message.revision}:${received.message.body.status}`);
+        }
+        if (received.type === "message" && received.message.body.kind === "cost") break;
+      }
+      expect(revisions, "空壳 0 版，每段 delta 和每次收尾、改状态都加一").toEqual([
+        "shell:0",
+        "delta:1:false",
+        "delta:2:false",
+        "tool:0:running",
+        "tool:1:ok",
+        "delta:3:true",
+      ]);
+
+      const page = MessageListResponse.parse(
+        await (await client.get(`/api/groups/${created.group.id}/messages`)).json(),
+      );
+      const said = page.messages.find((m) => m.id === saying);
+      expect(said?.revision, "历史和最后一帧同版").toBe(3);
+      expect(said?.body).toEqual({
+        kind: "bot",
+        botId: created.bot.id,
+        text: "先说第一段，再说第二段。",
+        streaming: false,
+      });
+      expect(page.messages.find((m) => m.id === toolId)?.revision).toBe(1);
+
+      const single = MessageResponse.parse(await (await client.get(`/api/messages/${saying}`)).json());
+      expect(single.message, "按 id 取单条，和历史里那一条同版同文").toEqual(said);
+      const stranger = server.client();
+      const other = await makeUser(database.db);
+      expect((await stranger.login(other.email, PASSWORD)).status).toBe(200);
+      expect((await stranger.get(`/api/messages/${saying}`)).status, "别人的消息查不到").toBe(404);
+    } finally {
+      agent.close();
+      push.close();
+    }
+  });
+
+  it("团队群成员删光后，群里的消息按 id 也取不到，和读历史一样是 404", async () => {
+    const client = await loggedInClient();
+    const sales = CreateBotResponse.parse(await (await client.post("/api/bots", { name: "小销" })).json());
+    const buyer = CreateBotResponse.parse(await (await client.post("/api/bots", { name: "小采" })).json());
+    const opened = await client.post("/api/groups", { title: "定价", botIds: [sales.bot.id, buyer.bot.id] });
+    expect(opened.status).toBe(201);
+    const team = CreateGroupResponse.parse(await opened.json());
+    const said = await appendMessage(database.db, team.group.id, { kind: "user", text: "这单怎么报价" });
+    expect((await client.get(`/api/messages/${said.id}`)).status, "群里还有成员，取得到").toBe(200);
+
+    expect((await client.delete(`/api/bots/${buyer.bot.id}`)).status).toBe(204);
+    expect((await client.delete(`/api/bots/${sales.bot.id}`)).status).toBe(204);
+    expect((await client.get(`/api/groups/${team.group.id}/messages`)).status).toBe(404);
+    expect((await client.get(`/api/messages/${said.id}`)).status, "空群的消息单拉也是 404，Web 据此清掉漏档").toBe(404);
+  });
+});
+
+function textOf(message: Message): string {
+  return message.body.kind === "user" ? message.body.text : "";
+}

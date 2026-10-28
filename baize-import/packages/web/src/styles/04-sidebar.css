@@ -1,0 +1,183 @@
+/* ---------- 02 三栏主窗口 ---------- */
+
+.window {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--panel-w);
+  grid-template-rows: auto 1fr;
+  height: 100%;
+  background: var(--bg-app);
+}
+
+.sidebar {
+  display: flex;
+  grid-row: 1 / -1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 0;
+  padding: var(--space-5) var(--space-4);
+  overflow-y: auto;
+  border-right: 1px solid var(--border-1);
+  background: var(--bg-sidebar);
+}
+
+.sidebar .nav {
+  display: flex;
+  gap: var(--space-5);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  color: var(--fg-2);
+  font: var(--type-ui);
+  text-align: left;
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .sidebar .nav:hover {
+    background: var(--bg-hover);
+  }
+}
+
+.sidebar .nav[aria-current="page"] {
+  background: var(--bg-selected);
+  color: var(--fg-1);
+}
+
+.sidebar .nav.lite {
+  color: var(--fg-3);
+}
+
+.sidebar .nav.lite[aria-current="page"] {
+  color: var(--fg-1);
+}
+
+.sidebar .count {
+  display: grid;
+  min-width: var(--space-7);
+  height: var(--space-7);
+  margin-left: auto;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: var(--type-label);
+  place-items: center;
+}
+
+.sidebar .sect {
+  display: flex;
+  align-items: center;
+  padding: var(--space-6) var(--space-5) var(--space-2);
+  color: var(--fg-4);
+  font: var(--type-caption);
+}
+
+.sect-add {
+  display: grid;
+  width: var(--space-8);
+  height: var(--space-8);
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+  color: var(--fg-3);
+  place-items: center;
+}
+
+.sect-add:hover {
+  background: var(--bg-hover);
+  color: var(--fg-1);
+}
+
+/* 项目行可能带角标和经手人，会折成几行。色点对齐第一行，而不是整行的中线。 */
+.sidebar .nav.project {
+  align-items: flex-start;
+}
+
+.sidebar .dot {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-4);
+  margin-top: var(--space-2);
+  border-radius: var(--radius-xs);
+}
+
+.project-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.project-body b {
+  overflow: hidden;
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-body small {
+  color: var(--fg-4);
+  font: var(--type-caption);
+}
+
+/* --fg-4 压在选中底色上，深色下只有 3.3，选中行的副标题抬一档到 --fg-2。 */
+.sidebar .nav[aria-current="page"] .project-body small {
+  color: var(--fg-2);
+}
+
+.project-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.side-low {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: auto;
+  padding-top: var(--space-5);
+}
+
+.sidebar .foot {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.account-button {
+  display: flex;
+  flex: 1;
+  gap: var(--space-5);
+  align-items: center;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  color: var(--fg-2);
+  font: var(--type-ui);
+  text-align: left;
+}
+
+.account-button:hover {
+  background: var(--bg-hover);
+}
+
+.account-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+
+.account-body b {
+  color: var(--fg-1);
+  font: var(--type-ui);
+}
+
+.account-body small {
+  color: var(--fg-3);
+  font: var(--type-caption);
+}

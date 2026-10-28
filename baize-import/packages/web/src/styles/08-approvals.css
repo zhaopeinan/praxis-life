@@ -1,0 +1,121 @@
+.card-approval {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border-color: var(--info-soft);
+  background: var(--info-soft);
+}
+
+.card-approval .card-title {
+  color: var(--info);
+}
+
+.card-approval[data-status="expired"] {
+  border-color: var(--border-1);
+  background: var(--bg-surface);
+}
+
+.card-approval[data-status="expired"] .card-title,
+.card-approval[data-status="expired"] .approval-summary,
+.approval-expired-text {
+  color: var(--fg-3);
+}
+
+.approval-summary {
+  margin: 0;
+  color: var(--fg-1);
+  font: var(--type-body);
+}
+
+.approval-target {
+  margin: 0;
+  color: var(--fg-2);
+  font: var(--type-caption);
+}
+
+.approval-summary .tool-view-content {
+  flex-wrap: wrap;
+  white-space: normal;
+}
+
+.approval-summary .tool-view-detail {
+  white-space: normal;
+}
+
+.approval-actions {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: flex-end;
+}
+
+.approval-expired-text {
+  margin: 0;
+  font: var(--type-caption);
+  white-space: nowrap;
+}
+
+/* .primary-button 是给整宽表单按钮做的，没有左右内边距。放进一行得自己撑开，高度也跟旁边的 ghost 对齐。 */
+.approval-actions .primary-button {
+  height: var(--control-h-md);
+  padding: 0 var(--space-6);
+}
+
+.approval-actions .primary-button small,
+.today-row-action small {
+  margin-left: var(--space-2);
+  font: var(--type-caption);
+  opacity: 0.8;
+}
+
+.approval-compact {
+  flex-direction: row;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-5);
+  border-color: var(--border-1);
+  background: var(--bg-surface);
+}
+
+.approval-compact-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-3);
+  font: var(--type-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-pill {
+  flex: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  font: var(--type-caption);
+}
+
+.card-approval:is([data-status="voided"], [data-status="timed_out"]) .approval-pill {
+  background: var(--bg-surface);
+  color: var(--fg-3);
+}
+
+.approval-details {
+  color: var(--fg-2);
+  font: var(--type-caption);
+}
+
+.approval-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.approval-details[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+.approval-details .tool-view-detail {
+  margin-left: var(--space-3);
+  white-space: normal;
+}

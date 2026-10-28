@@ -1,0 +1,1589 @@
+import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
+import { chromium, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import {
+  AccountListResponse,
+  BotListResponse,
+  BotTemplate,
+  ComputerListResponse,
+  ControlToAgent,
+  GroupResponse,
+  PokerTableResponse,
+  RoutineListResponse,
+  RoutineResponse,
+  ToolListResponse,
+  ToolResponse,
+  UsageResponse,
+  type Platform,
+  type PokerTableView,
+} from "@baize/shared";
+import { newHand } from "../../control-plane/src/poker/engine.js";
+import { seatNextHand } from "../../control-plane/src/poker/seating.js";
+import { startFakePlatforms, type FakePlatforms } from "../src/fake-platforms.js";
+import { startTestMcp, type TestMcp } from "../src/mcp.js";
+import { startStack, type Stack } from "../src/stack.js";
+import { startUpstream, type ChatRequest, type ScriptedTurn } from "../src/upstream.js";
+import { fakeChrome } from "./fake-chrome.js";
+import { contentText, POKER_HINT, pokerScript, pokerTurn } from "./fake-poker.js";
+
+const screenshots = fileURLToPath(new URL("./screenshots/", import.meta.url));
+const webDir = fileURLToPath(new URL("../../web/", import.meta.url));
+const viteBin = fileURLToPath(new URL("../../web/node_modules/vite/bin/vite.js", import.meta.url));
+const check = expect.configure({ timeout: 30_000 });
+const usage = { input: 1_200, output: 30 };
+
+// 1x1 的 PNG。发布器在打开发布页那一步就因登录过期停下，图的内容不重要，只要是工作目录里的真文件。
+const COVER = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+const PROJECT_ASK = "推广白泽的开源仓库，年底 1000 星";
+const PROJECT = "白泽开源推广";
+const DOUYIN_ASK = "把抖音号做起来，年底 1000 粉";
+const DOUYIN = "抖音号起步";
+const XHS_ASK = "@阿文 写第一篇小红书，讲白泽是怎么来的，配上封面图";
+const XHS_TITLE = "我们为什么做白泽";
+const CADENCE_ASK = "下周多发点小红书";
+const REPLY_ASK = "@小满 issue 12 里 lark-fan 问能不能接飞书，回他一句";
+const REVIEW_ASK = "周五复盘加上小红书的数据";
+const METRIC_BASELINE_ASK = "@老周 记录 GitHub 星数，当前读数 375";
+const METRIC_UPDATE_ASK = "@老周 更新 GitHub 星数，当前读数 412";
+const ISSUE_URL = "https://github.com/baize/baize-bot/issues/12";
+const ROUTINE_ASK = "每周五六点给白泽开源推广出一份周报";
+const ROUTINE_NAME = "白泽开源推广周报";
+const ROUTINE_INSTRUCTION = "汇总白泽开源推广这一周各平台发了什么、阅读和互动多少，写成一份周报";
+const TEAM_ASK = "白泽开源推广想加一个排版的";
+const HELPER_TASK = "查一下小红书图文排版常见的做法，列三条";
+const LAYOUT_ASK = "@小墨 给第一篇小红书排个版";
+const TEACH_ASK = "标题别超过 15 个字";
+const PREFERENCE = "小红书标题都在 15 个字以内";
+const TITLE_ASK = "给周四那篇起个标题";
+const TITLE_AGAIN_ASK = "再起一个标题";
+const WRITER_DESCRIPTION = "写小红书图文和长文，只起草不直接发";
+const PRIVATE_ASK = "只给我记住：私人号的验收暗号是 p2-private-731";
+const PRIVATE_PREFERENCE = "私人号的验收暗号是 p2-private-731";
+const PLUGIN = "分享验收插件";
+const PLUGIN_SECRET = "Bearer p2-acceptance-d-secret";
+const BUDGET_ROUTINE = "预算到点验收";
+const POKER_SEEDS = ["p3-acceptance-9576", "p3-acceptance-hand-2-4", "p3-acceptance-hand-3-100"] as const;
+
+// 剧本要用的 id 跑起来才知道，各段拿到后填进来。
+const ids: { project: string; accounts: Partial<Record<Platform, string>> } = { project: "", accounts: {} };
+
+const accountOf = (platform: Platform): string => {
+  const id = ids.accounts[platform];
+  if (id === undefined) throw new Error(`剧本要用 ${platform} 账号，但还没连上`);
+  return id;
+};
+
+// 下周第 day 天（0 是周一）北京时间 hour 点。排在下周，publishTick 不会把它们当到点的发出去。
+const nextWeek = (day: number, hour: number): string => {
+  const beijing = new Date(Date.now() + 8 * 3_600_000);
+  const untilMonday = (8 - beijing.getUTCDay()) % 7 || 7;
+  return new Date(
+    Date.UTC(beijing.getUTCFullYear(), beijing.getUTCMonth(), beijing.getUTCDate() + untilMonday + day, hour - 8),
+  ).toISOString();
+};
+
+const call = (id: string, name: string, args: Record<string, unknown>): ScriptedTurn => ({
+  textChunks: [],
+  toolCall: { id, name, args },
+  usage,
+});
+const say = (...textChunks: string[]): ScriptedTurn => ({ textChunks, usage });
+
+const turn = (request: ChatRequest): ScriptedTurn => {
+  const lastUser = request.messages.findLastIndex((message) => message.role === "user");
+  const content = request.messages[lastUser]?.content;
+  const prompt = typeof content === "string" ? content : JSON.stringify(content ?? "");
+  const current = prompt.split("当前这条：").at(-1) ?? prompt;
+  const afterTool = request.messages.slice(lastUser + 1).some((message) => message.role === "tool");
+
+  if (current.includes(PROJECT_ASK)) {
+    return afterTool
+      ? say("方案卡发好了，你看一眼，没问题就点开始。")
+      : call("offer-oss", "propose_project", {
+          name: PROJECT,
+          goal: "白泽开源仓库年底到 1000 星",
+          team: [
+            { name: "阿文", tags: ["小红书"], description: "写小红书图文，只起草不直接发" },
+            { name: "小满", tags: ["社区"], description: "回 GitHub 和 X 上的评论，回复先给你看" },
+            { name: "老周", tags: ["GitHub"], description: "写 GitHub 讨论和 X 推文，不改代码" },
+          ],
+          platforms: [
+            { kind: "supported", platform: "github" },
+            { kind: "supported", platform: "x" },
+            { kind: "supported", platform: "xiaohongshu" },
+          ],
+          cadence: "每周 2 篇小红书、3 条 X、1 篇 GitHub 讨论",
+          firstStep: "阿文先写第一篇小红书，讲白泽是怎么来的",
+        });
+  }
+  if (current.includes(XHS_ASK)) {
+    return afterTool
+      ? say("第一篇小红书写好了，在等你批。")
+      : call("xhs-first", "create_draft", {
+          accountId: accountOf("xiaohongshu"),
+          content: {
+            kind: "post",
+            title: XHS_TITLE,
+            text: "一个人的公司，也想有一支队伍。白泽把写稿、回评论、排计划交给几个 AI 队友，你只管点头。",
+            images: [{ path: "cover.png" }],
+          },
+        });
+  }
+  if (current.includes("排这个项目本周的计划")) {
+    return afterTool
+      ? say("本周计划排好了，5 条，等你确认。")
+      : call("plan-week", "propose_plan", {
+          title: "本周推广计划",
+          drafts: [
+            {
+              accountId: accountOf("x"),
+              content: { kind: "post", text: "白泽开源了：一个人也能带一支 AI 小队做推广。github.com/baize/baize-bot" },
+              scheduledAt: nextWeek(0, 10),
+            },
+            {
+              accountId: accountOf("xiaohongshu"),
+              content: {
+                kind: "post",
+                title: "我用 5 个 AI 做推广",
+                text: "我用 5 个 AI 做推广，一周省下 10 个小时。它们各管一摊：写稿、回评论、排计划。",
+                images: [{ path: "cover.png" }],
+              },
+              scheduledAt: nextWeek(1, 12),
+            },
+            {
+              accountId: accountOf("github"),
+              content: {
+                kind: "post",
+                title: "白泽 v0.2 想听听你的用法",
+                text: "我们在收集大家用白泽做推广的方式，欢迎在这里留言。",
+                github: { repo: "baize/baize-bot", as: "discussion" },
+              },
+              scheduledAt: nextWeek(2, 10),
+            },
+            {
+              accountId: accountOf("x"),
+              content: { kind: "post", text: "本周白泽新增：计划卡一次批完，改过的地方记进品牌手册。" },
+              scheduledAt: nextWeek(3, 10),
+            },
+            {
+              accountId: accountOf("xiaohongshu"),
+              content: {
+                kind: "post",
+                title: "AI 队友怎么分工",
+                text: "写稿的、回评论的、排计划的，各自有边界，越界的事先问你。",
+                images: [{ path: "cover.png" }],
+              },
+              scheduledAt: nextWeek(3, 20),
+            },
+          ],
+        });
+  }
+  if (current.includes(CADENCE_ASK)) {
+    return afterTool
+      ? say("好，下周小红书从 2 篇加到 3 篇，周一的计划里给你看。")
+      : call("cadence-xhs", "set_cadence", {
+          projectGroupId: ids.project,
+          cadence: "每周 3 篇小红书、3 条 X、1 篇 GitHub 讨论",
+        });
+  }
+  if (current.includes(REPLY_ASK)) {
+    return afterTool
+      ? say("回复写好了，等你批。")
+      : call("reply-lark", "create_draft", {
+          accountId: accountOf("github"),
+          content: {
+            kind: "reply",
+            text: "可以的，飞书的接入在路线图上，下个版本先支持消息推送，进展会在这个 issue 里同步。",
+            replyTo: { url: ISSUE_URL, author: "lark-fan", quote: "这个能接飞书吗" },
+          },
+        });
+  }
+  if (current.includes(DOUYIN_ASK)) {
+    return afterTool
+      ? say("方案卡发好了。抖音现在还不支持自动发，先把队伍和节奏定下来。")
+      : call("offer-douyin", "propose_project", {
+          name: DOUYIN,
+          goal: "抖音号年底到 1000 粉",
+          team: [{ name: "阿影", tags: ["短视频"], description: "写短视频脚本和标题，不剪片子不发视频" }],
+          platforms: [{ kind: "unsupported", name: "抖音" }],
+          cadence: "每周 3 条短视频脚本",
+          firstStep: "阿影先写 3 条短视频脚本给你挑",
+        });
+  }
+  if (current.includes(REVIEW_ASK)) {
+    return say("记下了，这周五的复盘会把小红书的阅读和收藏一起列出来。");
+  }
+  if (current.includes(METRIC_BASELINE_ASK) || current.includes(METRIC_UPDATE_ASK)) {
+    const value = current.includes(METRIC_BASELINE_ASK) ? 375 : 412;
+    return afterTool
+      ? say(`已记下 GitHub 星数 ${value}，项目进度更新了。`)
+      : call(`metric-stars-${value}`, "report_metric", { value, label: "GitHub 星数" });
+  }
+  if (current.includes(ROUTINE_ASK)) {
+    return afterTool
+      ? say("例行卡发好了，在等你确认里，点「加上」就每周五 18:00 出周报。")
+      : call("routine-weekly", "propose_routine", {
+          name: ROUTINE_NAME,
+          instruction: ROUTINE_INSTRUCTION,
+          cron: "0 18 * * 5",
+          boundary: "read_only",
+          projectGroupId: ids.project,
+        });
+  }
+  if (current.includes(ROUTINE_INSTRUCTION)) {
+    return say("本周周报：小红书发了 2 篇，GitHub 回了 1 条评论，X 发了 3 条。详细数字等下周对比。");
+  }
+  if (current.includes(HELPER_TASK)) {
+    return say("小红书图文排版常见三条：封面大字标题，正文分段加小标题，每段不超过 4 行。");
+  }
+  if (current.includes(TEAM_ASK)) {
+    const tools = request.messages.slice(lastUser + 1).filter((message) => message.role === "tool").length;
+    if (tools === 0) return call("helper-layout", "call_helper", { kind: "researcher", task: HELPER_TASK });
+    if (tools === 1) {
+      return call("team-layout", "propose_team", {
+        projectGroupId: ids.project,
+        members: [
+          {
+            kind: "new",
+            name: "小墨",
+            tags: ["排版"],
+            description: "给小红书图文排版、做封面，不写正文不发布",
+            note: "阿文写完的稿子现在要你自己排版，小墨接过来你就只用批",
+          },
+          {
+            kind: "new",
+            name: "阿彩",
+            tags: ["配图"],
+            description: "给小红书图文配插图，不写正文不发布",
+            note: "先不带：现在一周 3 篇，封面图阿文自己配得过来，发得多了再请",
+            suggested: true,
+          },
+        ],
+      });
+    }
+    return say("建队卡发好了，想给白泽开源推广加一个排版，你挑一下。");
+  }
+  if (current.includes(LAYOUT_ASK)) {
+    return say("排好了：封面大字标题，正文分三段，每段加一个小标题。");
+  }
+  if (current.includes(TEACH_ASK)) {
+    return afterTool
+      ? say(`记下了，以后${PREFERENCE}`)
+      : call("remember-title", "remember_preference", { text: PREFERENCE, private: false });
+  }
+  if (current.includes(PRIVATE_ASK)) {
+    return afterTool
+      ? say("这条私人偏好记下了，不默认分享。")
+      : call("remember-private", "remember_preference", { text: PRIVATE_PREFERENCE, private: true });
+  }
+  if (current.includes(TITLE_ASK)) return say("「一个人带一支 AI 小队」");
+  if (current.includes(TITLE_AGAIN_ASK)) return say("「白泽：一个人的公司也能有队伍」");
+  throw new Error(`假上游没有这条请求的剧本：${prompt.slice(-200)}`);
+};
+
+const freePort = (): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (address === null || typeof address === "string") {
+        server.close();
+        reject(new Error("没拿到 Vite 端口"));
+        return;
+      }
+      server.close(() => resolve(address.port));
+    });
+  });
+
+const startWeb = async (apiPort: number): Promise<{ url: string; child: ChildProcess }> => {
+  const port = await freePort();
+  const url = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, [viteBin], {
+    cwd: webDir,
+    env: { ...process.env, API_PORT: String(apiPort), WEB_PORT: String(port) },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  const collect = (chunk: Buffer) => {
+    output = `${output}${chunk.toString()}`.slice(-4_000);
+  };
+  child.stdout?.on("data", collect);
+  child.stderr?.on("data", collect);
+  try {
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      if (child.exitCode !== null) throw new Error(`Vite 提前退出：${output}`);
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(1_000) });
+        if (response.ok) return { url, child };
+      } catch {
+        await delay(100);
+      }
+    }
+    throw new Error(`等不到 Vite：${output}`);
+  } catch (error) {
+    await stopWeb(child);
+    throw error;
+  }
+};
+
+const stopWeb = async (child: ChildProcess): Promise<void> => {
+  if (child.exitCode !== null) return;
+  child.kill("SIGTERM");
+  await Promise.race([new Promise((resolve) => child.once("exit", resolve)), delay(5_000)]);
+  if (child.exitCode === null) child.kill("SIGKILL");
+};
+
+const shot = async (page: Page, name: string): Promise<void> => {
+  await page.screenshot({ path: join(screenshots, `${name}.png`) });
+  process.stdout.write(`  截图 ${name}.png\n`);
+};
+
+// P1-7：首页只说人话。运行编号、模型名、任务卡编号是给开发看的，出现在首页就是漏了。
+const assertPlainHome = async (page: Page, stack: Stack): Promise<void> => {
+  const text = await page.locator("body").innerText();
+  const runs = await stack.sql<{ id: string }[]>`SELECT id::text AS id FROM runs`;
+  for (const { id } of runs) check(text.includes(id), `首页不露 runId ${id}`).toBe(false);
+  check(text, "首页不露模型名").not.toMatch(/e2e-(plan|fast)-model|baize:(plan|fast)/);
+  check(text, "首页不露 T- 编号").not.toMatch(/T-\d{4}/);
+};
+
+// 代替系统通知中心：Web 发的原生通知记在页面里，验收读出来看。
+const RECORD_NOTICES = `
+  window.__notices = [];
+  window.Notification = class {
+    static permission = "granted";
+    static requestPermission() { return Promise.resolve("granted"); }
+    constructor(title, options) { window.__notices.push({ title, body: (options && options.body) || "" }); }
+  };
+`;
+
+const notices = async (page: Page): Promise<string> => JSON.stringify(await page.evaluate("window.__notices"));
+
+const openHome = async (page: Page, web: string): Promise<void> => {
+  await page.goto(web);
+  await check(page.getByTestId("today-page")).toBeVisible();
+  await check(page.locator(".today-loading")).toHaveCount(0);
+};
+
+const openSettings = async (page: Page, section: string): Promise<void> => {
+  await page.getByTestId("account-button").click();
+  await page.getByTestId("open-settings").click();
+  await page.getByTestId(`settings-nav-${section}`).click();
+};
+
+const loginCard = (page: Page, accountId: string) =>
+  page.locator(`[data-testid=today-row][data-kind=login][data-account-id="${accountId}"]`);
+
+const pendingRow = (page: Page, kind: "plan" | "draft", text: string) =>
+  page.locator(`[data-testid=today-row][data-kind=${kind}]`).filter({ hasText: text });
+
+const waitFor = async (what: string, probe: () => Promise<boolean> | boolean): Promise<void> => {
+  await check.poll(probe, { message: what }).toBe(true);
+};
+
+const botId = async (stack: Stack, name: string): Promise<string> => {
+  const bot = BotListResponse.parse(await stack.get("/api/bots")).items.find((item) => item.bot.name === name);
+  if (bot === undefined) throw new Error(`没有叫「${name}」的 Bot`);
+  return bot.bot.id;
+};
+
+const putCover = async (stack: Stack, name: string): Promise<void> => {
+  const work = join(stack.dataDir, await botId(stack, name), "work");
+  mkdirSync(work, { recursive: true });
+  writeFileSync(join(work, "cover.png"), COVER);
+};
+
+const draftStatus = async (stack: Stack, title: string): Promise<string | undefined> => {
+  const rows = await stack.sql<{ status: string }[]>`
+    SELECT status FROM drafts WHERE content->>'title' = ${title}`;
+  return rows[0]?.status;
+};
+
+const openProject = async (page: Page, title: string): Promise<void> => {
+  await page.locator(`[data-testid=group-item][data-group-title="${title}"]`).click();
+  await check(page.getByTestId("project-page")).toBeVisible();
+};
+
+const finishedRuns = async (stack: Stack, routineId: string): Promise<number> => {
+  const rows = await stack.sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM routine_runs WHERE routine_id = ${routineId} AND status <> 'running'`;
+  return rows[0]?.n ?? 0;
+};
+
+const routineState = async (stack: Stack, routineId: string): Promise<string | undefined> => {
+  const rows = await stack.sql<{ state: string }[]>`SELECT state FROM routines WHERE id = ${routineId}`;
+  return rows[0]?.state;
+};
+
+const lastUserText = (request: ChatRequest): string => {
+  const content = request.messages.findLast((message) => message.role === "user")?.content;
+  return typeof content === "string" ? content : JSON.stringify(content ?? "");
+};
+
+/** 偏好放在系统提示的记忆段里，不进会话历史，所以只看 system 那几条。 */
+const systemPromptFor = (requests: readonly ChatRequest[], ask: string): string => {
+  const request = requests.findLast((candidate) => lastUserText(candidate).includes(ask));
+  if (request === undefined) throw new Error(`假上游没收到「${ask}」这一句的请求`);
+  return JSON.stringify(
+    request.messages.filter((message) => message.role === "system" || message.role === "developer"),
+  );
+};
+
+const sendInChat = async (page: Page, text: string): Promise<void> => {
+  await page.getByTestId("composer-input").fill(text);
+  await page.getByTestId("composer-send").click();
+};
+
+const skip = (why: string): void => {
+  process.stdout.write(`  跳过：${why}\n`);
+};
+
+const filesUnder = (dir: string): string[] => {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? filesUnder(path) : [path];
+  });
+};
+
+const pokerTable = async (stack: Stack, groupId: string): Promise<PokerTableView> =>
+  PokerTableResponse.parse(await stack.get(`/api/poker/tables/${groupId}`)).table;
+
+const playPokerHand = async (page: Page, stack: Stack, opened: PokerTableView): Promise<PokerTableView> => {
+  if (opened.hand === null) throw new Error("牌桌没有正在打的手牌");
+  const handId = opened.hand.id;
+  for (let actions = 0; actions < 20; actions++) {
+    let ready = opened;
+    await waitFor("牌友出完，轮到你或摊牌", async () => {
+      ready = await pokerTable(stack, opened.groupId);
+      return ready.status === "idle" || ready.hand?.toAct === 4;
+    });
+    check(ready.hand?.id, "续打的是同一手牌").toBe(handId);
+    if (ready.status === "idle") {
+      await check(page.getByTestId("hand-end")).toBeVisible();
+      await check(page.getByTestId("felt-opponent").getByTestId("card-face")).toHaveCount(6);
+      await check(page.getByTestId("board-slot").getByTestId("card-face")).toHaveCount(5);
+      await shot(page, `U15-hand-${opened.hand.number}-showdown`);
+      return ready;
+    }
+    const hand = ready.hand;
+    if (hand === null) throw new Error("续打时手牌不见了");
+    await check(page.getByTestId("action-bar")).toHaveAttribute("data-mine", "true");
+    await check(page.getByTestId("action-pass")).toBeEnabled();
+    await shot(page, `U15-hand-${hand.number}-${hand.view.street}`);
+    const response = page.waitForResponse(
+      (reply) => reply.request().method() === "POST" && reply.url().endsWith(`/poker/hands/${handId}/act`),
+    );
+    await page.getByTestId("action-pass").click();
+    check((await response).status(), "界面过牌或跟注由引擎接受").toBe(200);
+    await waitFor("用户动作已经落定", async () => {
+      const latest = await pokerTable(stack, opened.groupId);
+      return (latest.hand?.view.events.length ?? 0) > hand.view.events.length;
+    });
+  }
+  throw new Error("一手牌超过 20 次用户行动");
+};
+
+const cardsIn = (request: ChatRequest): Set<string> => {
+  const raw = JSON.stringify(request);
+  const suits: Record<string, string> = { "♠": "s", "♥": "h", "♦": "d", "♣": "c" };
+  return new Set([
+    ...(raw.match(/\b[2-9TJQKA][shdc]\b/g) ?? []),
+    ...[...raw.matchAll(/(10|[2-9TJQKA])([♠♥♦♣])/g)].map(
+      (match) => `${match[1] === "10" ? "T" : match[1]}${suits[match[2]!]}`,
+    ),
+  ]);
+};
+
+const run = async (): Promise<void> => {
+  rmSync(screenshots, { recursive: true, force: true });
+  mkdirSync(screenshots, { recursive: true });
+  const piBefore = new Set(filesUnder(join(homedir(), ".pi")));
+  const poker = pokerScript();
+  const upstream = await startUpstream((request) =>
+    pokerTurn(request) === undefined ? turn(request) : poker.script(request),
+  );
+  let seedCalls = 0;
+  const chrome = fakeChrome();
+  let metricsNow = new Date();
+  let routinesNow = new Date();
+  let platforms: FakePlatforms | undefined;
+  let mcp: TestMcp | undefined;
+  let stack: Stack | undefined;
+  let web: { url: string; child: ChildProcess } | undefined;
+  let browser: Browser | undefined;
+  let context: BrowserContext | undefined;
+  let page: Page | undefined;
+  let step = "启动";
+  const begin = (name: string): void => {
+    step = name;
+    process.stdout.write(`${name}\n`);
+  };
+  try {
+    platforms = await startFakePlatforms();
+    const fake = platforms;
+
+    begin("U1 注册，装好白泽，首页什么都不用填");
+    stack = await startStack({
+      upstreamBaseUrl: upstream.baseUrl,
+      priceInputPerM: 300,
+      priceOutputPerM: 1_500,
+      githubApiBaseUrl: fake.githubBaseUrl,
+      xApiBaseUrl: fake.xBaseUrl,
+      metricsNow: () => metricsNow,
+      routinesNow: () => routinesNow,
+      pokerSeed: () => {
+        const seed = POKER_SEEDS[seedCalls++];
+        if (seed === undefined) throw new Error("U15 只应开三手牌");
+        return seed;
+      },
+      makeChrome: chrome.factory,
+      startComputer: false,
+      bootstrap: async (port) => {
+        const started = await startWeb(port);
+        web = started;
+        browser = await chromium.launch(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" });
+        const opened = await browser.newContext({ viewport: { width: 1_440, height: 900 } });
+        context = opened;
+        await opened.addInitScript({ content: RECORD_NOTICES });
+        const first = await opened.newPage();
+        page = first;
+        await first.goto(`${started.url}/register`);
+        await first.getByTestId("register-email").fill("chen@baize-acceptance.example");
+        await first.getByTestId("register-password").fill("acceptance-pass");
+        await first.getByTestId("register-name").fill("陈");
+        await shot(first, "U1-1-register");
+        await first.getByTestId("register-submit").click();
+        await check(first.getByTestId("today-page")).toBeVisible();
+        const cookies = await opened.cookies(started.url);
+        check(cookies.length, "注册后浏览器拿到登录 cookie").toBeGreaterThan(0);
+        return cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+      },
+    });
+    if (web === undefined || page === undefined || context === undefined || browser === undefined) {
+      throw new Error("注册阶段没把页面起来");
+    }
+    const s = stack;
+    const p: Page = page;
+    const ctx: BrowserContext = context;
+    const home = (web as { url: string }).url;
+    // 账号页授权 GitHub 和 X 要跳真平台，这里直接把假平台的令牌挂上，等同授权完回来。代理起来前挂，hello 的 config 就带上。
+    ids.accounts.github = (await s.addAccount({ platform: "github", handle: fake.handles.github, token: "gh-e2e" })).id;
+    ids.accounts.x = (await s.addAccount({ platform: "x", handle: fake.handles.x, token: "x-e2e" })).id;
+    await s.startComputer();
+    await openHome(p, home);
+    await check(p.getByTestId("today-assistant-text")).toContainText("想让我帮你做成什么事");
+    await check(p.locator(".today-template")).toHaveText(["推广一个产品", "运营一个号", "和 AI 打一局"]);
+    const firstHome = await p.locator("body").innerText();
+    for (const word of ["企业", "团队结算", "同事"]) check(firstHome, `首页不出现「${word}」`).not.toContain(word);
+    await assertPlainHome(p, s);
+    await shot(p, "U1-2-today");
+    await openSettings(p, "accounts");
+    await check(p.getByTestId("computer-status")).toHaveAttribute("data-status", "online");
+    await shot(p, "U1-3-computer");
+    await p.getByTestId("settings-close").click();
+
+    begin("U2 一句话开项目，点开始");
+    await p.getByTestId("new-project").click();
+    await p.getByTestId("new-project-input").fill(PROJECT_ASK);
+    await p.getByTestId("new-project-submit").click();
+    const offer = p.getByTestId("project-offer").filter({ hasText: PROJECT });
+    await check(offer).toHaveAttribute("data-status", "offered");
+    await check(offer.getByTestId("project-offer-member")).toHaveCount(3);
+    await check(offer.getByTestId("project-offer-platform")).toHaveCount(3);
+    await shot(p, "U2-1-offer");
+    await offer.getByTestId("project-offer-start").click();
+    await check(p.getByTestId("project-page")).toBeVisible();
+    const projectMatch = /\/p\/([^/?#]+)/.exec(p.url());
+    if (projectMatch?.[1] === undefined) throw new Error(`点开始后没进项目页：${p.url()}`);
+    ids.project = projectMatch[1];
+    await check(p.getByTestId("project-cadence")).toContainText("每周 2 篇小红书");
+    await shot(p, "U2-2-project");
+
+    begin("U3 给它开一个小红书号：账号页主动接入，扫码后多一行已登录");
+    const computerId = ComputerListResponse.parse(await s.get("/api/computers")).computers[0]?.id;
+    if (computerId === undefined) throw new Error("没有本机");
+    const before = AccountListResponse.parse(await s.get("/api/accounts")).accounts;
+    check(
+      before.some((account) => account.platform === "xiaohongshu"),
+      "点开始不会替用户建小红书占位",
+    ).toBe(false);
+    const configsBefore = s.configsApplied();
+    await openSettings(p, "accounts");
+    await p.locator("[data-testid=account-connect-browser][data-platform=xiaohongshu]").click();
+    const xhsRow = p.getByTestId("account-row").filter({ hasText: "小红书" });
+    await check(xhsRow).toHaveAttribute("data-login", "none");
+    await check(xhsRow.getByTestId("login-open"), "接入一点就开登录窗口").toHaveText("等你登录…");
+    await check(xhsRow.getByTestId("login-card-note")).toHaveText("登录窗口已在本机打开，登上后这里会变成已登录。");
+    await waitFor("电脑上开出了登录窗口", () => chrome.waitingLogins() === 1);
+    const placeholder = AccountListResponse.parse(await s.get("/api/accounts")).accounts.find(
+      (account) => account.platform === "xiaohongshu",
+    );
+    if (placeholder === undefined) throw new Error("点接入小红书之后控制面没有这个号");
+    check(placeholder.computerId, "小红书号挂在本机").toBe(computerId);
+    ids.accounts.xiaohongshu = placeholder.id;
+    await waitFor("加了小红书之后电脑收到新 config", () => s.configsApplied() > configsBefore);
+    await shot(p, "U3-1-connect");
+    chrome.scan("白泽工厂日记");
+    await check(xhsRow).toHaveAttribute("data-login", "valid");
+    await check(xhsRow).toContainText("小红书 · 白泽工厂日记");
+    await check(xhsRow.getByTestId("account-tier"), "权限默认发布要确认").toHaveText("发布要确认");
+    await check(xhsRow.getByTestId("login-open"), "登上之后行上不再有登录按钮").toHaveCount(0);
+    await shot(p, "U3-2-accounts");
+    await p.getByTestId("settings-close").click();
+    await putCover(s, "阿文");
+    await p.getByTestId("project-composer-input").fill(XHS_ASK);
+    await p.getByTestId("project-composer-send").click();
+    await waitFor("阿文起好了草稿", async () => (await draftStatus(s, XHS_TITLE)) === "pending");
+    await openHome(p, home);
+    await check(pendingRow(p, "draft", XHS_TITLE)).toBeVisible();
+    await check(loginCard(p, placeholder.id), "号已经登上，第一篇稿子不再要登录卡").toHaveCount(0);
+    await assertPlainHome(p, s);
+    await shot(p, "U3-3-first-draft");
+    skip("登录后 Bot 发一条测试请求确认能用（假浏览器给不出真登录态）");
+
+    begin("U4 周一早上的计划：菜单栏看数，首页改一条，批准");
+    await putCover(s, "主助理");
+    const monday = RoutineListResponse.parse(await s.get("/api/routines")).items.find(
+      (item) => item.name === "周一 09:00 排本周计划" && item.groupId === ids.project,
+    );
+    if (monday === undefined) throw new Error("点开始后没有周一计划的例行");
+    await s.post(`/api/routines/${monday.id}/run`, {});
+    await waitFor("主助理排出计划", async () => {
+      const rows = await s.sql<{ n: number }[]>`SELECT count(*)::int AS n FROM content_plans`;
+      return (rows[0]?.n ?? 0) > 0;
+    });
+    await openHome(p, home);
+    const planRow = pendingRow(p, "plan", "本周推广计划");
+    await check(planRow).toBeVisible();
+    const menubar = await ctx.newPage();
+    await menubar.setViewportSize({ width: 380, height: 560 });
+    await menubar.goto(`${home}/menubar`);
+    await check(menubar.getByTestId("menubar-page")).toContainText("件等你");
+    const pendingBefore = Number(await menubar.locator(".menubar-count").textContent());
+    await assertPlainHome(menubar, s);
+    await shot(menubar, "U4-1-menubar");
+    await planRow.getByTestId("today-expand").click();
+    const plan = planRow.getByTestId("plan-card");
+    await check(plan.getByTestId("plan-draft")).toHaveCount(5);
+    await plan.getByTestId("plan-draft-toggle").nth(1).click();
+    const editor = plan.getByTestId("draft-editor");
+    await editor.fill((await editor.inputValue()).replaceAll("5 个 AI", "一支 AI 小队"));
+    await check(plan.getByTestId("brand-hint")).toBeVisible();
+    await check(plan.getByTestId("plan-approve")).toHaveText("批准 5 条（改了 1 条）");
+    await assertPlainHome(p, s);
+    await shot(p, "U4-2-plan-edit");
+    await plan.getByTestId("plan-approve").click();
+    await check(pendingRow(p, "plan", "本周推广计划")).toHaveCount(0);
+    await menubar.reload();
+    await check(menubar.locator(".menubar-count")).toHaveText(String(pendingBefore - 1));
+    await assertPlainHome(menubar, s);
+    await shot(menubar, "U4-3-menubar-after");
+    await menubar.close();
+    const edited = await s.sql<{ text: string }[]>`
+      SELECT content->>'text' AS text FROM drafts WHERE content->>'title' = '我用 5 个 AI 做推广'`;
+    check(edited[0]?.text, "改过的那条照改后的文字批").toContain("一支 AI 小队");
+    skip("品牌手册积累、下次照着写（第 2 期）");
+
+    begin("U5 随口一句改节奏");
+    await openHome(p, home);
+    const pendingCount = p.getByTestId("today-pending").getByTestId("today-section-count");
+    const countBefore = (await pendingCount.textContent()) ?? "";
+    await p.getByTestId("today-composer-input").fill(CADENCE_ASK);
+    await p.getByTestId("today-composer-send").click();
+    await check(p.getByTestId("today-assistant-text")).toContainText("周一的计划里给你看");
+    await check(pendingCount, "改节奏不多出要确认的事").toHaveText(countBefore);
+    const cadence = await s.sql<{ cadence: string }[]>`SELECT cadence FROM tasks WHERE group_id = ${ids.project}`;
+    check(cadence[0]?.cadence, "节奏落到项目的任务卡上").toContain("每周 3 篇小红书");
+    await assertPlainHome(p, s);
+    await shot(p, "U5-1-cadence");
+
+    begin("U6 回评论：草稿卡带原话，批了发出去，刚做完多一条带链接");
+    await openProject(p, PROJECT);
+    await p.getByTestId("project-composer-input").fill(REPLY_ASK);
+    await p.getByTestId("project-composer-send").click();
+    await waitFor("小满起好了回复", async () => {
+      const rows = await s.sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM drafts WHERE content->>'kind' = 'reply' AND status = 'pending'`;
+      return (rows[0]?.n ?? 0) === 1;
+    });
+    await openHome(p, home);
+    const replyRow = pendingRow(p, "draft", "飞书");
+    await replyRow.getByTestId("today-expand").click();
+    await check(replyRow.getByTestId("draft-quote")).toContainText("这个能接飞书吗");
+    await assertPlainHome(p, s);
+    await shot(p, "U6-1-reply-draft");
+    await replyRow.getByTestId("draft-approve").click();
+    await check(replyRow).toHaveCount(0);
+    await s.publishTick();
+    check(
+      fake.requests().some((request) => request.method === "POST" && request.path.includes("/issues/12/comments")),
+      "假 GitHub 收到 issue 12 的评论",
+    ).toBe(true);
+    await openHome(p, home);
+    const published = p.getByTestId("today-done").locator("a.today-row");
+    await check(published).toHaveCount(1);
+    await check(published).toContainText("GitHub · 已发布");
+    await assertPlainHome(p, s);
+    await shot(p, "U6-2-done");
+    skip("小红书评论回复（本机发布器只接了发帖），评论平台换成 GitHub");
+
+    begin("U7 登录过期：发不出去，首页出登录卡并通知，当场扫码，排着的稿子照常");
+    const xhsDraft = pendingRow(p, "draft", XHS_TITLE);
+    await xhsDraft.getByTestId("today-expand").click();
+    await xhsDraft.getByTestId("draft-approve").click();
+    await check(xhsDraft).toHaveCount(0);
+    await s.publishTick();
+    await waitFor("小红书那条发失败", async () => (await draftStatus(s, XHS_TITLE)) === "failed");
+    const failure = await s.sql<{ failure: string | null; login: string }[]>`
+      SELECT d.failure, a.login FROM drafts d JOIN accounts a ON a.id = d.account_id
+      WHERE d.content->>'title' = ${XHS_TITLE}`;
+    check(failure[0], "发布器认出登录过期，账号跟着变过期").toEqual({ failure: "login_expired", login: "expired" });
+    // 等着发的只剩计划里批过的稿子，过期号照样换成能当场扫码的登录卡，不再是一行只能点去账号页的提示。
+    const expiredCard = loginCard(p, accountOf("xiaohongshu"));
+    await check(expiredCard).toHaveAttribute("data-state", "needed");
+    await check(expiredCard.getByTestId("login-card-title")).toHaveText("小红书 · 白泽工厂日记 登录过期了");
+    await check(expiredCard.getByTestId("login-open")).toHaveText("打开登录窗口");
+    await check(p.locator("[data-testid=today-row][data-kind=account]")).toHaveCount(0);
+    await waitFor("系统通知说登录过期了", async () => (await notices(p)).includes("登录过期"));
+    const planned = await s.sql<{ status: string }[]>`SELECT status FROM drafts WHERE plan_id IS NOT NULL`;
+    check(
+      planned.map((row) => row.status),
+      "过期只卡住发不出去的那条，计划里其余的稿子照常等排期",
+    ).toEqual(["approved", "approved", "approved", "approved", "approved"]);
+    await assertPlainHome(p, s);
+    await shot(p, "U7-1-expired");
+    await openSettings(p, "accounts");
+    const expiredAccount = p.getByTestId("account-row").filter({ hasText: "白泽工厂日记" });
+    await check(expiredAccount).toHaveAttribute("data-login", "expired");
+    await check(expiredAccount.getByTestId("login-open"), "账号页的行上也能重新登录").toHaveText("打开登录窗口");
+    await shot(p, "U7-2-accounts-expired");
+    await p.getByTestId("settings-close").click();
+    await expiredCard.getByTestId("login-open").click();
+    await check(expiredCard).toHaveAttribute("data-state", "opening");
+    await waitFor("电脑上开出了登录窗口", () => chrome.waitingLogins() === 1);
+    await assertPlainHome(p, s);
+    await shot(p, "U7-3-waiting-scan");
+    chrome.scan("白泽工厂日记");
+    await check(expiredCard, "扫码后卡片变成已登录").toHaveAttribute("data-state", "signed_in");
+    await check(expiredCard.getByTestId("login-card-title")).toContainText("白泽工厂日记 已登录");
+    await check(
+      p.getByTestId("today-pending").getByTestId("today-section-count"),
+      "登上之后等你确认不再计这件事，已登录的卡只是回执",
+    ).toHaveCount(0);
+    await check(p.getByTestId("today-page").locator(".today-greeting p")).toHaveText(
+      "没有要你处理的事，其余在按计划跑。",
+    );
+    await check(expiredCard, "服务端那行重拉后没了，已登录的卡还在").toHaveAttribute("data-state", "signed_in");
+    const relogged = await s.sql<
+      { login: string }[]
+    >`SELECT login FROM accounts WHERE id = ${accountOf("xiaohongshu")}`;
+    check(relogged[0]?.login, "账号回到已登录").toBe("valid");
+    const stillPlanned = await s.sql<{ status: string }[]>`SELECT status FROM drafts WHERE plan_id IS NOT NULL`;
+    check(
+      stillPlanned.map((row) => row.status),
+      "重新登录后计划里的稿子照常排着",
+    ).toEqual(["approved", "approved", "approved", "approved", "approved"]);
+    await check(p.getByTestId("today-next"), "周四那条小红书照常排着").toContainText("AI 队友怎么分工");
+    await assertPlainHome(p, s);
+    await shot(p, "U7-4-signed-in");
+    process.stdout.write(`  假 Chrome 收到的 CDP：${chrome.cdpCalls().join(" ")}\n`);
+
+    begin("U8 第二个项目：抖音暂不支持");
+    await p.getByTestId("new-project").click();
+    await p.getByTestId("new-project-input").fill(DOUYIN_ASK);
+    await p.getByTestId("new-project-submit").click();
+    const douyin = p.getByTestId("project-offer").filter({ hasText: DOUYIN });
+    await check(douyin).toHaveAttribute("data-status", "offered");
+    await check(douyin.locator("[data-testid=project-offer-platform][data-supported=false]")).toContainText(
+      "抖音暂不支持",
+    );
+    await shot(p, "U8-1-offer");
+    await douyin.getByTestId("project-offer-start").click();
+    await check(p.getByTestId("project-page")).toBeVisible();
+    await check(p.getByTestId("project-cadence")).toContainText("每周 3 条短视频脚本");
+    await shot(p, "U8-2-project");
+
+    begin("U9 项目页：设目标，Bot 报指标，项目与首页进度跟着变，最新一轮贴着输入框");
+    await openProject(p, PROJECT);
+    await check(p.getByTestId("project-page").locator("h1")).toHaveText(PROJECT);
+    // 当前定目标的入口在项目群的任务卡上，从项目页进群，存好再回项目页。
+    await p.getByTestId("project-open-group").click();
+    await p.getByTestId("task-goal").click();
+    const goalForm = p.getByTestId("task-goal-form");
+    const goalDue = `${new Date().getFullYear()}-12-31T23:59`;
+    await goalForm.getByTestId("task-goal-target").fill("1000");
+    await goalForm.getByTestId("task-goal-unit").fill("星");
+    await goalForm.getByTestId("task-goal-due").fill(goalDue);
+    await check(goalForm.getByTestId("task-goal-target")).toHaveValue("1000");
+    await check(goalForm.getByTestId("task-goal-unit")).toHaveValue("星");
+    await check(goalForm.getByTestId("task-goal-due")).toHaveValue(goalDue);
+    await assertPlainHome(p, s);
+    await shot(p, "U9-1-goal-form");
+    await goalForm.getByTestId("task-goal-save").click();
+    await check(goalForm).toHaveCount(0);
+    await check(p.getByTestId("task-goal"), "还没记过数，不拿 0 充当进度").toHaveText("目标 1000 星 · 还没读到数");
+    await openProject(p, PROJECT);
+    const progress = p.getByTestId("project-progress");
+    await check(progress).toContainText("还没读到数 · 目标 1000 星");
+    await check(progress).toContainText("截止 12-31 23:59");
+    await check(progress.locator("progress"), "没读到数不画进度条").toHaveCount(0);
+    await check(p.getByTestId("project-goal-week"), "还没有样本，不编本周变化").toHaveCount(0);
+    await assertPlainHome(p, s);
+    await shot(p, "U9-2-goal");
+
+    await p.getByTestId("project-composer-input").fill(METRIC_BASELINE_ASK);
+    await p.getByTestId("project-composer-send").click();
+    await check(p.getByTestId("project-latest-turn")).toContainText("已记下 GitHub 星数 375");
+    await check(progress, "Bot 报的第一个读数出现在项目页").toContainText("375 / 1000 星");
+    await check(progress.locator("progress")).toHaveAttribute("value", "375");
+    await check(p.getByTestId("project-goal-week"), "第一个读数是本周基线，变化为零不显示").toHaveCount(0);
+    await assertPlainHome(p, s);
+    await shot(p, "U9-3-metric-baseline");
+
+    const homeProgressPage = await ctx.newPage();
+    try {
+      await openHome(homeProgressPage, home);
+      const running = homeProgressPage
+        .getByTestId("today-running")
+        .getByTestId("today-row")
+        .filter({ hasText: PROJECT });
+      await check(running).toContainText("375 / 1000 星");
+      await check(running.locator("progress")).toHaveAttribute("max", "1000");
+      await check(running.locator("progress")).toHaveAttribute("value", "375");
+      await assertPlainHome(homeProgressPage, s);
+      await shot(homeProgressPage, "U9-4-home-baseline");
+
+      await p.getByTestId("project-composer-input").fill(METRIC_UPDATE_ASK);
+      await p.getByTestId("project-composer-send").click();
+      await check(p.getByTestId("project-latest-turn")).toContainText("已记下 GitHub 星数 412");
+      await check(progress, "不刷新项目页也能看到新读数").toContainText("412 / 1000 星");
+      await check(progress.locator("progress")).toHaveAttribute("value", "412");
+      await check(p.getByTestId("project-goal-week"), "本周变化取两个读数之差").toHaveText("本周 +37");
+      await assertPlainHome(p, s);
+      await shot(p, "U9-5-metric-updated");
+      await check(running, "已经打开的首页收到推送，进度也跟着变").toContainText("412 / 1000 星");
+      await check(running.locator("progress")).toHaveAttribute("value", "412");
+      await assertPlainHome(homeProgressPage, s);
+      await shot(homeProgressPage, "U9-6-home-updated");
+    } finally {
+      await homeProgressPage.close();
+    }
+
+    await p.getByTestId("project-composer-input").fill(REVIEW_ASK);
+    await p.getByTestId("project-composer-send").click();
+    await check(p.getByTestId("project-latest-turn")).toContainText(REVIEW_ASK);
+    await check(p.getByTestId("project-latest-turn")).toContainText("小红书的阅读和收藏");
+    await check(p.getByTestId("project-latest-turn"), "更早的指标对话收起，只展示最新一轮").not.toContainText(
+      "已记下 GitHub 星数",
+    );
+    await check(p.getByTestId("project-older")).toContainText(/更早 \d+ 轮 · 完整对话在项目群里/);
+    check(
+      await p
+        .getByTestId("project-thread")
+        .evaluate((thread) => thread.previousElementSibling?.matches("form.project-composer")),
+      "最新一轮紧贴在项目输入框下面",
+    ).toBe(true);
+    await check(progress, "聊天没有冲掉目标和指标").toContainText("412 / 1000 星");
+    await check(p.getByTestId("project-goal-week")).toHaveText("本周 +37");
+    await check(p.getByTestId("project-achievements")).toContainText("GitHub");
+    await check(p.getByTestId("project-pending")).toBeVisible();
+    await check(p.getByTestId("project-plan")).toContainText("本周计划");
+    await check(p.getByTestId("project-fold")).not.toHaveAttribute("open", "");
+    await check(p.getByTestId("project-fold").locator("summary")).toContainText("队伍 4 · 例行");
+    await assertPlainHome(p, s);
+    await shot(p, "U9-7-project");
+    await p.getByTestId("project-achievements").scrollIntoViewIfNeeded();
+    await check(p.getByTestId("project-achievement")).toHaveCount(1);
+    await check(p.getByTestId("project-achievement"), "成果带着假平台发布返回的原帖链接").toHaveAttribute(
+      "href",
+      /^https:\/\/github\.com\/baize\/baize-bot\/issues\/12#issuecomment-\d+$/,
+    );
+    await assertPlainHome(p, s);
+    await shot(p, "U9-8-achievements");
+
+    begin(
+      "U9 改成自动取样：挂上 GitHub 星数，任务卡里把目标改对它，读到之前写还没读到数；500 星，同格不重取，下一格 520",
+    );
+    const metricTask = GroupResponse.parse(await s.get(`/api/groups/${ids.project}`)).task;
+    if (metricTask.goal === null) throw new Error("前面的界面步骤没定下目标");
+    await s.patch(`/api/tasks/${metricTask.id}`, {
+      metricSources: [{ kind: "github_stars", accountId: accountOf("github"), repo: "baize/baize-bot" }],
+    });
+    await check(progress, "只挂来源不动目标，进度还是 Bot 报的 412").toContainText("412 / 1000 星");
+    await p.getByTestId("project-open-group").click();
+    await p.getByTestId("task-goal").click();
+    const switchForm = p.getByTestId("task-goal-form");
+    const switchNotice = switchForm.getByTestId("task-goal-metric-switch");
+    await check(switchForm.getByTestId("task-goal-metric"), "目标还对着手记的数").toHaveValue("");
+    await check(switchNotice).toHaveCount(0);
+    await switchForm.getByTestId("task-goal-metric").selectOption({ label: "GitHub 星数 · baize/baize-bot" });
+    await check(switchNotice, "换之前说清 375、412 不跟过来").toHaveText(
+      "进度改从「GitHub 星数 · baize/baize-bot」的读数算，之前记的数留在原来那条",
+    );
+    await assertPlainHome(p, s);
+    await shot(p, "U9-auto-0-switch-metric");
+    await switchForm.getByTestId("task-goal-save").click();
+    await check(switchForm).toHaveCount(0);
+    await check(p.getByTestId("task-goal"), "新指标还没读过").toHaveText("目标 1000 星 · 还没读到数");
+    await openProject(p, PROJECT);
+    await progress.scrollIntoViewIfNeeded();
+    await check(progress).toContainText("还没读到数 · 目标 1000 星");
+    await check(progress.locator("progress")).toHaveCount(0);
+    await check(p.getByTestId("project-metric"), "指标列表里目标那条也写还没读到数").toContainText(
+      "GitHub 星数 · baize/baize-bot目标还没读到数",
+    );
+    const automaticHome = await ctx.newPage();
+    try {
+      await openHome(automaticHome, home);
+      const running = automaticHome.getByTestId("today-running").getByTestId("today-row").filter({ hasText: PROJECT });
+      await check(running).toContainText("1000 星 · 还没读到数");
+      await check(running.locator("progress")).toHaveCount(0);
+      const reads = () =>
+        fake.requests().filter((request) => request.method === "GET" && request.path === "/repos/baize/baize-bot");
+      const initialReads = reads().length;
+      const assertMetric = async (value: number) => {
+        await check(progress, "项目页不刷新收到自动取样").toContainText(`${value} / 1000 星`);
+        await check(progress.locator("progress")).toHaveAttribute("value", String(value));
+        await check(running, "首页不刷新收到自动取样").toContainText(`${value} / 1000 星`);
+        await check(running.locator("progress")).toHaveAttribute("value", String(value));
+        check(GroupResponse.parse(await s.get(`/api/groups/${ids.project}`)).task.metric).toMatchObject({
+          kind: "read",
+          current: value,
+        });
+      };
+      fake.setGithubStars("baize/baize-bot", 500);
+      metricsNow = new Date(Date.now() + 1_000);
+      await s.metricsTick();
+      await assertMetric(500);
+      check(reads()).toHaveLength(initialReads + 1);
+      await shot(p, "U9-auto-1-project-500");
+      await shot(automaticHome, "U9-auto-2-home-500");
+      const firstSample = GroupResponse.parse(await s.get(`/api/groups/${ids.project}`)).task.metric;
+
+      fake.setGithubStars("baize/baize-bot", 520);
+      await s.metricsTick();
+      await assertMetric(500);
+      check(reads(), "同格去重不再请求假平台").toHaveLength(initialReads + 1);
+      check(GroupResponse.parse(await s.get(`/api/groups/${ids.project}`)).task.metric, "同格不落新样本").toEqual(
+        firstSample,
+      );
+      await shot(p, "U9-auto-3-project-same-slot");
+      await shot(automaticHome, "U9-auto-4-home-same-slot");
+
+      const windowMs = 6 * 60 * 60 * 1_000;
+      metricsNow = new Date((Math.floor(metricsNow.getTime() / windowMs) + 1) * windowMs);
+      await s.metricsTick();
+      await assertMetric(520);
+      check(reads()).toHaveLength(initialReads + 2);
+      await shot(p, "U9-auto-5-project-520");
+      await shot(automaticHome, "U9-auto-6-home-520");
+    } finally {
+      await automaticHome.close();
+    }
+
+    begin("U10 例行自己会停：一句话加一次「加上」，三次没人看自己停，侧栏亮点，点恢复");
+    skip("在项目里说：例行卡只在主助理单聊里出，项目群里调会报错让 Bot 转告，这句改在首页对主助理说");
+    await openHome(p, home);
+    await p.getByTestId("today-composer-input").fill(ROUTINE_ASK);
+    await p.getByTestId("today-composer-send").click();
+    await check(p.getByTestId("today-assistant-text")).toContainText("例行卡发好了");
+    const routineOffer = p.locator("[data-testid=today-row][data-kind=routine_offer]").getByTestId("routine-offer");
+    await check(routineOffer).toHaveAttribute("data-status", "offered");
+    await check(routineOffer.getByTestId("routine-offer-when"), "卡上写清什么时候").toHaveText("每周五 18:00");
+    await check(routineOffer.getByTestId("routine-offer-where"), "卡上写清哪个项目").toContainText(PROJECT);
+    await check(routineOffer.getByTestId("routine-offer-executor"), "卡上写清谁来做").toHaveText("主助理");
+    await check(routineOffer.getByTestId("routine-offer-boundary"), "卡上写清边界").toHaveText("只读，不发东西");
+    await check(routineOffer, "建例行不用填表").not.toContainText("cron");
+    await check(routineOffer, "用户自己开口要的例行，卡上不说成主助理看他常这么做").not.toContainText("常这么做");
+    await assertPlainHome(p, s);
+    await shot(p, "U10-1-offer");
+    await routineOffer.getByTestId("routine-offer-add").click();
+    await check(routineOffer).toHaveAttribute("data-status", "added");
+    const weekly = RoutineListResponse.parse(await s.get("/api/routines")).items.find(
+      (item) => item.name === ROUTINE_NAME,
+    );
+    if (weekly === undefined) throw new Error("点了加上没有建出例行");
+    check(weekly.groupId, "例行挂在项目上").toBe(ids.project);
+    check(weekly.boundary, "边界照卡上的只读").toBe("read_only");
+    await p.getByTestId("routines-nav").click();
+    const projectSection = p.locator(`[data-testid=routine-section][data-section-title="${PROJECT}"]`);
+    const weeklyRow = projectSection.locator(`[data-testid=routine-row][data-routine-name="${ROUTINE_NAME}"]`);
+    await check(weeklyRow, "例行页按项目分组，周报在项目那组").toHaveAttribute("data-state", "on");
+    await check(weeklyRow.getByTestId("routine-run"), "在跑的能立即跑一次").toBeVisible();
+    await check(weeklyRow.getByTestId("routine-toggle"), "在跑的能暂停").toHaveText("暂停");
+    await check(weeklyRow.getByTestId("routine-edit"), "每条能改").toBeVisible();
+    await check(p.getByTestId("routines-alert")).toHaveCount(0);
+    await shot(p, "U10-2-routines");
+    // 几周过去：例行到点跑了三次，用户一次也没打开项目看结果。人停在例行页上，不算看过。
+    for (let week = 1; week <= 3; week += 1) {
+      await s.post(`/api/routines/${weekly.id}/run`, {});
+      await waitFor(`第 ${week} 次周报跑完`, async () => (await finishedRuns(s, weekly.id)) === week);
+    }
+    await waitFor("连续三次没人看，周报自己停了", async () => (await routineState(s, weekly.id)) === "auto_paused");
+    await check(p.getByTestId("routines-alert"), "侧栏「例行」旁边亮一个点").toBeVisible();
+    await check(p.getByTestId("routine-stopped")).toContainText(`「${ROUTINE_NAME}」连续 3 次没人看，自己停了。`);
+    await check(weeklyRow).toHaveAttribute("data-state", "auto_paused");
+    await check(weeklyRow.getByTestId("routine-state"), "自己停和手动停分开显示").toHaveText("自己停了");
+    await check(weeklyRow.getByTestId("routine-run-count")).toHaveText("跑过 3 次");
+    await shot(p, "U10-3-auto-paused");
+    await weeklyRow.getByTestId("routine-edit").click();
+    await check(p.getByTestId("composer-input"), "改例行回到对话里，输入框预填一句话").toHaveValue(
+      `把「${ROUTINE_NAME}」改成`,
+    );
+    await shot(p, "U10-4-edit-prefill");
+    await p.getByTestId("routines-nav").click();
+    await p.getByTestId("routine-resume").click();
+    await check(weeklyRow).toHaveAttribute("data-state", "on");
+    await check(p.getByTestId("routine-stopped")).toHaveCount(0);
+    await check(p.getByTestId("routines-alert"), "恢复之后侧栏的点灭了").toHaveCount(0);
+    check(await routineState(s, weekly.id), "恢复回到 on").toBe("on");
+    await shot(p, "U10-5-resumed");
+
+    begin("U11 主助理提议加一个人：首页建队卡，默认不勾的人写着理由，选小墨确认");
+    await openHome(p, home);
+    await p.getByTestId("today-composer-input").fill(TEAM_ASK);
+    await p.getByTestId("today-composer-send").click();
+    await check(p.getByTestId("today-assistant-text")).toContainText("建队卡发好了");
+    const teamRow = p.locator("[data-testid=today-row][data-kind=team_offer]");
+    await check(teamRow).toContainText(PROJECT);
+    await teamRow.getByTestId("today-expand").click();
+    const teamOffer = teamRow.getByTestId("team-offer");
+    await check(teamOffer).toHaveAttribute("data-status", "offered");
+    const candidates = teamOffer.getByTestId("team-offer-member");
+    await check(candidates).toHaveCount(2);
+    const xiaomo = candidates.filter({ hasText: "小墨" });
+    const acai = candidates.filter({ hasText: "阿彩" });
+    await check(xiaomo.getByTestId("team-offer-new"), "新请的标「新」").toHaveText("新");
+    await check(xiaomo, "写为什么要它、它会什么").toContainText("给小红书图文排版、做封面");
+    await check(xiaomo).toContainText("小墨接过来你就只用批");
+    await check(xiaomo).toHaveAttribute("data-picked", "true");
+    await check(acai, "建议先不带的默认不勾").toHaveAttribute("data-picked", "false");
+    await check(acai, "不勾的写着理由").toContainText("先不带");
+    const offerText = await teamOffer.innerText();
+    check(offerText, "建队卡不问权限、不问模型").not.toMatch(/权限|模型/);
+    await assertPlainHome(p, s);
+    await shot(p, "U11-1-team-offer");
+    await teamOffer.getByTestId("team-offer-confirm").click();
+    await check(teamRow).toHaveCount(0);
+    const roster = BotListResponse.parse(await s.get("/api/bots")).items.map((item) => item.bot.name);
+    check(roster, "小墨请进来了").toContain("小墨");
+    check(roster, "没勾的阿彩不请").not.toContain("阿彩");
+    check(roster, "临时帮手不建 Bot").not.toContain("资料员");
+    await p.getByTestId("assistant-nav").click();
+    await check(p.getByTestId("message-list"), "临时帮手只在过程里出现一行").toContainText("拉临时帮手：资料员");
+    await shot(p, "U11-2-helper-line");
+    await p.getByTestId("team-nav").click();
+    await check(p.locator("[data-testid=team-bot][data-bot-name=小墨]")).toContainText(PROJECT);
+    await check(p.locator("[data-testid=team-bot][data-bot-name=阿彩]")).toHaveCount(0);
+    await check(p.locator("[data-testid=team-bot][data-bot-name=资料员]"), "临时帮手不进团队页").toHaveCount(0);
+    await shot(p, "U11-3-team");
+    await openProject(p, PROJECT);
+    await p.getByTestId("project-composer-input").fill(LAYOUT_ASK);
+    await p.getByTestId("project-composer-send").click();
+    await check(p.getByTestId("project-latest-turn")).toContainText("正文分三段");
+    const layoutPrompt = s.prompts().findLast((prompt) => prompt.group.id === ids.project);
+    check(
+      layoutPrompt?.members.map((member) => member.name),
+      "确认后新队员在下一次 prompt 的成员名单里",
+    ).toContain("小墨");
+    await shot(p, "U11-4-new-member");
+
+    begin("U12 教阿文一句话：当场记下，记住的条数加一，下一次写作套用，忘掉后不再套用");
+    const writerId = await botId(s, "阿文");
+    await p.getByTestId("team-nav").click();
+    await p.locator("[data-testid=team-bot][data-bot-name=阿文]").getByTestId("team-bot-chat").click();
+    const knowToggle = p.getByTestId("bot-know-toggle");
+    await check(knowToggle).toContainText("记住 0 条");
+    await sendInChat(p, TEACH_ASK);
+    await check(p.getByTestId("message-list")).toContainText(`记下了，以后${PREFERENCE}`);
+    const preferenceCard = p.locator("[data-testid=preference-offer][data-status=offered]");
+    await check(preferenceCard.getByTestId("preference-offer-text"), "Bot 只是提议，卡上写着要记的那句").toHaveText(
+      PREFERENCE,
+    );
+    await check(knowToggle, "点记住之前条数不变").toContainText("记住 0 条");
+    await shot(p, "U12-0-offer");
+    await preferenceCard.getByTestId("preference-offer-save").click();
+    await check(p.getByTestId("preference-offer-decided"), "点完卡上只剩结论").toHaveText("已记住");
+    await check(knowToggle, "单聊顶上记住的条数当场加一").toContainText("记住 1 条");
+    await knowToggle.click();
+    await check(p.getByTestId("bot-pref-text"), "点开能看到这一条").toHaveText([PREFERENCE]);
+    await check(p.getByTestId("bot-pref-forget")).toHaveText("忘掉");
+    const botPage = await p.locator("body").innerText();
+    check(botPage, "Bot 页上没有技能来源、插件勾选、模型选择").not.toMatch(/技能来源|插件|模型/);
+    await shot(p, "U12-1-remembered");
+    await sendInChat(p, TITLE_ASK);
+    await check(p.getByTestId("message-list")).toContainText("一个人带一支 AI 小队");
+    check(systemPromptFor(upstream.requests(), TITLE_ASK), "下一次写作带着这条偏好").toContain(PREFERENCE);
+    await p.getByTestId("bot-pref-forget").click();
+    await check(knowToggle, "忘掉之后条数减一").toContainText("记住 0 条");
+    await check(p.getByTestId("bot-pref")).toHaveCount(0);
+    await sendInChat(p, TITLE_AGAIN_ASK);
+    await check(p.getByTestId("message-list")).toContainText("一个人的公司也能有队伍");
+    const afterForget = systemPromptFor(upstream.requests(), TITLE_AGAIN_ASK);
+    check(afterForget, "忘掉之后下一次写作不再套用").not.toContain(PREFERENCE);
+    check(afterForget, "忘掉之后明确告诉它旧的作废").toContain("现在一条都没有");
+    await shot(p, "U12-2-forgotten");
+
+    begin("U13 改名字和标签：小弹窗，回车加标签，描述改一句；三个字段全空也能存");
+    await p.getByTestId("bot-edit").click();
+    const dialog = p.getByTestId("edit-bot-dialog");
+    await check(dialog, "弹窗上写都可以不填").toContainText("都可以不填，它干活时自己会记");
+    await dialog.getByTestId("edit-bot-tag-input").fill("长文");
+    await dialog.getByTestId("edit-bot-tag-input").press("Enter");
+    await check(dialog.getByTestId("edit-bot-tag"), "回车加上标签").toHaveText(["小红书", "长文"]);
+    await dialog.getByTestId("edit-bot-description").fill(WRITER_DESCRIPTION);
+    await shot(p, "U13-1-edit");
+    await dialog.getByTestId("edit-bot-save").click();
+    await check(dialog).toHaveCount(0);
+    await check(p.getByTestId("bot-header").locator(".bot-header-tags .tag")).toHaveText(["小红书", "长文"]);
+    await check(p.getByTestId("bot-header-description")).toHaveText(WRITER_DESCRIPTION);
+    await shot(p, "U13-2-saved");
+    await p.getByTestId("team-nav").click();
+    await check(p.locator("[data-testid=team-bot][data-bot-name=阿文]"), "团队页上显示新标签").toContainText("长文");
+    await p.locator("[data-testid=team-bot][data-bot-name=阿文]").getByTestId("team-bot-chat").click();
+    await p.getByTestId("bot-edit").click();
+    await dialog.getByTestId("edit-bot-name").fill("");
+    await dialog.getByTestId("edit-bot-description").fill("");
+    for (let left = 2; left > 0; left -= 1) await dialog.getByTestId("edit-bot-tag-remove").first().click();
+    await check(dialog.getByTestId("edit-bot-tag")).toHaveCount(0);
+    await shot(p, "U13-3-all-empty");
+    await dialog.getByTestId("edit-bot-save").click();
+    await check(dialog, "三个字段全空也能保存").toHaveCount(0);
+    const writer = BotListResponse.parse(await s.get("/api/bots")).items.find((item) => item.bot.id === writerId);
+    check(
+      writer?.bot && { name: writer.bot.name, tags: writer.bot.tags, description: writer.bot.description },
+      "名字空着不改名，标签和描述清空",
+    ).toEqual({ name: "阿文", tags: [], description: "" });
+    await check(p.getByTestId("bot-header-description")).toHaveCount(0);
+    await shot(p, "U13-4-empty-saved");
+    // U13 清空的资料恢复成分享配方；技能和已授权插件用真实 HTTP 创建，本地 MCP 不碰真实平台。
+    await s.patch(`/api/bots/${writerId}`, { tags: ["小红书", "长文"], description: WRITER_DESCRIPTION });
+    await s.post(`/api/bots/${writerId}/skills`, { name: "检查标题", steps: ["标题不超过 15 个字"] });
+    mcp = await startTestMcp();
+    const plugin = ToolResponse.parse(
+      await s.post("/api/tools", { name: PLUGIN, url: mcp.baseUrl, authorization: PLUGIN_SECRET }),
+    ).tool;
+    await s.patch(`/api/tools/${plugin.id}`, { assignedBotIds: [writerId] });
+    // HTTP 预置插件不经过 Web actions，重新载入后界面才拿到这份配置。
+    await p.reload();
+    await check(p.getByTestId("bot-header")).toBeVisible();
+    begin("设置五页和预算：假上游已结账，预算 1 元，到点没跑且保持开启，试跑照常");
+    await openSettings(p, "general");
+    await check(p.getByTestId("theme-select")).toBeVisible();
+    await check(p.getByTestId("notify-switch")).toBeVisible();
+    await shot(p, "settings-1-general");
+    await p.getByTestId("settings-nav-accounts").click();
+    await check(p.getByTestId("computer-status")).toHaveAttribute("data-status", "online");
+    await check(p.getByTestId("account-row")).toHaveCount(3);
+    await shot(p, "settings-2-accounts");
+    await p.getByTestId("settings-nav-tools").click();
+    await check(p.getByTestId("tool-card").filter({ hasText: PLUGIN })).toBeVisible();
+    await shot(p, "settings-3-tools");
+    await p.getByTestId("settings-nav-usage").click();
+    const spent = UsageResponse.parse(await s.get("/api/usage"));
+    check(spent.total, "前面故事经假上游 usage 和真实 run_done 结账，花费已超过 1 元").toBeGreaterThan(1);
+    await p.getByTestId("budget-edit").click();
+    await p.getByTestId("budget-input").fill("1");
+    await p.getByTestId("budget-save").click();
+    await check(p.getByTestId("usage-budget")).toHaveText("/ 预算 ¥1");
+    await check(p.getByTestId("usage-meter")).toHaveAttribute("aria-valuenow", "1");
+    await check(p.getByTestId("usage-meter").locator("i")).toHaveAttribute("style", "width: 100%;");
+    await shot(p, "settings-4-usage-over-budget");
+    await p.getByTestId("settings-nav-privacy").click();
+    await check(p.getByTestId("privacy-export")).toBeVisible();
+    await check(p.getByTestId("privacy-delete")).toBeVisible();
+    await shot(p, "settings-5-privacy");
+    await p.getByTestId("settings-close").click();
+    const budgetRoutine = RoutineResponse.parse(
+      await s.post(`/api/bots/${weekly.botId}/routines`, {
+        name: BUDGET_ROUTINE,
+        instruction: ROUTINE_INSTRUCTION,
+        triggers: [{ kind: "cron", expr: "* * * * *" }],
+        onFailure: "stop_and_tell",
+        boundary: "read_only",
+      }),
+    ).routine;
+    await p.getByTestId("routines-nav").click();
+    const budgetRow = p.getByTestId("routine-row").filter({ hasText: BUDGET_ROUTINE });
+    await check(budgetRow).toHaveAttribute("data-state", "on");
+    await shot(p, "budget-1-enabled");
+    // 到点时刻留在真实现在之前，后面的试跑才能按开始时间排在运行记录最前面。
+    routinesNow = new Date(Date.now() - 60_000);
+    await s.routinesTick();
+    const promptsBeforeBudget = s.prompts().length;
+    routinesNow = new Date(Math.floor(routinesNow.getTime() / 60_000) * 60_000 + 60_000);
+    await s.routinesTick();
+    await check(budgetRow.getByTestId("routine-last")).toContainText("本月超预算，没跑");
+    await check(budgetRow).toHaveAttribute("data-state", "on");
+    check(await routineState(s, budgetRoutine.id)).toBe("on");
+    check(s.prompts().length, "到点超预算没有向电脑派活").toBe(promptsBeforeBudget);
+    const stopped = RoutineListResponse.parse(await s.get("/api/routines")).items.find(
+      (item) => item.id === budgetRoutine.id,
+    );
+    check(stopped?.runs.map(({ status, note }) => ({ status, note }))).toEqual([
+      { status: "stopped", note: "本月超预算，没跑" },
+    ]);
+    await shot(p, "budget-2-cron-stopped");
+    await budgetRow.getByTestId("routine-run").click();
+    await waitFor("超预算的试跑照常派活并结账", async () => {
+      const item = RoutineListResponse.parse(await s.get("/api/routines")).items.find(
+        (routine) => routine.id === budgetRoutine.id,
+      );
+      return item?.runs.some((entry) => entry.status === "ok") === true;
+    });
+    check(s.prompts().length, "用户点试跑向真运行器派活").toBeGreaterThan(promptsBeforeBudget);
+    await check(budgetRow.getByTestId("routine-last")).toContainText("完成");
+    await check(budgetRow).toHaveAttribute("data-state", "on");
+    await shot(p, "budget-3-trial-ran");
+    process.stdout.write("  设置五页和预算 passed\n");
+    begin("U14 分享阿文：默认配方无凭据和对话，私人偏好留下，第二个账号粘贴导入独立副本");
+    await p.getByTestId("team-nav").click();
+    await p.locator("[data-testid=team-bot][data-bot-name=阿文]").getByTestId("team-bot-chat").click();
+    await sendInChat(p, TEACH_ASK);
+    await p.locator("[data-testid=preference-offer][data-status=offered]").getByTestId("preference-offer-save").click();
+    await check(knowToggle).toContainText("记住 1 条");
+    await sendInChat(p, PRIVATE_ASK);
+    await p.locator("[data-testid=preference-offer][data-status=offered]").getByTestId("preference-offer-save").click();
+    await check(knowToggle).toContainText("记住 2 条");
+    await knowToggle.click();
+    await check(p.getByTestId("bot-pref").filter({ hasText: PRIVATE_PREFERENCE })).toContainText("私人");
+    await p.getByTestId("bot-share").click();
+    const share = p.getByTestId("share-dialog");
+    await check(share.getByTestId("share-summary")).toContainText("你的登录、对话、文件和项目不带");
+    await check(share.getByTestId("share-summary")).toContainText("1 个技能、1 个插件的配置、1 条偏好");
+    await check(share.getByTestId("share-summary")).toContainText("有 1 条只和你的号有关，自动留下");
+    await check(share.getByTestId("share-more")).toHaveAttribute("aria-expanded", "false");
+    await check(share.getByTestId("share-pref")).toHaveCount(0);
+    await shot(p, "U14-1-share-default");
+    await share.getByTestId("share-copy").click();
+    await check(share.getByTestId("share-link")).toBeVisible();
+    const link = await share.getByTestId("share-link").inputValue();
+    const decoded = Buffer.from(new URL(link).hash.slice(1), "base64url").toString("utf8");
+    const template = BotTemplate.parse(JSON.parse(decoded));
+    check(decoded, "解码后的分享包 grep 不到凭据字段").not.toMatch(/token|cookie|authorization/i);
+    for (const secret of [PLUGIN_SECRET, "gh-e2e", "x-e2e", PRIVATE_PREFERENCE]) {
+      check(decoded, "分享包不带原账号的凭据和私人偏好").not.toContain(secret);
+    }
+    for (const cookie of await ctx.cookies(home))
+      check(decoded, "分享包不带登录 cookie 值").not.toContain(cookie.value);
+    for (const text of [XHS_ASK, TEACH_ASK, TITLE_ASK, PRIVATE_ASK, "一个人带一支 AI 小队"]) {
+      check(decoded, "分享包不带对话正文").not.toContain(text);
+    }
+    check(template.preferences).toEqual([{ text: PREFERENCE }]);
+    check(template.skills).toEqual([{ name: "检查标题", steps: ["标题不超过 15 个字"] }]);
+    check(template.plugins).toHaveLength(1);
+    writeFileSync(join(screenshots, "U14-share-package.txt"), `${JSON.stringify(template, null, 2)}\n`);
+    process.stdout.write("  U14 分享包凭据、对话和私人偏好检查 passed\n");
+    await shot(p, "U14-2-share-link");
+    await share.getByTestId("share-close").click();
+
+    const friend = await browser.newContext({ viewport: { width: 1_440, height: 900 } });
+    try {
+      const f = await friend.newPage();
+      await f.goto(`${home}/register`);
+      await f.getByTestId("register-email").fill("friend@baize-acceptance.example");
+      await f.getByTestId("register-password").fill("acceptance-pass");
+      await f.getByTestId("register-name").fill("朋友");
+      await f.getByTestId("register-submit").click();
+      await check(f.getByTestId("today-page")).toBeVisible();
+      // 预置同名 Bot，确保导入方的撞名分支在第二个账号上真实发生。
+      const existing = await friend.request.post(`${home}/api/bots`, { data: { name: "阿文" } });
+      check(existing.status()).toBe(201);
+      await f.getByTestId("team-nav").click();
+      await f.getByTestId("import-bot").click();
+      await f.getByTestId("import-link").fill(link);
+      await shot(f, "U14-3-friend-paste");
+      await f.getByTestId("import-go").click();
+      await check(f.getByTestId("import-dialog")).toHaveCount(0);
+      const importedRow = f.locator("[data-testid=team-bot][data-bot-name=阿文2]");
+      await check(importedRow).toContainText("还没进项目");
+      await check(importedRow).toContainText(WRITER_DESCRIPTION);
+      await shot(f, "U14-4-friend-team");
+      const friendTools = ToolListResponse.parse(await (await friend.request.get(`${home}/api/tools`)).json()).items;
+      check(friendTools).toHaveLength(1);
+      const importedPlugin = friendTools[0];
+      if (importedPlugin === undefined) throw new Error("导入后没有插件");
+      const storedPlugins = await s.sql<{ status: string; authorization_enc: string | null }[]>`
+        SELECT status, authorization_enc FROM tool_connections WHERE id = ${importedPlugin.id}`;
+      check(storedPlugins, "导入的插件在数据库里待授权且没有凭据").toEqual([
+        { status: "awaiting_authorization", authorization_enc: null },
+      ]);
+      process.stdout.write("  U14 第二账号导入后缀和插件落库待授权检查 passed\n");
+      await openSettings(f, "tools");
+      await shot(f, "U14-5-friend-plugins");
+      const pluginCard = f.locator(`[data-testid=tool-card][data-tool-name="${PLUGIN}"]`);
+      await check(pluginCard.getByTestId("tool-status"), "导入的插件卡显示待授权").toHaveText("待授权");
+      await check(pluginCard.getByTestId("tool-pending")).toContainText("点开填授权，或无凭据再试");
+      await check(pluginCard.getByTestId("tool-authorize-open"), "卡上有填授权的入口").toBeVisible();
+      await check(pluginCard.getByTestId("tool-retry-anonymous")).toBeVisible();
+    } finally {
+      await friend.close();
+    }
+
+    begin("U15 周末德州：茉莉换大刘，A♠ K♦，问老白，加注，三手摊牌，散场复盘");
+    await p.getByTestId("new-project").click();
+    const configsBeforePoker = s.configsApplied();
+    await p.getByTestId("new-project-table").click();
+    await check(p.getByTestId("poker-project")).toBeVisible();
+    const pokerGroupId = await p.getByTestId("poker-project").getAttribute("data-poker-project");
+    if (pokerGroupId === null) throw new Error("牌局项目没有 groupId");
+    await waitFor("预置牌友已随 config 到真运行器", () => s.configsApplied() > configsBeforePoker);
+    const beforeSwap = await pokerTable(s, pokerGroupId);
+    const groupBefore = GroupResponse.parse(await s.get(`/api/groups/${pokerGroupId}`)).group;
+    check(beforeSwap.seats.map((seat) => seat.name)).toEqual(["阿豹", "老K", "茉莉", "陈"]);
+    await shot(p, "U15-01-project");
+    await p.locator('[data-testid=poker-seat][data-seat-name="茉莉"]').getByTestId("poker-seat-swap").click();
+    await check(p.getByTestId("swap-seat-dialog")).toBeVisible();
+    await shot(p, "U15-02-swap-dialog");
+    await p.getByTestId("swap-seat-option").filter({ hasText: "大刘" }).click();
+    await check(p.getByTestId("swap-seat-dialog")).toHaveCount(0);
+    await check(p.getByTestId("poker-swap-notice")).toHaveText("茉莉 下桌，大刘 上桌");
+    const swapped = await pokerTable(s, pokerGroupId);
+    const groupAfter = GroupResponse.parse(await s.get(`/api/groups/${pokerGroupId}`)).group;
+    const outgoing = beforeSwap.seats.find((seat) => seat.seat === 3);
+    const incoming = swapped.seats.find((seat) => seat.seat === 3);
+    check(
+      swapped.seats.filter((seat) => seat.seat !== 3),
+      "换人只改 3 号位，其他座位完全相同",
+    ).toEqual(beforeSwap.seats.filter((seat) => seat.seat !== 3));
+    check(incoming).toMatchObject({ seat: 3, name: "大刘", persona: "dalu", stack: outgoing?.stack });
+    check(incoming?.botId, "3 号位真的换了 Bot").not.toBe(outgoing?.botId);
+    check(groupAfter.botIds.filter((id) => id !== incoming?.botId).toSorted(), "群成员也只换一个 Bot").toEqual(
+      groupBefore.botIds.filter((id) => id !== outgoing?.botId).toSorted(),
+    );
+    await shot(p, "U15-03-swapped");
+
+    const seating = seatNextHand(swapped.seats, null, 2_000);
+    const seeded = newHand(
+      POKER_SEEDS[0],
+      seating.seats.map((seat) => ({ id: String(seat.seat), stack: seat.stack })),
+      String(seating.button),
+      { small: 10, big: 20 },
+    );
+    check(seeded.seats.find((seat) => seat.id === "4")?.hole, "种子洗牌规则变了就让验收失败").toEqual(["As", "Kd"]);
+    await p.getByTestId("poker-start").click();
+    await check(p.getByTestId("table-page")).toBeVisible();
+    await check(p.getByTestId("felt-me").locator('[data-card="As"]')).toHaveAttribute("aria-label", "A♠");
+    await check(p.getByTestId("felt-me").locator('[data-card="Kd"]')).toHaveAttribute("aria-label", "K♦");
+    await check(p.getByTestId("felt-opponent").getByTestId("card-back")).toHaveCount(6);
+    await check(p.getByTestId("table-chips-note")).toHaveText("虚拟筹码，不涉及真钱");
+    const first = await pokerTable(s, pokerGroupId);
+    check(first.hand?.view.hole).toEqual(["As", "Kd"]);
+    await shot(p, "U15-04-AK");
+    await p.getByTestId("hint-ask").click();
+    await check(p.getByTestId("hint-card")).toContainText(POKER_HINT);
+    await check(p.getByTestId("hint-private")).toHaveText("仅你可见");
+    await check(p.getByTestId("table-log")).not.toContainText(POKER_HINT);
+    await shot(p, "U15-05-hint");
+
+    const advised = await pokerTable(s, pokerGroupId);
+    const hand = advised.hand;
+    const legal = hand?.view.legal;
+    const raise = legal?.kind === "your_turn" ? legal.options.find((option) => option.kind === "raise") : undefined;
+    if (hand === null || raise?.kind !== "raise") throw new Error("首手轮到用户时应该能加注");
+    await p.getByTestId("raise-amount").fill(String(raise.min - 1));
+    await check(p.getByTestId("action-raise"), "界面不足额加注不可提交").toBeDisabled();
+    const rejectedRaise = await ctx.request.post(`${home}/api/poker/hands/${hand.id}/act`, {
+      data: { seq: hand.view.events.length, action: { kind: "raise", amount: raise.min - 1 } },
+    });
+    check(rejectedRaise.status(), "绕过界面后引擎仍拒绝不足额加注").toBe(400);
+    const rejectedRaiseBody: unknown = await rejectedRaise.json();
+    check(rejectedRaiseBody).toEqual({ error: `加注额不够，最少要加到 ${raise.min}` });
+    const unchanged = await pokerTable(s, pokerGroupId);
+    check(unchanged.hand?.view.events, "拒绝的动作不落公开事件").toEqual(hand.view.events);
+    check(unchanged.seats, "拒绝的动作不改筹码").toEqual(advised.seats);
+    await shot(p, "U15-06-illegal-raise");
+    await p.getByTestId("raise-amount").fill(String(raise.min));
+    const raiseResponse = p.waitForResponse(
+      (reply) => reply.request().method() === "POST" && reply.url().endsWith(`/poker/hands/${hand.id}/act`),
+    );
+    await p.getByTestId("action-raise").click();
+    check((await raiseResponse).status()).toBe(200);
+    await waitFor(
+      "合法加注已落库",
+      async () =>
+        (await pokerTable(s, pokerGroupId)).hand?.view.events.some(
+          (event) => event.kind === "action" && event.seatId === "4" && event.action.kind === "raise",
+        ) === true,
+    );
+    await shot(p, "U15-07-raise");
+    const completed: PokerTableView[] = [await playPokerHand(p, s, first)];
+    await p.reload();
+    await check(p.getByTestId("hand-end"), "摊牌后刷新仍可再来一手或散场").toBeVisible();
+    await shot(p, "U15-hand-1-reloaded");
+    for (const number of [2, 3]) {
+      await p.getByTestId("hand-again").click();
+      await waitFor(`再来第 ${number} 手`, async () => (await pokerTable(s, pokerGroupId)).hand?.number === number);
+      await check(p.getByTestId("hand-end")).toHaveCount(0);
+      await shot(p, `U15-hand-${number}-again`);
+      completed.push(await playPokerHand(p, s, await pokerTable(s, pokerGroupId)));
+    }
+    for (const table of completed) {
+      check(
+        table.hand?.view.events.filter((event) => event.kind === "showdown"),
+        "每手四个座位摊牌",
+      ).toHaveLength(4);
+      check(
+        table.seats.reduce((total, seat) => total + seat.stack, 0),
+        "每手结算后虚拟筹码守恒",
+      ).toBe(8_000);
+    }
+    // 牌友只过牌跟注不说话，群里只剩老白的关键处播报；结算句点到 3 号位的名字。
+    await check(p.getByTestId("table-log")).toContainText("摊牌：");
+    await check(p.getByTestId("table-log")).toContainText("大刘");
+    await check(p.getByTestId("table-log")).not.toContainText("茉莉");
+    await p.getByTestId("hand-leave").click();
+    await check(p.getByTestId("poker-project")).toBeVisible();
+    await shot(p, "U15-08-left");
+    await check(p.getByTestId("review-hand")).toHaveCount(3);
+    await check(p.getByTestId("review-hand")).toContainText(["第 1 手复盘", "第 2 手复盘", "第 3 手复盘"]);
+    const reviewAboveSeats = await p.getByTestId("review-card").evaluate((element) => {
+      const seats = document.querySelector('[data-testid="poker-seats"]');
+      return seats !== null && Boolean(element.compareDocumentPosition(seats) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    check(reviewAboveSeats, "复盘在项目页牌友区之上").toBe(true);
+    const reviewed = await pokerTable(s, pokerGroupId);
+    check(reviewed.session, "散场已结束会话").toBeNull();
+    check(reviewed.lastReview?.hands.map((entry) => entry.number)).toEqual([1, 2, 3]);
+    await waitFor("牌局 run 全部收尾", async () => {
+      const [row] = await s.sql<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM runs WHERE group_id = ${pokerGroupId} AND ended_at IS NULL`;
+      return row?.count === 0;
+    });
+    await shot(p, "U15-09-review");
+
+    const pokerRequests = upstream.requests().filter((request) => pokerTurn(request) !== undefined);
+    const playerRequests = pokerRequests.filter((request) => pokerTurn(request)?.persona !== "laobai");
+    check(playerRequests.length, "三位牌友都经过真网关").toBeGreaterThan(0);
+    check(new Set(playerRequests.map((request) => pokerTurn(request)?.persona))).toEqual(
+      new Set(["leopard", "old_k", "dalu"]),
+    );
+    for (const table of completed) {
+      const [stored] = await s.sql<
+        {
+          seed: string;
+          seats_start: { seat: number; stack: number }[];
+          button_seat: number;
+          blinds: { small: number; big: number };
+        }[]
+      >`SELECT seed, seats_start, button_seat, blinds FROM poker_hands WHERE id = ${table.hand?.id ?? ""}`;
+      if (stored === undefined) throw new Error("数据库没有已摊牌的手牌");
+      const dealt = newHand(
+        stored.seed,
+        stored.seats_start.map((seat) => ({ id: String(seat.seat), stack: seat.stack })),
+        String(stored.button_seat),
+        stored.blinds,
+      );
+      const requests = playerRequests.filter((request) =>
+        pokerTurn(request)?.prompt.startsWith(`本手：${table.hand?.id}；`),
+      );
+      check(new Set(requests.map((request) => pokerTurn(request)?.persona)), "每手三位牌友都出过牌").toEqual(
+        new Set(["leopard", "old_k", "dalu"]),
+      );
+      for (const request of requests) {
+        const seat = /你的位置：(\d)，/.exec(pokerTurn(request)?.prompt ?? "")?.[1];
+        const mine = dealt.seats.find((candidate) => candidate.id === seat);
+        if (mine === undefined) throw new Error("牌友请求没有自己的座位");
+        const cards = cardsIn(request);
+        for (const card of mine.hole) check(cards.has(card), "牌友收到自己的底牌").toBe(true);
+        for (const other of dealt.seats.filter((candidate) => candidate.id !== seat)) {
+          for (const card of other.hole) check(cards.has(card), "牌友完整请求体没有用户或别的牌友底牌").toBe(false);
+        }
+        check(JSON.stringify(request), "牌友完整请求体没有种子").not.toContain(stored.seed);
+        check(JSON.stringify(request), "牌友完整请求体没有用户私密建议").not.toContain(POKER_HINT);
+        if (seat === "3") check(pokerTurn(request)?.persona, "3 号位的新台词跟着大刘").toBe("dalu");
+      }
+    }
+    const hintRequests = pokerRequests.filter(
+      (request) => pokerTurn(request)?.persona === "laobai" && !pokerTurn(request)?.prompt.startsWith("散场复盘："),
+    );
+    check(hintRequests).toHaveLength(1);
+    for (const card of ["As", "Kd"]) check(cardsIn(hintRequests[0]!).has(card), "老白的建议收到用户手牌").toBe(true);
+    for (const card of seeded.seats.filter((seat) => seat.id !== "4").flatMap((seat) => seat.hole)) {
+      check(cardsIn(hintRequests[0]!).has(card), "老白的建议没有牌友底牌").toBe(false);
+    }
+    const rejected = poker.rejected();
+    check(rejected, "确实故意发过一次非法跟注").toBeDefined();
+    const retries = poker.actions.filter((action) => action.handId === rejected?.handId && action.seq === rejected.seq);
+    check(
+      retries.map((action) => action.action),
+      "同决策点被拒绝后重试过牌",
+    ).toEqual(["call", "check"]);
+    const resultRows = await s.sql<{ runId: string; callId: string; result: unknown }[]>`
+      SELECT r.run_id AS "runId", r.call_id AS "callId", r.result
+      FROM poker_act_receipts r JOIN runs ON runs.id = r.run_id WHERE runs.group_id = ${pokerGroupId}`;
+    const receipts = resultRows
+      .map((row) => ControlToAgent.parse({ type: "poker_result", ...row }))
+      .flatMap((message) =>
+        message.type === "poker_result" && retries.some((retry) => retry.callId === message.callId) ? [message] : [],
+      );
+    check(receipts.find((receipt) => receipt.callId === retries[0]?.callId)?.result).toEqual({
+      ok: false,
+      error: "没人下注，不能跟注，可以过牌",
+    });
+    check(receipts.find((receipt) => receipt.callId === retries[1]?.callId)?.result).toEqual({ ok: true });
+    check(new Set(receipts.map((receipt) => receipt.runId)).size, "重试在同一次 run 内完成").toBe(1);
+    check(
+      playerRequests.some((request) =>
+        pokerTurn(request)?.tools.some((tool) => contentText(tool.content).includes("没人下注，不能跟注，可以过牌")),
+      ),
+    ).toBe(true);
+    check(
+      completed
+        .flatMap((table) => table.hand?.view.events ?? [])
+        .filter(
+          (event) =>
+            event.kind === "action" &&
+            event.seatId === rejected?.seat &&
+            event.action.kind === "call" &&
+            event.put === 0,
+        ),
+      "非法跟注没有落成出牌事件",
+    ).toEqual([]);
+    check(seedCalls, "一场共三手，全部使用已有种子注入点").toBe(3);
+    writeFileSync(
+      join(screenshots, "U15-assertions.txt"),
+      `${JSON.stringify({ seeds: POKER_SEEDS, beforeSwap: beforeSwap.seats, afterSwap: swapped.seats, playerRequests: playerRequests.length, rejectedRaise: { status: rejectedRaise.status(), body: rejectedRaiseBody }, retries, receipts, review: reviewed.lastReview }, null, 2)}\n`,
+    );
+    process.stdout.write("  U15 隐藏底牌、引擎拒绝非法动作、只换一个座位三条标准 passed\n");
+    process.stdout.write("acceptance: U1 到 U15、预算和设置五页 passed\n");
+  } catch (error) {
+    throw new Error(`${step} 失败：${String(error)}\n电脑代理日志：${stack?.agentLog().slice(-2_000) ?? "未启动"}`, {
+      cause: error,
+    });
+  } finally {
+    await browser?.close();
+    if (web !== undefined) await stopWeb((web as { child: ChildProcess }).child);
+    await stack?.close();
+    await platforms?.close();
+    await mcp?.close();
+    await upstream.close();
+    writeFileSync(
+      join(screenshots, "U15-upstream-requests.jsonl"),
+      `${upstream
+        .requests()
+        .map((request) => JSON.stringify(request))
+        .join("\n")}\n`,
+    );
+    check(
+      filesUnder(join(homedir(), ".pi")).filter((path) => !piBefore.has(path)),
+      "~/.pi 没有新文件",
+    ).toEqual([]);
+  }
+};
+
+run().catch((error: unknown) => {
+  process.stderr.write(`${String(error)}\n`);
+  process.exitCode = 1;
+});

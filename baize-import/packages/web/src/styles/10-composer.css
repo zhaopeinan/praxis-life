@@ -1,0 +1,56 @@
+/* 对话区底部被输入框占掉的高度：发送钮、上下内边距、边框、下边距。浮在右下角的接手提示要让开这一截。 */
+:root {
+  --composer-band: calc(var(--control-h-md) + 2 * var(--space-3) + 2px + var(--space-7));
+}
+
+.composer {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-end;
+  width: 100%;
+  max-width: var(--composer-max-w);
+  margin: 0 auto var(--space-7);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2xl);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.composer-textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--control-h-md);
+  max-height: calc(7lh + var(--control-h-md));
+  padding: calc((var(--control-h-md) - 1lh) / 2) 0;
+  border: 0;
+  background: none;
+  resize: none;
+}
+
+.composer-textarea:focus-visible {
+  box-shadow: none;
+}
+
+.composer .composer-textarea {
+  font: var(--type-body);
+}
+
+.composer:focus-within {
+  box-shadow: var(--ring-focus);
+}
+
+.send-button {
+  display: grid;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  border-radius: var(--radius-full);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  place-items: center;
+}
+
+.window.is-narrow .send-button {
+  width: var(--space-10);
+  height: var(--space-10);
+}

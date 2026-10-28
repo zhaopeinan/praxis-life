@@ -1,0 +1,499 @@
+/* ---------- 草稿卡、计划卡、回复卡 ---------- */
+
+.badge-running {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.badge-failed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.badge-muted {
+  background: var(--bg-inset);
+  color: var(--fg-3);
+}
+
+.draft-card,
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+}
+
+.draft-card-head {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  color: var(--fg-2);
+}
+
+.draft-card-title {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.draft-card-title b {
+  color: var(--fg-1);
+  font: var(--type-ui);
+  font-weight: var(--weight-semibold);
+}
+
+.draft-card-title small,
+.draft-meta,
+.plan-note {
+  margin: 0;
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+.draft-quote {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  border-left: 2px solid var(--border-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--fg-2);
+  font: var(--type-body);
+}
+
+.draft-quote b {
+  color: var(--fg-1);
+}
+
+.draft-text {
+  margin: 0;
+  color: var(--fg-1);
+  font: var(--type-body);
+  white-space: pre-wrap;
+}
+
+.draft-editor {
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--fg-1);
+  font: var(--type-body);
+  resize: vertical;
+}
+
+.draft-editor:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.draft-editor.is-edited {
+  border-color: var(--success);
+}
+
+.brand-hint {
+  margin: 0;
+  color: var(--success);
+  font: var(--type-caption);
+}
+
+.draft-outcome {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  color: var(--fg-2);
+  font: var(--type-caption);
+}
+
+.draft-outcome.is-failed,
+.draft-error {
+  margin: 0;
+  color: var(--danger);
+  font: var(--type-caption);
+}
+
+.draft-outcome a {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--link);
+}
+
+.draft-copy {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-3);
+  align-items: center;
+  height: var(--control-h-sm);
+  padding: 0 var(--space-5);
+}
+
+.plan-drafts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  list-style: none;
+}
+
+.plan-draft + .plan-draft {
+  border-top: 1px solid var(--border-1);
+}
+
+.plan-draft-toggle {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  width: 100%;
+  min-height: var(--control-h-lg);
+  padding: var(--space-3) var(--space-5);
+  color: var(--fg-3);
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .plan-draft-toggle:hover {
+    background: var(--bg-hover);
+  }
+}
+
+.plan-draft-time {
+  flex: none;
+  color: var(--fg-3);
+  font: var(--type-mono);
+}
+
+.plan-draft-line {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-1);
+  font: var(--type-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-draft-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.plan-card.is-folded {
+  flex-direction: row;
+  align-items: center;
+  padding: var(--space-4) var(--space-6);
+  color: var(--fg-2);
+}
+
+.plan-folded-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-1);
+  font: var(--type-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 首页里就地展开的行 ---------- */
+
+.today-expandable {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+.today-expand {
+  display: flex;
+  gap: var(--space-5);
+  align-items: center;
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.today-expanded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.today-expanded .card {
+  width: 100%;
+}
+
+.today-open-group {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--fg-3);
+  font: var(--type-caption);
+  cursor: pointer;
+}
+
+/* ---------- 设置里的账号页 ---------- */
+
+.accounts-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.account-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.account-group-head {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-2);
+}
+
+.account-group-head b {
+  color: var(--fg-1);
+  font: var(--type-label);
+}
+
+.account-group-head .computer-status {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--fg-2);
+  font: var(--type-caption);
+}
+
+/* 整行是一张卡，标题按钮、登录按钮和展开的档位都在卡里。 */
+.account-row {
+  overflow: hidden;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+
+.account-row-head {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-row-head > span:first-child {
+  flex: 1;
+}
+
+.account-tier {
+  flex: none;
+  color: var(--fg-2);
+  font: var(--type-caption);
+}
+
+.account-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4);
+  border: 0;
+}
+
+.account-tier-option {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.account-tier-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.account-tier-option b {
+  color: var(--fg-1);
+  font: var(--type-ui);
+}
+
+.account-tier-option small {
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+.account-tier-option.is-blocked {
+  cursor: not-allowed;
+}
+
+.account-tier-option.is-blocked b,
+.account-tier-option.is-blocked small {
+  color: var(--fg-4);
+}
+
+.account-tier-option.is-blocked .account-tier-reason {
+  color: var(--warning);
+}
+
+.account-tier-error {
+  color: var(--danger);
+  font: var(--type-caption);
+}
+
+.row-card small.account-login-failure {
+  color: var(--warning);
+}
+
+.account-login-action {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0 var(--space-6) var(--space-5);
+}
+
+.account-row > .scope-reconnect {
+  padding: 0 var(--space-6) var(--space-5);
+}
+
+.scope-reconnect {
+  display: flex;
+  flex: 1;
+  gap: var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scope-reconnect small {
+  color: var(--warning);
+  font: var(--type-caption);
+}
+
+.account-login-note {
+  flex: 1;
+  color: var(--fg-2);
+  font: var(--type-caption);
+}
+
+.account-login-note.is-alert,
+.account-connect-error {
+  color: var(--danger);
+  font: var(--type-caption);
+}
+
+/* ---------- 等你确认里的登录卡 ---------- */
+
+.today-login > svg {
+  color: var(--warning);
+}
+
+.today-login.is-signed-in > svg {
+  color: var(--success);
+}
+
+.today-login .today-row-main small {
+  white-space: normal;
+}
+
+.account-connect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.account-connect a {
+  text-decoration: none;
+}
+
+.account-connect-browser {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.account-connect-note,
+.account-connect-risk {
+  flex-basis: 100%;
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+/* 几台电脑时「接入」下面挂一张小菜单选在哪台上登录，本机排第一，不在线的灰着写原因。 */
+.connect-picker {
+  position: relative;
+}
+
+.connect-menu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: var(--layer-menu);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: max-content;
+  min-width: 240px;
+  max-width: min(360px, calc(100vw - 2 * var(--space-6)));
+  padding: var(--space-3);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+.connect-menu-head {
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  color: var(--fg-3);
+  font: var(--type-caption);
+}
+
+.connect-choice {
+  gap: var(--space-4);
+}
+
+.connect-choice-name {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  min-width: 0;
+}
+
+.connect-choice-name small {
+  overflow: hidden;
+  color: var(--fg-3);
+  font: var(--type-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-choice[aria-disabled="true"] {
+  color: var(--fg-4);
+  cursor: not-allowed;
+}
+
+.connect-choice[aria-disabled="true"]:hover {
+  background: none;
+}
+
+.connect-choice[aria-disabled="true"] .connect-choice-name small {
+  color: var(--fg-4);
+}

@@ -1,0 +1,29 @@
+{
+  "name": "baize-bot",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "lint": "oxlint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r test",
+    "dev": "node scripts/dev.mjs",
+    "db:own": "node scripts/db-own.mjs",
+    "check": "pnpm typecheck && pnpm lint && pnpm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "oxlint": "^1.83.0",
+    "prettier": "^3.9.8",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "postgres@3.4.9": "patches/postgres@3.4.9.patch"
+    }
+  }
+}

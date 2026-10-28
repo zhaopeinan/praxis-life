@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.audit/
+.playwright-mcp/
+*.log
+.env
+.DS_Store
+packages/*/node_modules/
+spikes/*/node_modules/
+test-results/
+playwright-report/
