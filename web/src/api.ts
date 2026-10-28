@@ -101,6 +101,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   me: async () => (await request<{ user: PublicUser }>("/api/auth/me")).user,
+  features: () => request<{ baize: boolean }>("/api/features"),
   bootstrapStatus: () => request<{ needsBootstrap: boolean }>("/api/auth/bootstrap-status"),
   bootstrap: (body: { name: string; email: string; password: string }) =>
     request<{ user: PublicUser }>("/api/auth/bootstrap", { method: "POST", body: JSON.stringify(body) }),

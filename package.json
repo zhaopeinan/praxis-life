@@ -3,9 +3,19 @@
   "private": true,
   "type": "module",
   "version": "0.1.0",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "postgres@3.4.9": "patches/postgres@3.4.9.patch"
+    }
+  },
   "description": "Praxis Life — self-hosted life OS. Multidimensional tables, kanban, calendar, and Agent/MCP on one private data plane.",
   "scripts": {
     "dev": "concurrently -n server,web -c blue,magenta \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:full": "node scripts/dev.mjs",
     "dev:server": "tsx watch src/listen.ts",
     "dev:web": "vite",
     "start": "tsx src/listen.ts",
@@ -16,9 +26,12 @@
     "scrape:feishu": "tsx scripts/scrape-feishu-bitable.mts",
     "scrape:feishu:parallel": "tsx scripts/scrape-feishu-bitable-parallel.mts",
     "scrape:feishu:all": "bash scripts/scrape-feishu-until-done.sh",
-    "build:web": "vite build"
+    "build:web": "vite build && VITE_BAIZE_BASE=/assistant BAIZE_BASE=/assistant pnpm --filter @baize/web build",
+    "db:own": "node scripts/db-own.mjs"
   },
   "dependencies": {
+    "@baize/control-plane": "workspace:*",
+    "@baize/shared": "workspace:*",
     "@hono/node-server": "^1.19.6",
     "@libsql/client": "^0.15.15",
     "@modelcontextprotocol/sdk": "^1.18.1",

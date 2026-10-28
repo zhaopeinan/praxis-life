@@ -1,0 +1,21 @@
+# 只格式化白泽 packages/ 下的代码；DuoWei 原有代码保持原样（未格式化过）
+src
+web
+scripts
+Android
+ResearchModule
+generated
+data
+dist-web
+docs
+infra
+*.md
+node_modules
+dist
+pnpm-lock.yaml
+package-lock.json
+bot-application-prototype
+packages/web/src/ds/tokens/
+packages/control-plane/drizzle/
+test-results/
+playwright-report/

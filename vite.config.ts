@@ -11,6 +11,7 @@ export default defineConfig({
     fs: { allow: [".."] },
     proxy: {
       "/api": "http://127.0.0.1:8787",
+      "/assistant": { target: "http://127.0.0.1:8787", ws: true },
     },
   },
   build: {

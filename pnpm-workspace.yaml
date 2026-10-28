@@ -1,0 +1,5 @@
+packages:
+  - packages/*
+
+# 白泽 web 用 React 18 类型、知行人生根用 React 19，关掉 peer 去重让两边各自解析
+dedupePeerDependents: false

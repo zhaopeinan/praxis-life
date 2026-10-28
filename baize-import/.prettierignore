@@ -1,9 +1,0 @@
-node_modules
-dist
-pnpm-lock.yaml
-bot-application-prototype
-spec/原型
-research
-*.md
-packages/web/src/ds/tokens/
-packages/control-plane/drizzle/

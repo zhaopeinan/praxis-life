@@ -62,6 +62,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const [payload, setPayload] = useState<TablePayload | null>(null);
   const [members, setMembers] = useState<BaseMember[]>([]);
   const [search, setSearch] = useState("");
+  const [features, setFeatures] = useState<{ baize: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState<string | null>(null);
@@ -91,6 +92,9 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
   const dialogPushed = useRef(false);
 
   useEffect(() => writeFlag("duowei:ui:nav-collapsed", navCollapsed), [navCollapsed]);
+  useEffect(() => {
+    api.features().then(setFeatures).catch(() => setFeatures(null));
+  }, []);
   useEffect(() => writeFlag("duowei:ui:docs-side-collapsed", docsSideCollapsed), [docsSideCollapsed]);
   useEffect(() => writeList("duowei:ui:open-bases", openBases), [openBases]);
 
@@ -1050,6 +1054,11 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
             <div className="top-user">
               <button type="button" className="secondary" onClick={() => setDialog("tokens")}>访问令牌</button>
               <button type="button" className="secondary" onClick={() => setDialog("agent-brief")}>给 Agent</button>
+              {features?.baize && (
+                <button type="button" className="secondary" onClick={() => window.open("/assistant/", "_blank", "noopener")}>
+                  AI 助理
+                </button>
+              )}
               <button type="button" className="secondary" onClick={() => setDialog("help")}>使用说明</button>
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("admin")}>用户管理</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("backup")}>数据备份</button>}
@@ -1072,6 +1081,9 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 <div className="menu-user">{user.name}</div>
                 <button type="button" onClick={() => setDialog("tokens")}>访问令牌</button>
                 <button type="button" onClick={() => setDialog("agent-brief")}>给 Agent</button>
+                {features?.baize && (
+                  <button type="button" onClick={() => window.open("/assistant/", "_blank", "noopener")}>AI 助理</button>
+                )}
                 <button type="button" onClick={() => setDialog("help")}>使用说明</button>
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("admin")}>用户管理</button>}
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("backup")}>数据备份</button>}

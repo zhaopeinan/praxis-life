@@ -9,6 +9,8 @@ import { Accounts } from "./accounts.js";
 import { assertBaseRole } from "./access.js";
 import { configureAgentRuntime } from "./agent-runtime.js";
 import { BackupService } from "./backup.js";
+import { baizeConfig } from "./baize/config.js";
+import { baizeHandles, BAIZE_PATH_PREFIX, mountBaize } from "./baize/index.js";
 import { buildBaseExport } from "./export.js";
 import { DomainError, type Store } from "./store.js";
 import { createTemplate, TEMPLATES, type TemplateId } from "./templates.js";
@@ -22,7 +24,7 @@ import {
   type ViewType,
 } from "./types.js";
 
-const COOKIE = "duowei_session";
+export const COOKIE = "duowei_session";
 const VIEW_TYPES = ["grid", "kanban", "calendar", "gallery", "form", "gantt"] as const;
 
 const FieldDraftSchema = z.object({
@@ -246,6 +248,9 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
   });
 
   app.get("/api/health", (c) => c.json({ ok: true }));
+
+  /** 前端按需点亮「AI 助理」入口：BAIZE_ENABLED 才显示。 */
+  app.get("/api/features", (c) => c.json({ baize: baizeConfig() !== null }));
 
   app.get("/api/system/backup", async (c) => {
     await requireAdmin(c);
@@ -1816,6 +1821,9 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     return user;
   }
 
+  // 白泽 Bot 子系统：BAIZE_ENABLED=1 时才真正注册，挂在 /assistant 下，须在静态伺服之前。
+  mountBaize(app, accounts);
+
   const webRoot = resolveWebRoot();
   if (webRoot) {
     app.use(
@@ -1827,6 +1835,16 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     );
     app.notFound(async (c) => {
       if (c.req.path.startsWith("/api")) return c.json({ error: "未找到接口" }, 404);
+      // /assistant 的前端路由刷新：白泽的 SPA index.html（/assistant/api 除外，那是接口要 JSON 404）。
+      const baizeIndex = baizeIndexHtml();
+      if (
+        baizeIndex !== null &&
+        c.req.path.startsWith(BAIZE_PATH_PREFIX) &&
+        !c.req.path.startsWith(`${BAIZE_PATH_PREFIX}/api`)
+      ) {
+        const html = await fs.promises.readFile(baizeIndex, "utf8");
+        return c.html(html);
+      }
       const index = path.join(webRoot, "index.html");
       const html = await fs.promises.readFile(index, "utf8");
       return c.html(html);
@@ -1834,6 +1852,14 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
   }
 
   return app;
+}
+
+/** 白泽 Web 的 index.html 路径；BAIZE_ENABLED 且构建产物存在才给。 */
+function baizeIndexHtml(): string | null {
+  const handles = baizeHandles();
+  if (handles === null || handles.webDir === null) return null;
+  const index = path.join(handles.webDir, "index.html");
+  return fs.existsSync(index) ? index : null;
 }
 
 function resolveWebRoot(): string | null {
@@ -1849,7 +1875,7 @@ function resolveWebRoot(): string | null {
   return null;
 }
 
-function readSecret(c: Context): string | undefined {
+export function readSecret(c: Context): string | undefined {
   const header = c.req.header("authorization");
   if (header?.toLowerCase().startsWith("bearer ")) return header.slice(7).trim();
   return getCookie(c, COOKIE);
