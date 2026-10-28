@@ -96,6 +96,7 @@ remote 'set -e
   else
     podman build --target remote-computer \
       --build-arg APT_MIRROR='"$APT_MIRROR"' \
+      --build-arg NODE_IMAGE='"${ZHIXING_NODE_BASE:-docker.m.daocloud.io/library/node:22-bookworm-slim}"' \
       -f docs/baize/deploy/remote/Dockerfile -t '"$REMOTE_IMAGE"' .
     podman image inspect '"$REMOTE_IMAGE"' --format "构建完成：{{.Os}}/{{.Architecture}}"
   fi'
