@@ -1,4 +1,4 @@
-# 构建上下文是仓库根：docker build -f deploy/remote/Dockerfile .
+# 构建上下文是仓库根：podman build --target remote-computer -f docs/baize/deploy/remote/Dockerfile .
 # 基础镜像钉在多架构索引（含 amd64、arm64）的 digest 上，标签只给人读，升级时换这一处。
 ARG NODE_IMAGE=node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
 
@@ -17,7 +17,6 @@ COPY packages/computer-agent/package.json packages/computer-agent/
 COPY packages/desktop/package.json packages/desktop/
 COPY packages/web/package.json packages/web/
 COPY packages/e2e/package.json packages/e2e/
-COPY spikes/pi-embed/package.json spikes/pi-embed/
 RUN pnpm install --frozen-lockfile --filter "@baize/control-plane..." --filter "@baize/computer-agent..."
 COPY packages/shared packages/shared
 COPY packages/control-plane packages/control-plane
@@ -44,7 +43,7 @@ RUN if [ -n "$APT_MIRROR" ]; then sed -i "s#http://deb.debian.org#${APT_MIRROR}#
   && apt-get install -y --no-install-recommends chromium chromium-l10n fonts-liberation2 xvfb xauth bubblewrap procps curl ca-certificates fonts-noto-cjk git python3 python3-venv \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app /app
-COPY deploy/remote/remote-entrypoint.sh /usr/local/bin/remote-entrypoint.sh
+COPY docs/baize/deploy/remote/remote-entrypoint.sh /usr/local/bin/remote-entrypoint.sh
 RUN install -d -o node -g node -m 700 /home/node/.baize /home/node/.baize/bots \
   && install -d -m 1777 /tmp/.X11-unix
 WORKDIR /app/packages/computer-agent

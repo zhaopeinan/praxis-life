@@ -38,9 +38,21 @@ ROLLBACK_IMAGE="docker.io/library/duowei:rollback"
 CONTAINER="duowei"
 REMOTE_DATA_DIR="/opt/duowei/data"
 REMOTE_SRC_DIR="/opt/duowei-src"
+# 白泽子系统（BAIZE_ENABLED=1 时生效）的服务器侧落点。
+REMOTE_BAIZE_DIR="/opt/duowei/baize"
+REMOTE_BAIZE_ENV="$REMOTE_BAIZE_DIR/baize.env"
+BAIZE_NETWORK="baize-net"
+BAIZE_PG_CONTAINER="baize-postgres"
+BAIZE_PG_VOLUME="/opt/duowei/pgdata"
+# 容器内 PG 监听 5432，宿主机经 127.0.0.1:5435 维护（pg_dump/排查）。
+BAIZE_PG_PORT_HOST="5435"
 # 国内服务器直连 Docker Hub 不通，基础镜像走镜像加速站。
 NODE_BASE="${DUOWEI_NODE_BASE:-docker.m.daocloud.io/library/node:22-bookworm-slim}"
+PG_BASE="${BAIZE_PG_BASE:-docker.m.daocloud.io/library/postgres:16}"
 PUBLIC_URL="${DUOWEI_PUBLIC_URL:-http://47.122.123.1/}"
+
+# 白泽模型上游：优先读本机 baize.env（gitignored），没有就生成钥匙骨架，网关地址/key 之后手动填。
+LOCAL_BAIZE_ENV="$ROOT/baize.env"
 
 BUILD=1
 REMOTE_BUILD=0
@@ -64,13 +76,17 @@ remote() { sshpass -e ssh "${SSH_OPTS[@]}" "$SSH_USER@$HOST" "$@"; }
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 
-# 起容器的命令（正式部署与回滚共用，避免两处漂移）
+# 起容器的命令（正式部署与回滚共用，避免两处漂移）。
+# 白泽子系统经 --env-file 注入 BAIZE_*；BAIZE_ENABLED 不在文件里时应用行为与旧版一致。
 container_run_cmd() {
   cat <<EOF
+podman network exists $BAIZE_NETWORK || podman network create $BAIZE_NETWORK >/dev/null
 podman rm $CONTAINER >/dev/null 2>&1 || true
 podman run -d --name $CONTAINER --restart unless-stopped \\
+  --network $BAIZE_NETWORK \\
   -p 127.0.0.1:8787:8787 \\
   -v $REMOTE_DATA_DIR:/app/data \\
+  --env-file $REMOTE_BAIZE_ENV \\
   -e DUOWEI_HOST=0.0.0.0 \\
   -e DUOWEI_PORT=8787 \\
   -e DUOWEI_WEB_ROOT=/app/dist-web \\
@@ -89,7 +105,11 @@ smoke_check() {
     ASSET="$(curl -s http://127.0.0.1:8787/ | grep -o "assets/index-[A-Za-z0-9_-]*\.js" | head -1)"
     test -n "$ASSET"
     curl -fsS -o /dev/null "http://127.0.0.1:8787/$ASSET"
-    echo "冒烟通过（健康检查 / 首页 / 前端资源）"'
+    echo "冒烟通过（健康检查 / 首页 / 前端资源）
+    if grep -q "^BAIZE_ENABLED=1" '"$REMOTE_BAIZE_ENV"' 2>/dev/null; then
+      curl -fsS -m 10 http://127.0.0.1:8787/assistant/api/health | grep -q "\"ok\":true"
+      echo "白泽子系统健康检查通过（/assistant/api/health）"
+    fi"'
 }
 
 rollback_to_previous() {
@@ -123,8 +143,8 @@ remote "if podman container exists $CONTAINER; then
         fi"
 
 if (( REMOTE_BUILD )); then
-  step "本机构建前端产物（原生 arm64，产物与平台无关）"
-  (cd "$ROOT" && npm run build:web)
+  step "本机构建前端产物（产物与平台无关）"
+  (cd "$ROOT" && pnpm build:web)
 
   step "上传源码 + dist-web，并在服务器上原生构建镜像"
   # 先在服务器上停掉 duowei：一是给 podman build 腾内存（该机器只有 1.7G 且无 swap），
@@ -133,8 +153,9 @@ if (( REMOTE_BUILD )); then
   # 而 Dockerfile.remote 正要 COPY dist-web。上下文由下面这份白名单控制，本来也不会带上 node_modules / data / .git。
   # scripts / infra 也要带上：/opt/duowei-src 会被清空重建，值班日报、恢复演练脚本以这里为落点。
   tar czf - -C "$ROOT" \
-      Dockerfile.remote package.json package-lock.json tsconfig.json \
-      src web dist-web scripts infra \
+      Dockerfile.remote package.json pnpm-lock.yaml pnpm-workspace.yaml \
+      tsconfig.json tsconfig.base.json patches \
+      src web dist-web packages scripts infra docs/baize/deploy \
     | remote "set -e
              rm -rf $REMOTE_SRC_DIR && mkdir -p $REMOTE_SRC_DIR
              tar xzf - -C $REMOTE_SRC_DIR
@@ -175,7 +196,68 @@ remote "podman stop $CONTAINER >/dev/null 2>&1 || true
         tar czf $REMOTE_DATA_DIR/duowei-db-\$(date +%Y%m%d-%H%M%S).tar.gz -C $REMOTE_DATA_DIR duowei.db duowei.db-wal duowei.db-shm 2>/dev/null || true
         ls -1t $REMOTE_DATA_DIR/duowei-db-*.tar.gz | head -1"
 
+# ---- 白泽子系统：env 骨架、Postgres、迁移。幂等，BAIZE_ENABLED 不开时env 文件里没有开关，下面全是空转 ----
+step "白泽：确保服务器侧 $REMOTE_BAIZE_ENV"
+if [[ -f "$LOCAL_BAIZE_ENV" ]]; then
+  echo "从本机 $LOCAL_BAIZE_ENV 上传（含模型上游配置）"
+  sshpass -e scp "${SSH_OPTS[@]}" "$LOCAL_BAIZE_ENV" "$SSH_USER@$HOST:$REMOTE_BAIZE_ENV.part"
+  remote "mkdir -p $REMOTE_BAIZE_DIR && mv $REMOTE_BAIZE_ENV.part $REMOTE_BAIZE_ENV && chmod 600 $REMOTE_BAIZE_ENV"
+else
+  remote "mkdir -p $REMOTE_BAIZE_DIR
+          if [[ ! -f $REMOTE_BAIZE_ENV ]]; then
+            umask 077
+            cat > $REMOTE_BAIZE_ENV <<BAIZEENV
+BAIZE_ENABLED=1
+BAIZE_DATABASE_URL=postgres://baize:baize@$BAIZE_PG_CONTAINER:5432/baize
+BAIZE_TOOL_SECRET_KEY=$(openssl rand -hex 32)
+BAIZE_CREDENTIALS_KEY=$(openssl rand -base64 32)
+BAIZE_UPSTREAM_BASE_URL=
+BAIZE_UPSTREAM_API_KEY=
+BAIZE_GATEWAY_MODELS=plan=baize-default,fast=baize-default
+BAIZEENV
+            echo '已生成 baize.env 骨架；BAIZE_UPSTREAM_* 还没填，Bot 干活会 502'
+          else
+            echo 'baize.env 已存在，保留'
+          fi"
+fi
+
+step "白泽：确保 Postgres 容器（$BAIZE_PG_CONTAINER，只绑 127.0.0.1:$BAIZE_PG_PORT_HOST）"
+remote "set -e
+        podman network exists $BAIZE_NETWORK || podman network create $BAIZE_NETWORK >/dev/null
+        if ! podman container exists $BAIZE_PG_CONTAINER; then
+          podman run -d --name $BAIZE_PG_CONTAINER --restart unless-stopped \
+            --network $BAIZE_NETWORK \
+            -p 127.0.0.1:$BAIZE_PG_PORT_HOST:5432 \
+            -e POSTGRES_USER=baize -e POSTGRES_PASSWORD=baize -e POSTGRES_DB=baize \
+            -v $BAIZE_PG_VOLUME:/var/lib/postgresql/data \
+            $PG_BASE >/dev/null
+          echo 'PG 已创建'
+        else
+          podman start $BAIZE_PG_CONTAINER >/dev/null 2>&1 || true
+          echo 'PG 已存在'
+        fi
+        for i in \$(seq 1 30); do
+          podman exec $BAIZE_PG_CONTAINER pg_isready -U baize >/dev/null 2>&1 && break
+          sleep 1
+        done"
+
+step "白泽：应用迁移（幂等，advisory 锁）"
+remote "set -e
+        DB_URL=\$(grep '^BAIZE_DATABASE_URL=' $REMOTE_BAIZE_ENV | cut -d= -f2-)
+        test -n \"\$DB_URL\"
+        podman run --rm --network $BAIZE_NETWORK -e DATABASE_URL=\"\$DB_URL\" $RUN_IMAGE \
+          ./node_modules/.bin/tsx packages/control-plane/src/scripts/migrate.ts"
+
+step "备份白泽 PG（pg_dump 进数据目录，跟 SQLite 备份一个节奏）"
+remote "if podman container exists $BAIZE_PG_CONTAINER && grep -q '^BAIZE_ENABLED=1' $REMOTE_BAIZE_ENV 2>/dev/null; then
+          podman exec $BAIZE_PG_CONTAINER pg_dump -U baize -Fc baize > $REMOTE_DATA_DIR/baize-pg-\$(date +%Y%m%d-%H%M%S).dump 2>/dev/null || true
+          ls -1t $REMOTE_DATA_DIR/baize-pg-*.dump 2>/dev/null | head -1
+        else
+          echo '白泽未启用，跳过 PG 备份'
+        fi"
+
 step "同步 Caddy 配置（仓库 infra/caddy/duowei.caddyfile 为准）"
+# 白泽挂在同域 /assistant 下（合并应用直接伺服），Caddy 规则不变，这份文件不需要动。
 # scp 偶尔会在认证阶段被客户端提前关掉（服务器忙时更明显，sshd 侧看到的是 preauth 断开），
 # 重试即可；连续三次都失败才让部署停在这里。
 upload_caddy() {

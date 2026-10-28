@@ -3,11 +3,16 @@
 # 写在 FROM 上则 buildx 与 legacy builder 都能正确产出 linux/amd64 镜像。
 FROM --platform=linux/amd64 node:22-bookworm-slim AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
 RUN npm config set registry https://registry.npmmirror.com \
-  && npm ci
+  && corepack enable
+# workspace 清单 + 全部子包清单，一次性装好依赖（含 postgres 补丁）。
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY patches ./patches
+COPY packages ./packages
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build:web
+# 两个前端：知行人生 dist-web + 白泽 Web（带 /assistant 前缀）。
+RUN pnpm build:web
 
 FROM --platform=linux/amd64 node:22-bookworm-slim
 WORKDIR /app
@@ -17,14 +22,18 @@ ENV NODE_ENV=production \
     DUOWEI_WEB_ROOT=/app/dist-web \
     DUOWEI_DEV_CODES=0 \
     DUOWEI_COOKIE_SECURE=0
-COPY package.json package-lock.json ./
 RUN npm config set registry https://registry.npmmirror.com \
-  && npm ci --omit=dev
-COPY --from=build /app/dist-web ./dist-web
+  && corepack enable
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY patches ./patches
+COPY packages ./packages
+RUN pnpm install --frozen-lockfile --prod \
+  && mkdir -p /app/data \
+  && test -x node_modules/.bin/tsx
 COPY src ./src
 COPY tsconfig.json ./
-RUN mkdir -p /app/data \
-  && test -x node_modules/.bin/tsx
+COPY --from=build /app/dist-web ./dist-web
+COPY --from=build /app/packages/web/dist ./packages/web/dist
 VOLUME ["/app/data"]
 EXPOSE 8787
 CMD ["./node_modules/.bin/tsx", "src/listen.ts"]
