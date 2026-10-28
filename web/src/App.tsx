@@ -1052,28 +1052,29 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
           </div>
           {!isMobile && (
             <div className="top-user">
-              <button type="button" className="secondary" onClick={() => setDialog("tokens")}>访问令牌</button>
-              <button type="button" className="secondary" onClick={() => setDialog("agent-brief")}>给 Agent</button>
               {features?.baize && (
-                <button type="button" className="secondary" onClick={() => window.open("/assistant/", "_blank", "noopener")}>
+                <button
+                  type="button"
+                  className="secondary top-assistant"
+                  onClick={() => window.open("/assistant/", "_blank", "noopener")}
+                >
                   AI 助理
                 </button>
               )}
               <button type="button" className="secondary" onClick={() => setDialog("help")}>使用说明</button>
-              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("admin")}>用户管理</button>}
-              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("backup")}>数据备份</button>}
-              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("usage")}>使用度量</button>}
-              {user.role === "admin" && features?.baize && <button type="button" className="secondary" onClick={() => setDialog("model-gateway")}>模型网关</button>}
-              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("agents")}>Agent 管理</button>}
-              {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("smart-agents")}>智能体</button>}
-              <span>{user.name}</span>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => api.logout().finally(onLogout)}
-              >
-                退出
-              </button>
+              <DropMenu label="设置" ariaLabel="账户与设置">
+                <div className="menu-user">{user.name}</div>
+                <button type="button" onClick={() => setDialog("tokens")}>访问令牌</button>
+                <button type="button" onClick={() => setDialog("agent-brief")}>给 Agent</button>
+                {user.role === "admin" && <button type="button" onClick={() => setDialog("admin")}>用户管理</button>}
+                {user.role === "admin" && <button type="button" onClick={() => setDialog("backup")}>数据备份</button>}
+                {user.role === "admin" && <button type="button" onClick={() => setDialog("usage")}>使用度量</button>}
+                {user.role === "admin" && <button type="button" onClick={() => setDialog("agents")}>Agent 管理</button>}
+                {user.role === "admin" && <button type="button" onClick={() => setDialog("smart-agents")}>智能体</button>}
+                {user.role === "admin" && features?.baize && <button type="button" onClick={() => setDialog("model-gateway")}>模型网关</button>}
+                <hr className="menu-sep" />
+                <button type="button" className="danger-text" onClick={() => api.logout().finally(onLogout)}>退出登录</button>
+              </DropMenu>
             </div>
           )}
           {isMobile && (

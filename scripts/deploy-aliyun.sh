@@ -51,7 +51,7 @@ NODE_BASE="${DUOWEI_NODE_BASE:-docker.m.daocloud.io/library/node:22-bookworm-sli
 PG_BASE="${BAIZE_PG_BASE:-docker.m.daocloud.io/library/postgres:16}"
 PUBLIC_URL="${DUOWEI_PUBLIC_URL:-http://47.122.123.1/}"
 
-# 白泽模型上游：优先读本机 baize.env（gitignored），没有就生成钥匙骨架，网关地址/key 之后手动填。
+# 本机 baize.env（gitignored）若存在则上传；模型上游不在里面——前端「模型网关」页配置。
 LOCAL_BAIZE_ENV="$ROOT/baize.env"
 
 BUILD=1

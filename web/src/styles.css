@@ -127,6 +127,13 @@ button:active:not(:disabled) { transform: translateY(0.5px); }
   color: var(--ink);
 }
 
+/* 顶栏的 AI 助理入口：主入口，颜色往前站一步。 */
+.top-user > button.top-assistant {
+  background: var(--accent-soft, var(--surface));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .ghost,
 .views > button.ghost,
 .toolbar-right > button.ghost {
