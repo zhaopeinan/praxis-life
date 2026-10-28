@@ -17,7 +17,9 @@ COPY packages/computer-agent/package.json packages/computer-agent/
 COPY packages/desktop/package.json packages/desktop/
 COPY packages/web/package.json packages/web/
 COPY packages/e2e/package.json packages/e2e/
-RUN pnpm install --frozen-lockfile --filter "@baize/control-plane..." --filter "@baize/computer-agent..."
+RUN pnpm install --frozen-lockfile --filter "@zhixingbot/control-plane..." --filter "@zhixingbot/computer-agent..." --filter .
+# --filter . 把根项目也算进来：pnpm 的 .pnpm 虚拟店开在根 node_modules 下，
+# 过滤条件一个都匹配不上（或根项目被排除）时，包内 node_modules 全是悬空软链。
 COPY packages/shared packages/shared
 COPY packages/control-plane packages/control-plane
 COPY packages/bot-runner packages/bot-runner
