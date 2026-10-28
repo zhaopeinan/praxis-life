@@ -73,7 +73,7 @@ remote 'set -euo pipefail
   printf "{\"url\":\"%s\",\"computerId\":\"%s\",\"token\":\"%s\",\"dataDir\":\"/home/node/.zhixingbot/bots\"}\n" \
     "'"$AGENT_URL"'" "$COMPUTER_ID" "$AGENT_TOKEN" > '"$REMOTE_RUN_DIR"'/launch.json
   chmod 600 '"$REMOTE_RUN_DIR"'/launch.json
-  chown -R 1000:1000 '"$REMOTE_BOTS_DIR"' 2>/dev/null || true
+  chown 1000:1000 '"$REMOTE_RUN_DIR"' '"$REMOTE_RUN_DIR"'/launch.json '"$REMOTE_BOTS_DIR"' 2>/dev/null || true
   echo "launch.json 已写好（computer ${COMPUTER_ID}）"'
 
 step "传 bwrap seccomp 配置"
