@@ -74,6 +74,9 @@ command -v sshpass >/dev/null || { echo "需要 sshpass：brew install hudochenk
 
 remote() { sshpass -e ssh "${SSH_OPTS[@]}" "$SSH_USER@$HOST" "$@"; }
 
+
+step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
+
 # 旧白泽标识迁移（2026-10 改名 zhixingbot）：目录、env 文件、PG 容器各挪一次，幂等。
 step "迁移旧标识（baize → zhixingbot，已迁过则空转）"
 remote 'set -e
@@ -94,8 +97,6 @@ remote 'set -e
           echo "远程电脑容器已改名"
         fi
         echo "迁移检查完"'
-
-step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 
 # 起容器的命令（正式部署与回滚共用，避免两处漂移）。
 # 知行Bot子系统经 --env-file 注入 ZHIXINGBOT_*；ZHIXINGBOT_ENABLED 不在文件里时应用行为与旧版一致。
