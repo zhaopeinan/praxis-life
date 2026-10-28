@@ -11,7 +11,7 @@ import {
   type PokerCard,
   type PokerPersona,
   type PokerTableView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { configurePoker } from "../../control-plane/src/poker/converge.js";
 import { newHand } from "../../control-plane/src/poker/engine.js";
 import { startStack, type Stack } from "../src/stack.js";

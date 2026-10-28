@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RunId } from "@baize/shared";
+import { RunId } from "@zhixingbot/shared";
 import { previewOf } from "./preview.js";
 
 describe("previewOf", () => {

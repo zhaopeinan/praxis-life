@@ -1,4 +1,4 @@
-import { LiveFromViewer } from "@baize/shared";
+import { LiveFromViewer } from "@zhixingbot/shared";
 import { z } from "zod";
 import { SHOT, expect, login, openSettings, test, type APIRequestContext, type Page } from "./fixtures";
 

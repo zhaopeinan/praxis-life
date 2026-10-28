@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Play, Settings2 } from "lucide-react";
-import { POKER_PERSONAS, type GroupId, type PokerSeatNo, type PokerTableView } from "@baize/shared";
+import { POKER_PERSONAS, type GroupId, type PokerSeatNo, type PokerTableView } from "@zhixingbot/shared";
 import { ArchiveGroup } from "../components/ArchiveGroup.js";
 import { ReviewCard } from "../components/poker/ReviewCard.js";
 import { SeatsBlock } from "../components/poker/SeatsBlock.js";

@@ -5,7 +5,7 @@ import {
   type GroupId,
   type ServerPush,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { bots, computers, groupMembers, groups, runs } from "../db/schema.js";

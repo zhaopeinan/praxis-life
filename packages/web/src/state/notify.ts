@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { Notice, Settings } from "@baize/shared";
+import type { Notice, Settings } from "@zhixingbot/shared";
 import { pathOf } from "../routes/screen.js";
 
 const TITLE: Record<Notice["kind"], string> = {

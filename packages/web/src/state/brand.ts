@@ -1,4 +1,4 @@
-import type { BrandBook } from "@baize/shared";
+import type { BrandBook } from "@zhixingbot/shared";
 import type { Action, ReadyState } from "./types.js";
 
 const versionOf = (brand: BrandBook | null) => brand?.version ?? 0;

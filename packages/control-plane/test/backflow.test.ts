@@ -7,7 +7,7 @@ import {
   type GroupId,
   type Message,
   type RunId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ApiClient, startTestServer, type TestServer } from "./helpers/client.js";
 import { createTestDb, type TestDb } from "./helpers/db.js";

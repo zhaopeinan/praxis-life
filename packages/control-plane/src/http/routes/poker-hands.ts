@@ -1,4 +1,4 @@
-import { PokerActRequest, StartHandRequest, type Message, type PokerTableView } from "@baize/shared";
+import { PokerActRequest, StartHandRequest, type Message, type PokerTableView } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import { concealed, log } from "../../log.js";
 import { apply } from "../../poker/engine.js";

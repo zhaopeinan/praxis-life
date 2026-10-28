@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BotListResponse, CreateGroupResponse, GroupResponse, type TopicTask } from "@baize/shared";
+import { BotListResponse, CreateGroupResponse, GroupResponse, type TopicTask } from "@zhixingbot/shared";
 import { startFakePlatforms } from "../src/fake-platforms.js";
 import { startStack, type Stack } from "../src/stack.js";
 import { startUpstream } from "../src/upstream.js";

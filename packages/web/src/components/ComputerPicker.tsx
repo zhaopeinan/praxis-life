@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Check, ChevronDown, Laptop, MonitorSmartphone, Server } from "lucide-react";
-import type { Bot, BotId, Computer, ComputerKind, GroupId } from "@baize/shared";
+import type { Bot, BotId, Computer, ComputerKind, GroupId } from "@zhixingbot/shared";
 import { RequestFailed } from "../api/client.js";
 import { BotAvatar } from "./BotAvatar.js";
 import type { ChoiceEntry } from "../state/types.js";

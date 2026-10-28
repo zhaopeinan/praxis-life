@@ -8,7 +8,7 @@ import type {
   MessageBody,
   MessageId,
   ProjectOfferPlatform,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { PLATFORM } from "./content.js";
 import { useFailureToast } from "../Toasts.js";
 

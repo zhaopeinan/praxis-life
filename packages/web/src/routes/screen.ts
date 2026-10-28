@@ -1,4 +1,4 @@
-import { GroupId } from "@baize/shared";
+import { GroupId } from "@zhixingbot/shared";
 
 // 主窗口的每个入口一条路径，路径是「现在在哪」的唯一来源。reducer 不记选中，刷新后照路径回到原处。
 export type Screen =

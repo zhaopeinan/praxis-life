@@ -30,8 +30,8 @@ import {
   UplinkFrame,
   type UplinkRejection,
   type WorkAppend,
-} from "@baize/shared";
-import { CURRENT_SESSION_VERSION, type CdpConnection, type CdpEvent, type RunnerConfig } from "@baize/bot-runner";
+} from "@zhixingbot/shared";
+import { CURRENT_SESSION_VERSION, type CdpConnection, type CdpEvent, type RunnerConfig } from "@zhixingbot/bot-runner";
 import {
   startAgent as startProductAgent,
   type AgentHandle,
@@ -41,7 +41,7 @@ import {
 } from "../src/agent.js";
 import { startAssistantChrome, type AssistantChrome } from "../src/chrome.js";
 import { chromeProfileDir, profileChromePids, reapProfileChromes } from "../src/chrome-process.js";
-import type { CdpPipe } from "@baize/bot-runner";
+import type { CdpPipe } from "@zhixingbot/bot-runner";
 import { backoffDelay, type BackoffOptions } from "../src/backoff.js";
 import { ReliableOutbox } from "../src/reliable-transport.js";
 
@@ -141,7 +141,7 @@ function startAgent(options: AgentOptions): AgentHandle {
   return startProductAgent({ ...options, dataDir, makeChrome: options.makeChrome ?? fakeChrome });
 }
 
-// 假运行器。电脑代理这一层只管把报文派到运行器的接口上，真跑 Pi 在 @baize/bot-runner 的测试里。
+// 假运行器。电脑代理这一层只管把报文派到运行器的接口上，真跑 Pi 在 @zhixingbot/bot-runner 的测试里。
 interface RunnerCalls {
   readonly approvals: Array<{ runId: RunId; callId: string; outcome: ApprovalOutcome }>;
   readonly pokerResults: Array<{ runId: RunId; callId: string; result: { ok: true } | { ok: false; error: string } }>;

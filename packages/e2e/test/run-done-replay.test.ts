@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { BotListResponse, MessageListResponse } from "@baize/shared";
+import { BotListResponse, MessageListResponse } from "@zhixingbot/shared";
 import { startStack, type Stack } from "../src/stack.js";
 import { startUpstream } from "../src/upstream.js";
 

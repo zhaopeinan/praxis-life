@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Message, type PokerEvent, type PokerSeatView, type PokerTableView } from "@baize/shared";
+import { Message, type PokerEvent, type PokerSeatView, type PokerTableView } from "@zhixingbot/shared";
 import { pokerCreateTable, pokerStartHand, pokerView, resetPoker } from "../../../mock/state/poker.js";
 import { handResult, hintStage, hintText, netOf, publicLines } from "./table-side.js";
 

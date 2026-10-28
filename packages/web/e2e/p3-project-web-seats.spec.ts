@@ -1,4 +1,4 @@
-import { PokerTableResponse, POKER_PERSONAS, type GroupId, type PokerTableView } from "@baize/shared";
+import { PokerTableResponse, POKER_PERSONAS, type GroupId, type PokerTableView } from "@zhixingbot/shared";
 import { expect, login, test, type Page } from "./fixtures";
 
 // 牌桌在 mock 里没有侧栏入口以外的路径，用例建好桌直接按网址进项目页。

@@ -1,5 +1,5 @@
 {
-  "name": "@baize/control-plane",
+  "name": "@zhixingbot/control-plane",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,7 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@baize/shared": "workspace:*",
+    "@zhixingbot/shared": "workspace:*",
     "@hono/node-server": "^1.13.7",
     "@modelcontextprotocol/sdk": "1.30.0",
     "croner": "^10.0.1",

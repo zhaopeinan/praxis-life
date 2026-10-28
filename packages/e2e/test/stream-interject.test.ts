@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { BotListResponse, CreateGroupResponse } from "@baize/shared";
+import { BotListResponse, CreateGroupResponse } from "@zhixingbot/shared";
 import { startStack, type Stack } from "../src/stack.js";
 import {
   type ChatRequest,

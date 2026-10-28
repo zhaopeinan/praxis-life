@@ -20,7 +20,7 @@ import {
   RunId,
   type AgentToControl,
   type DraftImage,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { attachmentCopyName, type AttachmentLive } from "../src/attachments.js";
 import { createDraftTools } from "../src/drafts.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Computer, type ComputerStatus } from "@baize/shared";
+import { Computer, type ComputerStatus } from "@zhixingbot/shared";
 import { connectNote, connectTarget } from "./ConnectEntries.js";
 
 const local = (status: ComputerStatus = "online") =>

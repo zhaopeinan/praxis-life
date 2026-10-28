@@ -1,4 +1,4 @@
-import { AccountResponse, CreateBotResponse, MessageListResponse, type GroupId, type ServerPush } from "@baize/shared";
+import { AccountResponse, CreateBotResponse, MessageListResponse, type GroupId, type ServerPush } from "@zhixingbot/shared";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { startTestServer, type ApiClient, type TestServer } from "./helpers/client.js";
 import { createTestDb, type TestDb } from "./helpers/db.js";

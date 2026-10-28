@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { POKER_PERSONAS, PokerTableView, type PokerPersona } from "@baize/shared";
+import { POKER_PERSONAS, PokerTableView, type PokerPersona } from "@zhixingbot/shared";
 import { swapCandidates } from "./SwapSeatDialog.js";
 
 const tableWith = (personas: readonly PokerPersona[]) =>

@@ -1,4 +1,4 @@
-import { AccountListResponse } from "@baize/shared";
+import { AccountListResponse } from "@zhixingbot/shared";
 import { SHOT, expect, login, openSettings, test, type APIRequestContext, type Page } from "./fixtures";
 
 // 账号页的 X 有两种连法：接口授权（OAuth）和电脑上的浏览器登录。后者和小红书同一套：在挑中的电脑上建占位号、开登录画面。

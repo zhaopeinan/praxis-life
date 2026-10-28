@@ -10,7 +10,7 @@ import {
   UsageResponse,
   type MessageBody,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { messages, runs } from "../src/db/schema.js";

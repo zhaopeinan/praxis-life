@@ -1,4 +1,4 @@
-import { DecidePreferenceOfferRequest, UpdatePreferenceRequest } from "@baize/shared";
+import { DecidePreferenceOfferRequest, UpdatePreferenceRequest } from "@zhixingbot/shared";
 import {
   bots,
   findMessage,

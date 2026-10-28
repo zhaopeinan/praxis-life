@@ -1,4 +1,4 @@
-import { PokerTableResponse, type PokerTableView } from "@baize/shared";
+import { PokerTableResponse, type PokerTableView } from "@zhixingbot/shared";
 import { expect, login, test, type Page } from "./fixtures";
 
 // 牌桌 mock 里的牌桌没有对应的 Group，侧栏点不进去，用例直接按 URL 进页面。

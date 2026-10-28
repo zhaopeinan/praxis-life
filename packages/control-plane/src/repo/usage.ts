@@ -1,4 +1,4 @@
-import { BotId, GroupId, RunId, type MessageBody, type UsageResponse, type UserId, type Viewer } from "@baize/shared";
+import { BotId, GroupId, RunId, type MessageBody, type UsageResponse, type UserId, type Viewer } from "@zhixingbot/shared";
 import { and, asc, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { bots, groups, messages, routineRuns, routines, runs, settings, tasks } from "../db/schema.js";

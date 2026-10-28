@@ -1,4 +1,4 @@
-import { BotId, CreateBotResponse, ExportTemplateRequest, ImportTemplateRequest } from "@baize/shared";
+import { BotId, CreateBotResponse, ExportTemplateRequest, ImportTemplateRequest } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import type { AgentHub } from "../../agent/hub.js";
 import type { Db } from "../../db/client.js";

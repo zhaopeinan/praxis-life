@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Lightbulb, LoaderCircle } from "lucide-react";
-import type { PokerHandId, PokerTableView } from "@baize/shared";
+import type { PokerHandId, PokerTableView } from "@zhixingbot/shared";
 import { RequestFailed } from "../../api/client.js";
 import { useApp } from "../../state/app.js";
 import { hintStage, hintText } from "./table-side.js";

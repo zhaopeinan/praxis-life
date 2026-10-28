@@ -1,5 +1,5 @@
 import type { WebSocketRoute } from "@playwright/test";
-import { CreateGroupResponse, GroupListResponse, ProjectResponse, type TopicTask } from "@baize/shared";
+import { CreateGroupResponse, GroupListResponse, ProjectResponse, type TopicTask } from "@zhixingbot/shared";
 import {
   EMAIL,
   PASSWORD,

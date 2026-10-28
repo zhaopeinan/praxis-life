@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { AccountId, BotId, ControlToAgent, DraftId } from "@baize/shared";
+import { AccountId, BotId, ControlToAgent, DraftId } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createBotBrowser } from "../src/browser.js";
 import { acquireBotBrowserMutex } from "../src/browser-mutex.js";

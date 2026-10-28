@@ -8,7 +8,7 @@ import {
   GroupResponse,
   MessageListResponse,
   SendMessageResponse,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { startStack, type Stack } from "../src/stack.js";
 import { isFollowUpTurn, startUpstream, type ScriptedTurn } from "../src/upstream.js";
 

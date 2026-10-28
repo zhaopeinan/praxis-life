@@ -11,7 +11,7 @@ import type {
   Platform,
   PublishVia,
   ToolCallStatus,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { TakeoverScreen } from "../../state/live.js";
 
 export const PLATFORM: Record<Platform, string> = {

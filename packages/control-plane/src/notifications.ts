@@ -1,4 +1,4 @@
-import type { GroupId, NotifyKind, UserId } from "@baize/shared";
+import type { GroupId, NotifyKind, UserId } from "@zhixingbot/shared";
 import { log } from "./log.js";
 import type { Db } from "./db/client.js";
 import { claimBudgetAlert, getSettings } from "./repo/settings.js";

@@ -1,4 +1,4 @@
-import { BotListResponse, LoginResponse } from "@baize/shared";
+import { BotListResponse, LoginResponse } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runMigrations } from "../src/db/migrate.js";
 import { addAccount } from "../src/repo/accounts.js";

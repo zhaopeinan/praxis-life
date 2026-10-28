@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, SendHorizontal, Sparkles, Users } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { Bot, BotId, ChecklistItem, GroupId, Message, MessageId, Skill } from "@baize/shared";
+import type { Bot, BotId, ChecklistItem, GroupId, Message, MessageId, Skill } from "@zhixingbot/shared";
 import {
   TurnView,
   type ApprovalTable,

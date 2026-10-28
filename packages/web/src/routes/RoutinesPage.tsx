@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, Clock, Copy, Globe, Pause, Pencil, Play, Plus, ShieldCheck, X } from "lucide-react";
-import { BotId, OnFailure, type Bot, type Routine, type RoutineId, type TriggerInput } from "@baize/shared";
+import { BotId, OnFailure, type Bot, type Routine, type RoutineId, type TriggerInput } from "@zhixingbot/shared";
 import { BotAvatar } from "../components/BotAvatar.js";
 import { useFailureToast } from "../components/Toasts.js";
 import { useApp } from "../state/app.js";

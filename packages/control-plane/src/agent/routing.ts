@@ -1,4 +1,4 @@
-import type { BotId, SkillId } from "@baize/shared";
+import type { BotId, SkillId } from "@zhixingbot/shared";
 
 // 派活路由的几个纯函数。不碰数据库，群成员和 skill 由调用方查好传进来。
 

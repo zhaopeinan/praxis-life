@@ -1,4 +1,4 @@
-import type { TriggerInput } from "@baize/shared";
+import type { TriggerInput } from "@zhixingbot/shared";
 
 // 第一版只让用户挑这四种时刻，表达式由这里拼。反过来列表要说「下次什么时候跑」，也是拿表达式回到这四种上。
 // 认不出来的表达式原样显示：它是从控制面或者以后的高级输入来的，猜错了比不猜更糟。

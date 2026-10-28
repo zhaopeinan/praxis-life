@@ -1,4 +1,4 @@
-import { BotId, ComputerId, GroupId, RunId, type PokerTableRole, type UsageRecord, UserId } from "@baize/shared";
+import { BotId, ComputerId, GroupId, RunId, type PokerTableRole, type UsageRecord, UserId } from "@zhixingbot/shared";
 import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { agentOutbox, bots, groups, runs } from "../db/schema.js";

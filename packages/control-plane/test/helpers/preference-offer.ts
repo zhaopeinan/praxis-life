@@ -5,7 +5,7 @@ import {
   type Message,
   type MessageId,
   type RunId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { expect } from "vitest";
 import type { AgentClient } from "./agent.js";
 import type { ApiClient } from "./client.js";

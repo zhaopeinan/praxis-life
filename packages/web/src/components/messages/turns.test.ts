@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Message } from "@baize/shared";
+import { Message } from "@zhixingbot/shared";
 import { turnsOf, type Turn } from "./turns.js";
 
 let nextMessageId = 0;

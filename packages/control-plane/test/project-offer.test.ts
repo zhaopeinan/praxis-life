@@ -15,7 +15,7 @@ import {
   type MessageBody,
   type RunId,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { newId } from "../src/ids.js";
 import { helloAgent, type AgentClient } from "./helpers/agent.js";

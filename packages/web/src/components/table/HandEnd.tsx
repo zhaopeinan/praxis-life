@@ -1,5 +1,5 @@
 import { List, RotateCcw } from "lucide-react";
-import type { PokerTableView } from "@baize/shared";
+import type { PokerTableView } from "@zhixingbot/shared";
 import { handResult } from "./table-side.js";
 import { useTableRun } from "./use-table-run.js";
 import "./table-side.css";

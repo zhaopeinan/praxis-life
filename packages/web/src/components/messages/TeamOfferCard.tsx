@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Check, UserPlus } from "lucide-react";
-import type { Bot, BotId, GroupId, MessageBody, MessageId, TeamOfferMember } from "@baize/shared";
+import type { Bot, BotId, GroupId, MessageBody, MessageId, TeamOfferMember } from "@zhixingbot/shared";
 import { RequestFailed } from "../../api/client.js";
 import { useApp } from "../../state/app.js";
 

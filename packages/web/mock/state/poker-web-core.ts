@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PokerTableView } from "@baize/shared";
+import type { PokerTableView } from "@zhixingbot/shared";
 import { readBody, send, type Route } from "../routes/http.js";
 import { pokerTableOf, pokerView } from "./poker.js";
 

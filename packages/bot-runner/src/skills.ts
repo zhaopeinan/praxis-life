@@ -1,6 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { AgentToControl, SkillOrigin, type RunId, type Skill, type SkillChange } from "@baize/shared";
+import { AgentToControl, SkillOrigin, type RunId, type Skill, type SkillChange } from "@zhixingbot/shared";
 import { type Static, Type } from "typebox";
 import type { RunnerTool } from "./bot-session.js";
 import type { ActiveRun } from "./topic.js";

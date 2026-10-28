@@ -1,4 +1,4 @@
-import { AgentToControl, type ControlToAgent, Platform } from "@baize/shared";
+import { AgentToControl, type ControlToAgent, Platform } from "@zhixingbot/shared";
 import { type Static, Type } from "typebox";
 import type { z } from "zod";
 import type { RunnerTool } from "./bot-session.js";

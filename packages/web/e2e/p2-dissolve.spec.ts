@@ -1,4 +1,4 @@
-import { GroupListResponse, PokerTableResponse } from "@baize/shared";
+import { GroupListResponse, PokerTableResponse } from "@zhixingbot/shared";
 import { TEAM_TITLE, expect, login, teamItem, test, type Page } from "./fixtures";
 
 const listedTitles = async (page: Page): Promise<string[]> =>

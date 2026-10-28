@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { GroupId } from "@baize/shared";
+import type { GroupId } from "@zhixingbot/shared";
 import { useApp } from "./app.js";
 
 export type PokerTableLoad = "loading" | "ready" | "failed";

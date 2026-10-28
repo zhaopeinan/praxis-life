@@ -27,11 +27,11 @@ jobs:
       - name: 知行人生单元测试
         run: pnpm test
       - name: 白泽 control-plane 测试（每个文件一个临时库）
-        run: pnpm --filter @baize/control-plane test
+        run: pnpm --filter @zhixingbot/control-plane test
         env:
           DATABASE_URL: postgres://baize:baize@localhost:5432/baize
       - name: 白泽 web 单测
-        run: pnpm --filter @baize/web exec vitest run
+        run: pnpm --filter @zhixingbot/web exec vitest run
       - name: 前端构建（双 Web）
         run: pnpm build:web
     services:

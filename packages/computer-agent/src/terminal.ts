@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import type { Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
-import type { TerminalSpawn } from "@baize/bot-runner";
-import { encodeLive, type LiveDown, type LiveId } from "@baize/shared";
+import type { TerminalSpawn } from "@zhixingbot/bot-runner";
+import { encodeLive, type LiveDown, type LiveId } from "@zhixingbot/shared";
 
 // 云电脑上的网页终端：一个伪终端里的 bash，输出按序送给正在看的人，人敲的字原样写回去。
 // 和画面一样只过内存：输出和输入都不落盘、不记日志，回滚缓冲随会话一起没。

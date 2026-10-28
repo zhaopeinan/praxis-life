@@ -1,4 +1,4 @@
-import { BotId, DecideRoutineOfferRequest, GroupId, Routine } from "@baize/shared";
+import { BotId, DecideRoutineOfferRequest, GroupId, Routine } from "@zhixingbot/shared";
 import { z } from "zod";
 import {
   appendMessage,

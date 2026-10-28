@@ -1,4 +1,4 @@
-import type { AgentToControl, ApprovalOutcome, BotId, GrantTarget, GroupId, RunId, ToolView } from "@baize/shared";
+import type { AgentToControl, ApprovalOutcome, BotId, GrantTarget, GroupId, RunId, ToolView } from "@zhixingbot/shared";
 
 export type ApprovalAction = Extract<AgentToControl, { type: "approval_request" }>["action"];
 export type LocalApprovalOutcome = ApprovalOutcome | "expired";

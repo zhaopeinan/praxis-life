@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { OAuthPlatform } from "@baize/shared";
+import type { OAuthPlatform } from "@zhixingbot/shared";
 import { log } from "./log.js";
 import type { OAuthConfig } from "./env.js";
 

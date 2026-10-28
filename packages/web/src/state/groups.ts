@@ -1,4 +1,4 @@
-import type { BotId, Group, GroupId, GroupListItem, Message, MessageId, TopicTask } from "@baize/shared";
+import type { BotId, Group, GroupId, GroupListItem, Message, MessageId, TopicTask } from "@zhixingbot/shared";
 import { newer, shelfLoad, shelfPrepend, shelfRow, shelfWrite, type Seq } from "./stamped.js";
 import type {
   Action,

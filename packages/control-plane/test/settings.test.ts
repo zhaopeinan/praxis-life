@@ -1,4 +1,4 @@
-import { ApiError, Settings } from "@baize/shared";
+import { ApiError, Settings } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startTestServer, type TestServer } from "./helpers/client.js";
 import { createTestDb, type TestDb } from "./helpers/db.js";

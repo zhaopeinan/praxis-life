@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TodayResponse } from "@baize/shared";
+import type { TodayResponse } from "@zhixingbot/shared";
 import { useApp } from "./app.js";
 
 type TodayLoad =

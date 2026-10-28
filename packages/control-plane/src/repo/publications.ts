@@ -1,4 +1,4 @@
-import { Publication, type ContentPlanId, type DraftId, type UserId } from "@baize/shared";
+import { Publication, type ContentPlanId, type DraftId, type UserId } from "@zhixingbot/shared";
 import { and, asc, eq, inArray, or, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { drafts, publications } from "../db/schema.js";

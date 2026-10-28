@@ -15,7 +15,7 @@ import {
   type LiveInput,
   type LiveSession,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 import { bytesOf } from "../src/live/relay.js";

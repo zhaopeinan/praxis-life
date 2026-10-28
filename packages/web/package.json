@@ -1,5 +1,5 @@
 {
-  "name": "@baize/web",
+  "name": "@zhixingbot/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@baize/shared": "workspace:*",
+    "@zhixingbot/shared": "workspace:*",
     "@xterm/addon-fit": "0.10.0",
     "@xterm/xterm": "5.5.0",
     "lucide-react": "^0.468.0",

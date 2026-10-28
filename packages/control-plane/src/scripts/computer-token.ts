@@ -1,4 +1,4 @@
-import { ComputerKind } from "@baize/shared";
+import { ComputerKind } from "@zhixingbot/shared";
 import { connect } from "../db/client.js";
 import { databaseUrl } from "../env.js";
 import { ensureComputer, resetComputerToken } from "../repo/computers.js";

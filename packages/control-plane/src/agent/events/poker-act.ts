@@ -1,4 +1,4 @@
-import { BotId, type AgentToControl, type Message } from "@baize/shared";
+import { BotId, type AgentToControl, type Message } from "@zhixingbot/shared";
 import { and, count, eq, gte, sql } from "drizzle-orm";
 import type { Db } from "../../db/client.js";
 import { messages, pokerActReceipts, pokerHands, runs, type PokerActResult } from "../../db/schema.js";

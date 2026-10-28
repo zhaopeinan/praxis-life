@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { open, unlink, type FileHandle } from "node:fs/promises";
-import { AgentLaunch } from "@baize/shared";
+import { AgentLaunch } from "@zhixingbot/shared";
 
 export type LaunchFile = { readonly kind: "absent" } | { readonly kind: "taken"; readonly launch: AgentLaunch };
 

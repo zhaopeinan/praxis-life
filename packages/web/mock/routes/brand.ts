@@ -1,4 +1,4 @@
-import { BrandResponse, UpdateBrandRequest } from "@baize/shared";
+import { BrandResponse, UpdateBrandRequest } from "@zhixingbot/shared";
 import { brand, replaceBrand } from "../state.js";
 import { readBody, send, type Route } from "./http.js";
 

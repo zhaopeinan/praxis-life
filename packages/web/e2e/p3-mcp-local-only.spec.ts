@@ -1,4 +1,4 @@
-import { BotTemplate, CreateBotResponse, ToolListResponse } from "@baize/shared";
+import { BotTemplate, CreateBotResponse, ToolListResponse } from "@zhixingbot/shared";
 import { expect, fillTool, login, openTools, test, toolCard } from "./fixtures";
 
 test("新插件默认供本机与远程电脑使用，勾选只在本机后创建并保留", async ({ page }) => {

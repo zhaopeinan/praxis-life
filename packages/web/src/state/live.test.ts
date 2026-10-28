@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AccountId, ComputerId, LiveId, LiveSession, LoginAttemptId } from "@baize/shared";
+import { AccountId, ComputerId, LiveId, LiveSession, LoginAttemptId } from "@zhixingbot/shared";
 import { EMPTY_CONTENT, reduceContent } from "./content.js";
 import { openTerminal, shownLive, shownLogin, takeoverScreen } from "./live.js";
 import { createClock } from "./stamped.js";

@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline";
-import { AgentLaunch } from "@baize/shared";
+import { AgentLaunch } from "@zhixingbot/shared";
 import { startAgent } from "./agent.js";
 
 const AGENT_VERSION = "0.1.0";

@@ -2,7 +2,7 @@ import { lstatSync, mkdirSync, readlinkSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BotId, GroupId } from "@baize/shared";
+import type { BotId, GroupId } from "@zhixingbot/shared";
 
 // Pi 有四个独立的落盘回落点，不给就各自回落到 ~/.pi/agent：
 // createAgentSession 的 agentDir、DefaultResourceLoader 的 agentDir、

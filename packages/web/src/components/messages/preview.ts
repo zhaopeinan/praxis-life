@@ -1,5 +1,5 @@
-import { toolViewText } from "@baize/shared";
-import type { Message, MessageBody, SkillChange } from "@baize/shared";
+import { toolViewText } from "@zhixingbot/shared";
+import type { Message, MessageBody, SkillChange } from "@zhixingbot/shared";
 
 export const skillOfferTitle = (change: SkillChange): string => {
   switch (change.op) {

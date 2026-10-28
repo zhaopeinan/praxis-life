@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PokerTableView } from "@baize/shared";
+import type { PokerTableView } from "@zhixingbot/shared";
 import { api, RequestFailed } from "../../api/client.js";
 import { BotAvatar } from "../BotAvatar.js";
 

@@ -1,4 +1,4 @@
-import type { ControlToAgent, GroupId, RunId } from "@baize/shared";
+import type { ControlToAgent, GroupId, RunId } from "@zhixingbot/shared";
 import type { BotSession } from "./bot-session.js";
 import type { BotGeneration } from "./index.js";
 import type { RememberingRun } from "./memory.js";

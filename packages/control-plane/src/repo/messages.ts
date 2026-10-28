@@ -9,7 +9,7 @@ import {
   type RunId,
   type UserId,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, desc, eq, inArray, isNull, lt, max, ne, notExists, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { bots, groupMembers, groups, messages, runs } from "../db/schema.js";

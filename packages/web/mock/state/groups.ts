@@ -1,4 +1,4 @@
-import { Bot, BotId, BotShape, Group, GroupId, TaskId, TopicTask, type ChecklistItem } from "@baize/shared";
+import { Bot, BotId, BotShape, Group, GroupId, TaskId, TopicTask, type ChecklistItem } from "@zhixingbot/shared";
 import {
   HUES,
   bots,

@@ -1,5 +1,5 @@
 import { dirname, join } from "node:path";
-import type { ComputerKind } from "@baize/shared";
+import type { ComputerKind } from "@zhixingbot/shared";
 import type { SandboxKind } from "./gate.js";
 
 export type ContainmentLevel = "none" | "closed";

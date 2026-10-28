@@ -14,7 +14,7 @@ import {
   type DraftContent,
   type Message,
   type Publication,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import {
   accounts,
   at,

@@ -1,4 +1,4 @@
-import type { UplinkAck, UplinkRejection, WorkAppend, WorkAppendResult } from "@baize/shared";
+import type { UplinkAck, UplinkRejection, WorkAppend, WorkAppendResult } from "@zhixingbot/shared";
 import { OversizedUplink } from "./frame-limit.js";
 
 type Result = WorkAppendResult | { readonly kind: "disconnected" };

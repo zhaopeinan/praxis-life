@@ -18,7 +18,7 @@ import {
   PokerHandId,
   PokerSessionId,
   type ToolConnectionConfig,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { AgentSession } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";

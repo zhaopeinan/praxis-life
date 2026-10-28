@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { POKER_PERSONAS, SwapSeatRequest, type PokerSeatNo, type PokerTableView } from "@baize/shared";
+import { POKER_PERSONAS, SwapSeatRequest, type PokerSeatNo, type PokerTableView } from "@zhixingbot/shared";
 import { BotAvatar } from "../BotAvatar.js";
 import { useEscapeToClose } from "../useEscapeToClose.js";
 

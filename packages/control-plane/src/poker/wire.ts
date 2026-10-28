@@ -1,4 +1,4 @@
-import { PokerSeatView } from "@baize/shared";
+import { PokerSeatView } from "@zhixingbot/shared";
 import type { SeatView } from "./view.js";
 
 // shared 的 PokerSeatView 是引擎 SeatView 的 zod 镜像。两边必须一字不差：引擎多一个字段，

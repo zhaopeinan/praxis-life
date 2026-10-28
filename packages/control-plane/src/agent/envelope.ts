@@ -12,7 +12,7 @@ import {
   type RunId,
   type UplinkAck,
   type UplinkRejection,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { agentOutbox, bots, computers, groupMembers, routineRuns, routines, runs } from "../db/schema.js";

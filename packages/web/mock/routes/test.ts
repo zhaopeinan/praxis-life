@@ -15,7 +15,7 @@ import {
   ServerPush,
   RunId,
   SkillChange,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { z } from "zod";
 import {
   confirmNextHandoff,

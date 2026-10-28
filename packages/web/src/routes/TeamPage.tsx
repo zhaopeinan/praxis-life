@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowRightLeft, BookOpen, Download, Hand, MessageSquare, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { Bot, BotId } from "@baize/shared";
+import type { Bot, BotId } from "@zhixingbot/shared";
 import { BotAvatar, resolveBotAvatarState } from "../components/BotAvatar.js";
 import { BrandBookOpener } from "../components/BrandBookDialog.js";
 import { ImportDialog } from "../components/ImportDialog.js";

@@ -1,4 +1,4 @@
-import { ServerPush } from "@baize/shared";
+import { ServerPush } from "@zhixingbot/shared";
 import { WebSocket } from "ws";
 import { WS_PATH } from "../../src/server.js";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BotId, Grant, type ToolConnection } from "@baize/shared";
+import { BotId, Grant, type ToolConnection } from "@zhixingbot/shared";
 import { reduceSettings } from "./settings.js";
 import type { ReadyState } from "./types.js";
 

@@ -18,7 +18,7 @@ import {
   TopicTask,
   User,
   type BotHue,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 
 export type ApprovalDecision = "approved" | "rejected";
 

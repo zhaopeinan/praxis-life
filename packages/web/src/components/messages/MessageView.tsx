@@ -19,7 +19,7 @@ import type {
   PreferenceOfferStatus,
   SkillChangeOp,
   SkillOfferStatus,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { ContentBook } from "../../state/types.js";
 import { BotAvatar, resolveBotAvatarState } from "../BotAvatar.js";
 import { ACTION_TEXT, SCOPE_TEXT, offeredScopes, targetText } from "../grantText.js";

@@ -1,4 +1,4 @@
-import type { PokerCard } from "@baize/shared";
+import type { PokerCard } from "@zhixingbot/shared";
 import { cardParts, cardText } from "../../state/poker.js";
 import "./felt.css";
 

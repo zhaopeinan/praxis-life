@@ -20,7 +20,7 @@ import {
   type ServerPush,
   type ToolView,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { MENTION_LOOP_NOTICE } from "../src/agent/group-turn.js";

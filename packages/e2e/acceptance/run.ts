@@ -21,7 +21,7 @@ import {
   UsageResponse,
   type Platform,
   type PokerTableView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { newHand } from "../../control-plane/src/poker/engine.js";
 import { seatNextHand } from "../../control-plane/src/poker/seating.js";
 import { startFakePlatforms, type FakePlatforms } from "../src/fake-platforms.js";

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { CreateBotResponse, MessageListResponse } from "@baize/shared";
+import { CreateBotResponse, MessageListResponse } from "@zhixingbot/shared";
 import { expect, it } from "vitest";
 import { runMigrations } from "../src/db/migrate.js";
 import { PASSWORD, makeComputer, makeUser } from "./helpers/fixtures.js";

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { BotListResponse, CreateGroupResponse, MessageListResponse, type UplinkFrame } from "@baize/shared";
+import { BotListResponse, CreateGroupResponse, MessageListResponse, type UplinkFrame } from "@zhixingbot/shared";
 import { startStack, type Stack } from "../src/stack.js";
 import { isFollowUpTurn, startUpstream, type ChatRequest, type ScriptedTurn } from "../src/upstream.js";
 

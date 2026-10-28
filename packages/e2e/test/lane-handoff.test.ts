@@ -13,9 +13,9 @@ import {
   MessageListResponse,
   type ComputerId,
   type RunId,
-} from "@baize/shared";
-import { createRunner, type Runner } from "@baize/bot-runner";
-import { startAgent, type AgentHandle } from "@baize/computer-agent";
+} from "@zhixingbot/shared";
+import { createRunner, type Runner } from "@zhixingbot/bot-runner";
+import { startAgent, type AgentHandle } from "@zhixingbot/computer-agent";
 import { startRelayEntry } from "../src/relay.js";
 import { startStack, type Stack } from "../src/stack.js";
 import { startUpstream } from "../src/upstream.js";

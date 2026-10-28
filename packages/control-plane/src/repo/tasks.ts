@@ -9,7 +9,7 @@ import {
   type TaskId,
   type TopicTask,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, eq, exists, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import type { PgUpdateSetSource } from "drizzle-orm/pg-core";
 import type { Db } from "../db/client.js";

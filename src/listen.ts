@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { accounts, backup, init, store } from "./context.js";
-import { BAIZE_PATH_PREFIX, baizeHandles, baizeReady } from "./baize/index.js";
+import { ZHIXINGBOT_PATH_PREFIX, baizeHandles, baizeReady } from "./zhixingbot/index.js";
 import { createApp } from "./server.js";
 
 await init();
@@ -18,7 +18,7 @@ const baize = baizeHandles();
 if (baize) {
   server.on("upgrade", (request, socket, head) => {
     const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
-    if (pathname.startsWith(BAIZE_PATH_PREFIX)) {
+    if (pathname.startsWith(ZHIXINGBOT_PATH_PREFIX)) {
       baize.upgrade(pathname, request, socket, head);
       return;
     }

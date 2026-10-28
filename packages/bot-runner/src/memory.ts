@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { AgentToControl, type BotId, type ControlToAgent, type MessageId } from "@baize/shared";
+import { AgentToControl, type BotId, type ControlToAgent, type MessageId } from "@zhixingbot/shared";
 import { type Static, Type } from "typebox";
 import type { RunnerTool } from "./bot-session.js";
 import { CLI_TOOLS_SECTION } from "./cli-tools.js";

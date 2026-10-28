@@ -1,4 +1,4 @@
-import { BotId, Message, MessageId, PokerPersona, Timestamp } from "@baize/shared";
+import { BotId, Message, MessageId, PokerPersona, Timestamp } from "@zhixingbot/shared";
 import { z } from "zod";
 import { readBody, send, type Route } from "../routes/http.js";
 import { messagesByGroupId, nextSuffix } from "./store.js";

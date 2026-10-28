@@ -8,8 +8,8 @@ import { Accounts } from "./accounts.js";
 import { assertBaseRole } from "./access.js";
 import { configureAgentRuntime } from "./agent-runtime.js";
 import { BackupService } from "./backup.js";
-import { baizeConfig } from "./baize/config.js";
-import { baizeHandles, BAIZE_PATH_PREFIX, mountBaize } from "./baize/index.js";
+import { baizeConfig } from "./zhixingbot/config.js";
+import { baizeHandles, ZHIXINGBOT_PATH_PREFIX, mountBaize } from "./zhixingbot/index.js";
 import { buildBaseExport } from "./export.js";
 import { DomainError, type Store } from "./store.js";
 import { createTemplate, TEMPLATES, type TemplateId } from "./templates.js";
@@ -248,7 +248,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
 
   app.get("/api/health", (c) => c.json({ ok: true }));
 
-  /** 前端按需点亮「AI 助理」入口：BAIZE_ENABLED 才显示。 */
+  /** 前端按需点亮「AI 助理」入口：ZHIXINGBOT_ENABLED 才显示。 */
   app.get("/api/features", (c) => c.json({ baize: baizeConfig() !== null }));
 
   /** 知行Bot模型网关配置（管理员）。apiKey 只写不读：GET 只回 hasApiKey。 */
@@ -1862,7 +1862,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     return user;
   }
 
-  // 知行Bot 子系统：BAIZE_ENABLED=1 时才真正注册，挂在 /assistant 下，须在静态伺服之前。
+  // 知行Bot 子系统：ZHIXINGBOT_ENABLED=1 时才真正注册，挂在 /assistant 下，须在静态伺服之前。
   mountBaize(app, accounts, store);
 
   const webRoot = resolveWebRoot();
@@ -1880,8 +1880,8 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
       const baizeIndex = baizeIndexHtml();
       if (
         baizeIndex !== null &&
-        c.req.path.startsWith(BAIZE_PATH_PREFIX) &&
-        !c.req.path.startsWith(`${BAIZE_PATH_PREFIX}/api`)
+        c.req.path.startsWith(ZHIXINGBOT_PATH_PREFIX) &&
+        !c.req.path.startsWith(`${ZHIXINGBOT_PATH_PREFIX}/api`)
       ) {
         const html = await fs.promises.readFile(baizeIndex, "utf8");
         return c.html(html);
@@ -1895,7 +1895,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
   return app;
 }
 
-/** 知行Bot Web 的 index.html 路径；BAIZE_ENABLED 且构建产物存在才给。 */
+/** 知行Bot Web 的 index.html 路径；ZHIXINGBOT_ENABLED 且构建产物存在才给。 */
 function baizeIndexHtml(): string | null {
   const handles = baizeHandles();
   if (handles === null || handles.webDir === null) return null;

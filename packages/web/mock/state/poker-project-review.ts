@@ -1,4 +1,4 @@
-import { BotId, Group, GroupId, TopicTask } from "@baize/shared";
+import { BotId, Group, GroupId, TopicTask } from "@zhixingbot/shared";
 import { z } from "zod";
 import { createGroup } from "./groups.js";
 import { pokerTableOf } from "./poker.js";

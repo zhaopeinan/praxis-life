@@ -16,7 +16,7 @@ import {
   type RunId,
   type ServerPush,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BOT_MESSAGE_LIMIT, MENTION_LOOP_NOTICE } from "../src/agent/group-turn.js";
 import { appendMessage } from "../src/repo/messages.js";

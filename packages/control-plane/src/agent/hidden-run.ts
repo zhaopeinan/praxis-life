@@ -7,7 +7,7 @@ import type {
   RunId,
   TablePrompt,
   Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { Db } from "../db/client.js";
 import { ownerOfGroup } from "../repo/runs.js";
 import { placeRun } from "./place-run.js";

@@ -1,4 +1,4 @@
-import { GroupId, HandoffId, UserId, type BotId, type Handoff, type Message } from "@baize/shared";
+import { GroupId, HandoffId, UserId, type BotId, type Handoff, type Message } from "@zhixingbot/shared";
 import { and, asc, count, eq, inArray, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { bots, groups, handoffs, messages } from "../db/schema.js";

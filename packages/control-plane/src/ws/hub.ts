@@ -1,4 +1,4 @@
-import { ServerPush, type UserId } from "@baize/shared";
+import { ServerPush, type UserId } from "@zhixingbot/shared";
 import type { WebSocket } from "ws";
 
 /** WebSocket 的 1008（违反策略）：握手时认得出的人，后来账号没了。 */

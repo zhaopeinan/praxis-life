@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BotId, ComputerId, GroupId } from "@baize/shared";
+import { BotId, ComputerId, GroupId } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { homeCommands, renderCliToolsSection } from "../src/cli-tools.js";
 import { decide, type GateCall } from "../src/gate.js";

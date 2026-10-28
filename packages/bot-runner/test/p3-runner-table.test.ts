@@ -14,7 +14,7 @@ import {
   RunId,
   type TablePrompt,
   TaskId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRunner, type PromptMessage, type Runner, type RunnerConfig } from "../src/index.js";
 import { composeTablePrompt, createPokerResults } from "../src/table.js";

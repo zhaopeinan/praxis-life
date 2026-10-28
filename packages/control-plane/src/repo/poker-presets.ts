@@ -1,4 +1,4 @@
-import { POKER_PERSONAS, PokerPersona, type BotRole, type UserId } from "@baize/shared";
+import { POKER_PERSONAS, PokerPersona, type BotRole, type UserId } from "@zhixingbot/shared";
 import { sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { bots } from "../db/schema.js";

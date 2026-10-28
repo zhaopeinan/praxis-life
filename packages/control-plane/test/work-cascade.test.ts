@@ -9,7 +9,7 @@ import {
   advanceWorkHead,
   type BotId,
   type GroupId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { RawData } from "ws";
 import { openAgent, sendHello, type AgentClient } from "./helpers/agent.js";
@@ -44,7 +44,7 @@ afterAll(async () => {
 type Person = { readonly id: string; readonly email: string };
 type BotGroup = { readonly botId: BotId; readonly groupId: GroupId };
 type OnlineAgent = { readonly agent: AgentClient; readonly computer: TestComputer; readonly key: string };
-type Prompt = Extract<import("@baize/shared").ControlToAgent, { type: "prompt" }>;
+type Prompt = Extract<import("@zhixingbot/shared").ControlToAgent, { type: "prompt" }>;
 
 async function login(name: string): Promise<{ user: Person; client: ApiClient; computer: TestComputer }> {
   const user = await makeUser(database.db, name);

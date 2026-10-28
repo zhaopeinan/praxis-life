@@ -1,4 +1,4 @@
-import { AccountId, type DraftContent } from "@baize/shared";
+import { AccountId, type DraftContent } from "@zhixingbot/shared";
 import { describe, expect, it } from "vitest";
 import { contentHash } from "../src/repo/drafts.js";
 

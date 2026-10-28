@@ -17,7 +17,7 @@ import {
   type TeamOfferMember,
   type ToolCallStatus,
   type ToolView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";

@@ -1,4 +1,4 @@
-import { BrandResponse, UpdateBrandRequest, type BrandBook, type UserId } from "@baize/shared";
+import { BrandResponse, UpdateBrandRequest, type BrandBook, type UserId } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import type { AgentHub } from "../../agent/hub.js";
 import type { Db } from "../../db/client.js";

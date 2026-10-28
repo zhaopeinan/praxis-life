@@ -1,4 +1,4 @@
-import { DecideTeamOfferRequest, DecideTeamOfferResponse, MessageId, type GroupId, type UserId } from "@baize/shared";
+import { DecideTeamOfferRequest, DecideTeamOfferResponse, MessageId, type GroupId, type UserId } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import type { AgentHub } from "../../agent/hub.js";
 import type { Db } from "../../db/client.js";

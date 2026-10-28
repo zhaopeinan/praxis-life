@@ -21,16 +21,16 @@ const rejectGateway = (): Plugin => ({
 
 export default defineConfig({
   // 嵌进知行人生时构建带前缀（资源路径、dev 代理都跟着走），独立运行默认根路径。
-  base: process.env["BAIZE_BASE"] ?? "/",
+  base: process.env["ZHIXINGBOT_BASE"] ?? "/",
   plugins: [react(), rejectGateway()],
-  resolve: { alias: { "@baize/shared": sharedSrc } },
-  optimizeDeps: { exclude: ["@baize/shared"] },
+  resolve: { alias: { "@zhixingbot/shared": sharedSrc } },
+  optimizeDeps: { exclude: ["@zhixingbot/shared"] },
   server: {
     host: "127.0.0.1",
     port: Number(process.env["WEB_PORT"] ?? 5173),
     strictPort: true,
     proxy: {
-      [`${process.env["BAIZE_BASE"] ?? ""}/api`]: {
+      [`${process.env["ZHIXINGBOT_BASE"] ?? ""}/api`]: {
         target: `http://127.0.0.1:${apiPort}`,
         changeOrigin: false,
         ws: true,

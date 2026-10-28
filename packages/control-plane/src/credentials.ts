@@ -1,4 +1,4 @@
-import { OAuthPlatform, type Account, type AccountId, type Platform } from "@baize/shared";
+import { OAuthPlatform, type Account, type AccountId, type Platform } from "@zhixingbot/shared";
 import { and, eq, ne, or, sql } from "drizzle-orm";
 import { open, seal } from "./crypto.js";
 import type { Db } from "./db/client.js";

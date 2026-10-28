@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { AgentHandle } from "@baize/computer-agent";
+import type { AgentHandle } from "@zhixingbot/computer-agent";
 import {
   AccountResponse,
   BotListResponse,
@@ -13,8 +13,8 @@ import {
   TodayResponse,
   type AccountId,
   type Draft,
-} from "@baize/shared";
-import { startFakePlatforms } from "@baize/control-plane/testing";
+} from "@zhixingbot/shared";
+import { startFakePlatforms } from "@zhixingbot/control-plane/testing";
 import { fakeChrome } from "../acceptance/fake-chrome.js";
 import { pushUntil, startRemoteComputer } from "../src/live.js";
 import { startStack, type Stack } from "../src/stack.js";

@@ -11,7 +11,7 @@ import {
   type Platform,
   type PublishVia,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, desc, eq, lte, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import type { Tx } from "./messages.js";

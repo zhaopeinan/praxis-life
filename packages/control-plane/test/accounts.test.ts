@@ -14,7 +14,7 @@ import {
   type ComputerId,
   type ServerPush,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { runMigrations } from "../src/db/migrate.js";
 import { accounts } from "../src/db/schema.js";

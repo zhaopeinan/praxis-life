@@ -1,4 +1,4 @@
-import { Message, MessageId } from "@baize/shared";
+import { Message, MessageId } from "@zhixingbot/shared";
 import { describe, expect, it } from "vitest";
 import { RequestFailed, type Api } from "../api/client.js";
 import { createLoadBucket, loadMessageGap, type Scope } from "./app.js";

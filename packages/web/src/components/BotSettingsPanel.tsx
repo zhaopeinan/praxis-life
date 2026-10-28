@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, Pencil, X } from "lucide-react";
-import { BotHue, BotShape, type Bot, type BotId } from "@baize/shared";
+import { BotHue, BotShape, type Bot, type BotId } from "@zhixingbot/shared";
 import type { BotDraft } from "../api/client.js";
 import { BotAvatar, SHAPES } from "./BotAvatar.js";
 import { useFailureToast } from "./Toasts.js";

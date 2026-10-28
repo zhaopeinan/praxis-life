@@ -1,4 +1,4 @@
-import { DOWNLINK_DELIVERY, type AgentToControl, type UplinkRejection } from "@baize/shared";
+import { DOWNLINK_DELIVERY, type AgentToControl, type UplinkRejection } from "@zhixingbot/shared";
 import type { Db } from "../db/client.js";
 import type { Tx } from "../repo/messages.js";
 import type { AgentConnection } from "./hub.js";

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { type CdpConnection, evaluateIsolated, type LiveEnd, type PresentPage } from "@baize/bot-runner";
-import { type AccountId, type BrowserPlatform, LiveId, type LoginAttemptId, type LoginFailure } from "@baize/shared";
+import { type CdpConnection, evaluateIsolated, type LiveEnd, type PresentPage } from "@zhixingbot/bot-runner";
+import { type AccountId, type BrowserPlatform, LiveId, type LoginAttemptId, type LoginFailure } from "@zhixingbot/shared";
 import { type AssistantChrome, untilAborted } from "./chrome.js";
 
 // 登录就是把平台的登录页摆到屏上给人操作，本机和远程一样。电脑这边只看页面上出没出现已登录的标志。

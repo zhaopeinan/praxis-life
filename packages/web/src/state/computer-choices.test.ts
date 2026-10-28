@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BotId, GroupId, type ComputerChoices } from "@baize/shared";
+import { BotId, GroupId, type ComputerChoices } from "@zhixingbot/shared";
 import { finishingElsewhere } from "./computer-choices.js";
 import { reduce } from "./reducer.js";
 import { createClock } from "./stamped.js";

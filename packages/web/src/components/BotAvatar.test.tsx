@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BotShape } from "@baize/shared";
+import { BotShape } from "@zhixingbot/shared";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BotAvatar, resolveBotAvatarState, SHAPES } from "./BotAvatar.js";
 

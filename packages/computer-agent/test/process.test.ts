@@ -15,7 +15,7 @@ import {
   GroupId,
   RunId,
   UplinkFrame,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { DownlinkCursor, ReliableOutbox } from "../src/reliable-transport.js";
 
 // 断开期间进程里没有别的 handle 撑着事件循环，这个缺陷只有真起进程才看得见：

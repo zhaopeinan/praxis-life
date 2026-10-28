@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
-import { CreateBotResponse } from "@baize/shared";
+import { CreateBotResponse } from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import postgres from "postgres";
 import { afterEach, expect, it, vi } from "vitest";

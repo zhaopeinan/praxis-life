@@ -9,9 +9,9 @@ import {
   ComputerTokenResponse,
   type ComputerId,
   type ServerPush,
-} from "@baize/shared";
-import { createRunner, type PromptMessage } from "@baize/bot-runner";
-import { startAgent, type AgentHandle } from "@baize/computer-agent";
+} from "@zhixingbot/shared";
+import { createRunner, type PromptMessage } from "@zhixingbot/bot-runner";
+import { startAgent, type AgentHandle } from "@zhixingbot/computer-agent";
 import { startStack, type Stack } from "../src/stack.js";
 import { type ChatMessage, type ChatRequest, isFollowUpTurn, startUpstream } from "../src/upstream.js";
 

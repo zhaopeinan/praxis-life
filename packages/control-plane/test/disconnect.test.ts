@@ -7,7 +7,7 @@ import {
   type Bot,
   type GroupId,
   type RunId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { DEFAULT_RUNTIME_CONFIG, startServer, type RunningServer } from "../src/server.js";
 import * as runsRepo from "../src/repo/runs.js";

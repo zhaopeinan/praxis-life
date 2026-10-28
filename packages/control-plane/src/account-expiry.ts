@@ -1,4 +1,4 @@
-import type { AccountId, UserId } from "@baize/shared";
+import type { AccountId, UserId } from "@zhixingbot/shared";
 import { PLATFORM_LABEL, type SettleDeps } from "./publish/settle.js";
 import { markLoginExpired, type RejectedCredentials, type ReportingConnection } from "./repo/accounts.js";
 

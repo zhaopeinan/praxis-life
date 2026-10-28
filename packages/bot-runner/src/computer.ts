@@ -1,4 +1,4 @@
-import { ComputerKind, SwitchComputerResponse, type ComputerView, type RunId } from "@baize/shared";
+import { ComputerKind, SwitchComputerResponse, type ComputerView, type RunId } from "@zhixingbot/shared";
 import { Type } from "typebox";
 import type { RunnerTool } from "./bot-session.js";
 

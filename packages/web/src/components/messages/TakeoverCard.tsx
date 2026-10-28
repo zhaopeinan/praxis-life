@@ -1,5 +1,5 @@
 import { MonitorUp } from "lucide-react";
-import type { MessageBody, MessageId, ToolView } from "@baize/shared";
+import type { MessageBody, MessageId, ToolView } from "@zhixingbot/shared";
 import { takeoverScreen } from "../../state/live.js";
 import type { ContentBook } from "../../state/types.js";
 import { useFailureToast } from "../Toasts.js";

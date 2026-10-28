@@ -1,4 +1,4 @@
-import type { Bot, BotId } from "@baize/shared";
+import type { Bot, BotId } from "@zhixingbot/shared";
 import { reduceApprovals } from "./approvals.js";
 import { reduceBrand } from "./brand.js";
 import { reduceComputerChoices } from "./computer-choices.js";

@@ -1,4 +1,4 @@
-import { type ControlToAgent, MessageId } from "@baize/shared";
+import { type ControlToAgent, MessageId } from "@zhixingbot/shared";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import { z } from "zod";
 

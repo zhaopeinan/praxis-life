@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { SendHorizontal } from "lucide-react";
-import type { ApprovalId, DecideApprovalRequest, GroupId } from "@baize/shared";
+import type { ApprovalId, DecideApprovalRequest, GroupId } from "@zhixingbot/shared";
 import { TodayPending } from "./TodayPage.js";
 import { useToday } from "../state/today.js";
 

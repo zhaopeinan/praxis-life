@@ -1,4 +1,4 @@
-import { ComputerId, UserId, type ComputerKind } from "@baize/shared";
+import { ComputerId, UserId, type ComputerKind } from "@zhixingbot/shared";
 import { and, asc, eq, inArray, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import type { Tx } from "./messages.js";

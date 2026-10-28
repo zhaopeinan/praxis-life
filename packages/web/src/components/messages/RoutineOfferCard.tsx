@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Repeat, ShieldCheck } from "lucide-react";
-import type { Message, RoutineBoundary } from "@baize/shared";
+import type { Message, RoutineBoundary } from "@zhixingbot/shared";
 import { useApp } from "../../state/app.js";
 import { shelfRow } from "../../state/stamped.js";
 import { describeCron } from "../routines/cron.js";

@@ -1,4 +1,4 @@
-import { OAuthPlatform, OAuthResult } from "@baize/shared";
+import { OAuthPlatform, OAuthResult } from "@zhixingbot/shared";
 import { PLATFORM } from "../components/messages/content.js";
 
 export type OAuthReturn = { platform: OAuthPlatform; result: OAuthResult };

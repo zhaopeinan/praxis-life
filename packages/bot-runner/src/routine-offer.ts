@@ -1,4 +1,4 @@
-import { type AgentToControl, BotId, ModelPurpose, RoutineBoundary } from "@baize/shared";
+import { type AgentToControl, BotId, ModelPurpose, RoutineBoundary } from "@zhixingbot/shared";
 import { type Static, Type } from "typebox";
 import { parseOrThrow, resultText } from "./assistant.js";
 import type { RunnerTool } from "./bot-session.js";

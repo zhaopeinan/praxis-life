@@ -9,7 +9,7 @@ import {
   type PokerPersona,
   type PokerTableView,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, count, eq, isNotNull } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { bots, groupMembers, groups, pokerTables } from "../src/db/schema.js";

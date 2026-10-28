@@ -8,7 +8,7 @@ import {
   type GroupId,
   type PublishVia,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   accounts,

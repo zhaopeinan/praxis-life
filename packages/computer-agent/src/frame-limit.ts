@@ -1,4 +1,4 @@
-import { AGENT_FRAME_MAX_BYTES, type AgentToControl, type JsonValue, type ToolView } from "@baize/shared";
+import { AGENT_FRAME_MAX_BYTES, type AgentToControl, type JsonValue, type ToolView } from "@zhixingbot/shared";
 
 const CLIPPED = "…（内容过长，后面的已截掉）";
 const VIEW_TEXT_MAX_BYTES = 4096;

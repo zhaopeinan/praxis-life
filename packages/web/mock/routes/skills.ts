@@ -1,4 +1,4 @@
-import { CreateSkillRequest, DecideSkillOfferRequest, type MessageBody, type Skill } from "@baize/shared";
+import { CreateSkillRequest, DecideSkillOfferRequest, type MessageBody, type Skill } from "@zhixingbot/shared";
 import {
   bots,
   createSkill,

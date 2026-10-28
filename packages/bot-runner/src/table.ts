@@ -11,7 +11,7 @@ import {
   type PokerSeatView,
   type RunId,
   type TablePrompt,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import {
   createAgentSession,
   DefaultResourceLoader,

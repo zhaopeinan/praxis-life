@@ -9,7 +9,7 @@ import {
   type RunId,
   type UserId,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, getTableColumns, count, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import {

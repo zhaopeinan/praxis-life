@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Message } from "@baize/shared";
+import { Message } from "@zhixingbot/shared";
 import { latestTurnOf, weekChangesOf } from "./ProjectPage.js";
 
 let nextMessageId = 0;

@@ -11,7 +11,7 @@ import {
   type HandoffId,
   type RunId,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BOT_MESSAGE_LIMIT, HANDOFF_LIMIT_NOTICE, MENTION_LOOP_NOTICE } from "../src/agent/group-turn.js";
 import { STALE_HANDOFF_MS, remindStaleHandoffs } from "../src/repo/handoffs.js";

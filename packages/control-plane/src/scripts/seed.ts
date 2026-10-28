@@ -11,7 +11,7 @@ try {
   console.log(`COMPUTER_ID=${result.computerId}`);
   // token 明文只在建电脑那一刻存在，库里存的是哈希，所以重跑 seed 打不出旧的。
   if (result.computerToken === null) {
-    console.log("电脑已在，要一把新 token 就跑 pnpm --filter @baize/control-plane computer-token");
+    console.log("电脑已在，要一把新 token 就跑 pnpm --filter @zhixingbot/control-plane computer-token");
   } else {
     console.log(`AGENT_TOKEN=${result.computerToken}`);
   }

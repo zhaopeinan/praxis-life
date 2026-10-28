@@ -52,7 +52,7 @@ import {
   type TaskId,
   type TopicTask,
   type User,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { RequestFailed, type Api, type BotDraft } from "../api/client.js";
 import { applyTheme } from "./theme.js";
 import { noticeTarget } from "./notify.js";

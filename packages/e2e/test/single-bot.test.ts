@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { BotListResponse, MessageListResponse, type ServerPush } from "@baize/shared";
-import { botDirs } from "@baize/bot-runner";
+import { BotListResponse, MessageListResponse, type ServerPush } from "@zhixingbot/shared";
+import { botDirs } from "@zhixingbot/bot-runner";
 import { startStack } from "../src/stack.js";
 import { type ChatRequest, isFollowUpTurn, type ScriptedTurn, startUpstream } from "../src/upstream.js";
 

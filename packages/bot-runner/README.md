@@ -1,4 +1,4 @@
-# @baize/bot-runner
+# @zhixingbot/bot-runner
 
 Bot 运行器。用 `@earendil-works/pi-coding-agent` 1.1.0 的 SDK，一个 Bot 在每个群一份 `AgentSession`，跑在电脑代理进程里。同一个 Bot 在不同群可以并行干活，同一群的 prompt 按到达顺序一条一条跑。
 
@@ -697,7 +697,7 @@ Pi 把 `getSkills()` 的结果经 `formatSkillsForPrompt` 拼进系统提示，�
 ## 跑测试
 
 ```
-pnpm --filter @baize/bot-runner test
+pnpm --filter @zhixingbot/bot-runner test
 ```
 
 本机没有模型 key。测试起一个假上游加 OpenAI 兼容网关（`test/fixtures/`，搬自 `spikes/pi-embed/`，去掉了转发真上游的分支），按脚本产出 SSE 分片，不打任何付费接口。工具连接的用例起一个本地假 MCP（`test/helpers/mcp.ts`，SDK 的 `McpServer` 加 `StreamableHTTPServerTransport`），记下收到的参数和 `Authorization` 头。

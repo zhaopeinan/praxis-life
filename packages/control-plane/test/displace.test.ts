@@ -7,7 +7,7 @@ import {
   CreateBotResponse,
   PairLocalConflictResponse,
   RegisterResponse,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 import * as computersRepo from "../src/repo/computers.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BotListResponse, CreateGroupResponse, type ServerPush } from "@baize/shared";
+import { BotListResponse, CreateGroupResponse, type ServerPush } from "@zhixingbot/shared";
 import { startStack, type Stack } from "../src/stack.js";
 import { type ChatRequest, startUpstream, type ScriptedTurn } from "../src/upstream.js";
 

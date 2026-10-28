@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { BotListResponse, CreateGroupResponse, recallPlaceholder, type WorkAppend } from "@baize/shared";
-import { type PromptMessage } from "@baize/bot-runner";
+import { BotListResponse, CreateGroupResponse, recallPlaceholder, type WorkAppend } from "@zhixingbot/shared";
+import { type PromptMessage } from "@zhixingbot/bot-runner";
 import { describe, expect, it } from "vitest";
 import { startStack, type Stack } from "../src/stack.js";
 import { startUpstream, type ChatRequest, type ScriptedTurn } from "../src/upstream.js";

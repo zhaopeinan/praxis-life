@@ -8,7 +8,7 @@ import {
   type McpProxyCallRequest,
   type ToolConnectionConfig,
   type ToolOperation,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
@@ -181,7 +181,7 @@ const textOf = (blocks: readonly ResultBlock[]): string =>
   blocks.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("\n");
 
 async function connect(connection: Link["connection"], signal: AbortSignal): Promise<Client> {
-  const client = new Client({ name: "baize-bot-runner", version: "0.1.0" });
+  const client = new Client({ name: "zhixingbot-bot-runner", version: "0.1.0" });
   const transport = new StreamableHTTPClientTransport(
     new URL(connection.url),
     connection.authorization === null ? {} : { requestInit: { headers: { Authorization: connection.authorization } } },

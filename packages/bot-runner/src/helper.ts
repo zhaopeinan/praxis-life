@@ -1,4 +1,4 @@
-import type { ControlToAgent, ToolView } from "@baize/shared";
+import type { ControlToAgent, ToolView } from "@zhixingbot/shared";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
 import { ACCOUNT_READ_TOOL } from "./account-read.js";

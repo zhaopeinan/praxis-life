@@ -1,4 +1,4 @@
-import { GroupListResponse, PokerTableResponse, type PokerTableView } from "@baize/shared";
+import { GroupListResponse, PokerTableResponse, type PokerTableView } from "@zhixingbot/shared";
 import { expect, login, teamItem, test, type APIRequestContext, type Page } from "./fixtures";
 
 const REQUEST_ID = "p3-project-review";

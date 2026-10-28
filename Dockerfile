@@ -3,6 +3,8 @@
 # 写在 FROM 上则 buildx 与 legacy builder 都能正确产出 linux/amd64 镜像。
 FROM --platform=linux/amd64 node:22-bookworm-slim AS build
 WORKDIR /app
+# corepack 下 pnpm 二进制走 npmmirror：构建容器直连 npmjs 会 fetch failed。
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
 RUN npm config set registry https://registry.npmmirror.com \
   && corepack enable
 # workspace 清单 + 全部子包清单，一次性装好依赖（含 postgres 补丁）。
@@ -17,6 +19,7 @@ RUN pnpm build:web
 FROM --platform=linux/amd64 node:22-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production \
+    COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
     DUOWEI_HOST=0.0.0.0 \
     DUOWEI_PORT=8787 \
     DUOWEI_WEB_ROOT=/app/dist-web \

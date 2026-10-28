@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BotListResponse, MessageListResponse, ToolListResponse, ToolResponse } from "@baize/shared";
+import { BotListResponse, MessageListResponse, ToolListResponse, ToolResponse } from "@zhixingbot/shared";
 import { startTestMcp, type McpCall, type TestMcp } from "../src/mcp.js";
 import { startStack, type Stack } from "../src/stack.js";
 import { isFollowUpTurn, startUpstream, type ScriptedTurn } from "../src/upstream.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BotTemplate } from "@baize/shared";
+import type { BotTemplate } from "@zhixingbot/shared";
 import { shareLinkOf, shareSummary, templateFromLink } from "./shareLink.js";
 
 const template: BotTemplate = {

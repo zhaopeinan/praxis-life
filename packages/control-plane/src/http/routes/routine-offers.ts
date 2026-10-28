@@ -1,4 +1,4 @@
-import { DecideRoutineOfferRequest, DecideRoutineOfferResponse, MessageId } from "@baize/shared";
+import { DecideRoutineOfferRequest, DecideRoutineOfferResponse, MessageId } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import type { Db } from "../../db/client.js";
 import { decideRoutineOffer, findOwnedRoutineOffer } from "../../repo/routine-offers.js";

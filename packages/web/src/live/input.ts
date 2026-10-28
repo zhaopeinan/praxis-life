@@ -1,4 +1,4 @@
-import type { ComputerKind, LiveInput } from "@baize/shared";
+import type { ComputerKind, LiveInput } from "@zhixingbot/shared";
 
 // 浏览器事件换成画面输入。坐标用比例，换算成远端 CSS 像素是电脑的事：只有它手里有最新一帧的设备尺寸。
 

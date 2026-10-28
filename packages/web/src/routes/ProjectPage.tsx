@@ -19,7 +19,7 @@ import {
   type Message,
   type ProjectResponse,
   type ProjectTurn,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { ArchiveGroup } from "../components/ArchiveGroup.js";
 import { BotAvatar } from "../components/BotAvatar.js";
 import { PLATFORM, draftText, timeText } from "../components/messages/content.js";

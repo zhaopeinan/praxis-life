@@ -7,7 +7,7 @@ import {
   type Skill,
   type SkillChange,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { TransactionRollbackError, and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { parseSkillRefs } from "../agent/routing.js";
 import type { Db } from "../db/client.js";

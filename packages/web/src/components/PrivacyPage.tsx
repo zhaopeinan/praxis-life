@@ -7,7 +7,7 @@ import {
   SESSION_SWEEP_INTERVAL_MS,
   SESSION_TTL_MS,
   type User,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { exportDataUrl } from "../api/client.js";
 import { useApp } from "../state/app.js";
 

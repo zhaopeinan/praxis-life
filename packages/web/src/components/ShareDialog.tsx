@@ -8,7 +8,7 @@ import {
   type PreferenceId,
   type Skill,
   type ToolConnection,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { BotAvatar } from "./BotAvatar.js";
 import { SHARE_LINK_MAX, shareLinkOf, shareSummary } from "./shareLink.js";
 import { trapTab } from "./trapTab.js";

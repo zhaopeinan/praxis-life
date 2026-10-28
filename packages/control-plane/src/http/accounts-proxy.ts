@@ -1,4 +1,4 @@
-import { AccountId, OAuthPlatform } from "@baize/shared";
+import { AccountId, OAuthPlatform } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import { log } from "../log.js";
 import { expireLogin } from "../account-expiry.js";

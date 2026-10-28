@@ -7,7 +7,7 @@ import type {
   ProjectResponse,
   ReadMetric,
   TaskMetric,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { useApp } from "./app.js";
 
 type ProjectLoad =

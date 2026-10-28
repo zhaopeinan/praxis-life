@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { GroupId } from "@baize/shared";
+import type { GroupId } from "@zhixingbot/shared";
 import { useNavigate } from "react-router-dom";
 import { RequestFailed } from "../../api/client.js";
 import { useApp } from "../../state/app.js";

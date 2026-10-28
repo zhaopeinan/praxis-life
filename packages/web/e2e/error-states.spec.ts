@@ -1,4 +1,4 @@
-import { PokerTableResponse } from "@baize/shared";
+import { PokerTableResponse } from "@zhixingbot/shared";
 import {
   expect,
   login,

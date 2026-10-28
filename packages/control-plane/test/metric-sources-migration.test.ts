@@ -1,4 +1,4 @@
-import { GroupResponse, UserId } from "@baize/shared";
+import { GroupResponse, UserId } from "@zhixingbot/shared";
 import { expect, it } from "vitest";
 import { runMigrations } from "../src/db/migrate.js";
 import { hashPassword } from "../src/password.js";

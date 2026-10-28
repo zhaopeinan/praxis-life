@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { AccountId, type Account } from "@baize/shared";
+import { AccountId, type Account } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addAccountWithToken, CredentialCrypto } from "../src/credentials.js";
 import { accounts } from "../src/db/schema.js";

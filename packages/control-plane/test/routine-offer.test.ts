@@ -13,7 +13,7 @@ import {
   type Message,
   type MessageBody,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { helloAgent, type AgentClient } from "./helpers/agent.js";

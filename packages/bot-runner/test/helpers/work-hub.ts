@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { EMPTY_WORK_HEAD, advanceWorkHead, type HubLaneSnapshot, type WorkAppend } from "@baize/shared";
+import { EMPTY_WORK_HEAD, advanceWorkHead, type HubLaneSnapshot, type WorkAppend } from "@zhixingbot/shared";
 
 /** 假 Hub：内存里一条流，`append` 当运行器的 workAppend，GET 按 after/limit 分页回快照。 */
 export async function startWorkHub() {

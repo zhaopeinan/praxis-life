@@ -10,7 +10,7 @@ import {
   type ControlToAgent,
   type GroupId,
   type WorkAppend,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { startServer, type RunningServer } from "../src/server.js";
 import { helloAgent, type AgentClient } from "./helpers/agent.js";

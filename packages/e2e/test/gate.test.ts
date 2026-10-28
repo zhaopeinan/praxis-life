@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BotListResponse, BotResponse, GrantListResponse, MessageListResponse, type Approval } from "@baize/shared";
+import { BotListResponse, BotResponse, GrantListResponse, MessageListResponse, type Approval } from "@zhixingbot/shared";
 import { startStack, type Stack } from "../src/stack.js";
 import { startUpstream, type ChatMessage, type ChatRequest, type ScriptedTurn } from "../src/upstream.js";
 

@@ -11,7 +11,7 @@ import {
   type RoutineRunStatus as RoutineRunStatusSchema,
   type RoutineState,
   type TriggerInput,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomBytes } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNull, ne, notInArray, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import type { z } from "zod";

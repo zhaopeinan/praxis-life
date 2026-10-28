@@ -1,4 +1,4 @@
-import { DecideTeamOfferRequest } from "@baize/shared";
+import { DecideTeamOfferRequest } from "@zhixingbot/shared";
 import { decideTeamOffer, seedHelperTool, seedTeamOffer } from "../state.js";
 import { readBody, send, type Route } from "./http.js";
 

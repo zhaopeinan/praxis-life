@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setImmediate as nextTurn } from "node:timers/promises";
-import { AgentToControl, BotId, ComputerId, GroupId, MessageId, RunId } from "@baize/shared";
+import { AgentToControl, BotId, ComputerId, GroupId, MessageId, RunId } from "@zhixingbot/shared";
 import { afterEach, expect, it } from "vitest";
 import { createRunner, type PromptMessage, type RunnerConfig } from "../src/index.js";
 import { startGateway } from "./fixtures/gateway.js";

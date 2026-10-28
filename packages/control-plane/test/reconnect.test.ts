@@ -5,7 +5,7 @@ import {
   type GroupId,
   type RunId,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { DEFAULT_RUNTIME_CONFIG, startServer, type RunningServer } from "../src/server.js";
 import * as events from "../src/agent/events.js";

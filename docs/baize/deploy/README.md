@@ -24,7 +24,7 @@ compose 网络：postgres、migrate（一次性）、control-plane、remote-comp
 
 ```
 docker run --rm --entrypoint node baize-control-plane:remote --version
-docker run --rm --entrypoint node baize-remote-computer:remote --version
+docker run --rm --entrypoint node zhixingbot-remote-computer:remote --version
 ```
 
 - 宿主机只在构建 Web 时需要 Node（见「Caddy 托管 Web」），版本要求同上，另需 `corepack enable` 拿到 `pnpm@9.15.9`（`package.json:4`）。Web 也可以在开发机上构建好再拷过去。
@@ -129,7 +129,7 @@ Web 是 Vite 单页应用，用 `BrowserRouter`（`packages/web/src/main.tsx:13`
 
 ```
 pnpm install --frozen-lockfile
-pnpm --filter @baize/web build        # 产物在 packages/web/dist（vite.config.ts 没改 outDir）
+pnpm --filter @zhixingbot/web build        # 产物在 packages/web/dist（vite.config.ts 没改 outDir）
 sudo mkdir -p /srv/baize-web && sudo rsync -a --delete packages/web/dist/ /srv/baize-web/
 ```
 

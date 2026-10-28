@@ -14,7 +14,7 @@ import {
   type Message,
   type ServerPush,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accounts, contentPlans, drafts, metricSamples } from "../src/db/schema.js";
 import { newId } from "../src/ids.js";

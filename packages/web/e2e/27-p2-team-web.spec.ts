@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BotId, BotListResponse, DecideTeamOfferResponse, GroupId, GroupListResponse, MessageId } from "@baize/shared";
+import { BotId, BotListResponse, DecideTeamOfferResponse, GroupId, GroupListResponse, MessageId } from "@zhixingbot/shared";
 import { expect, login, ServerPush, teamCard, test, type Page } from "./fixtures";
 import type { ProviderProbe } from "./support/mount-provider";
 

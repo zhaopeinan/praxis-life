@@ -1,4 +1,4 @@
-import { KEPT_EDGE_BYTES, RETAIN_TEXT_LIMIT_BYTES, SESSION_TTL_MS, type OpenAtLogin } from "@baize/shared";
+import { KEPT_EDGE_BYTES, RETAIN_TEXT_LIMIT_BYTES, SESSION_TTL_MS, type OpenAtLogin } from "@zhixingbot/shared";
 import { expect, login, openSettings, test, type Page } from "./fixtures";
 
 type MockBridgeWindow = Window & {

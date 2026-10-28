@@ -1,4 +1,4 @@
-import { Bot, Group, Message, TopicTask } from "@baize/shared";
+import { Bot, Group, Message, TopicTask } from "@zhixingbot/shared";
 import { describe, expect, it } from "vitest";
 import { createPushHandlers, dispatchServerPush } from "./push.js";
 import { reduce } from "./reducer.js";

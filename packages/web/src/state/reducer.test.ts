@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GroupId, Message, MessageId } from "@baize/shared";
+import { GroupId, Message, MessageId } from "@zhixingbot/shared";
 import { reduce } from "./reducer.js";
 import { createClock } from "./stamped.js";
 import type { Action, AppState, ReadyState, SessionId } from "./types.js";

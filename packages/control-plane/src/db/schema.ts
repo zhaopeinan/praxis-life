@@ -46,8 +46,8 @@ import type {
   ToolView,
   TaskStatus as TaskStatusSchema,
   Viewer,
-} from "@baize/shared";
-import type { RetainSnapshot } from "@baize/shared/work-record";
+} from "@zhixingbot/shared";
+import type { RetainSnapshot } from "@zhixingbot/shared/work-record";
 import { sql } from "drizzle-orm";
 import type { z } from "zod";
 import {

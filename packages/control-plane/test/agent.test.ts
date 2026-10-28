@@ -6,7 +6,7 @@ import {
   CreateBotResponse,
   MessageListResponse,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { findComputerByOwner } from "../src/repo/computers.js";
 import { AgentHub } from "../src/agent/hub.js";

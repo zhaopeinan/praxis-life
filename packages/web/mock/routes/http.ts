@@ -1,5 +1,5 @@
 import { type IncomingMessage, type ServerResponse } from "node:http";
-import { type ServerPush, type Routine } from "@baize/shared";
+import { type ServerPush, type Routine } from "@zhixingbot/shared";
 
 export type Push = (event: ServerPush) => void;
 

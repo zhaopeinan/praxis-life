@@ -1,4 +1,4 @@
-import type { Account, AccountId, TodayPendingItem } from "@baize/shared";
+import type { Account, AccountId, TodayPendingItem } from "@zhixingbot/shared";
 import type { ContentBook } from "./types.js";
 
 const isBrowser = (account: Account): boolean => account.via === "computer";

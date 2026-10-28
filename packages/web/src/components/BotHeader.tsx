@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronRight, PanelRight, Pencil, Share2 } from "lucide-react";
-import type { Bot, BotId, Preference, Skill, SkillSource } from "@baize/shared";
+import type { Bot, BotId, Preference, Skill, SkillSource } from "@zhixingbot/shared";
 import { BotAvatar, type BotAvatarState } from "./BotAvatar.js";
 import { BotComputerPicker, type ComputerChoicesView } from "./ComputerPicker.js";
 import { EditBotDialog } from "./EditBotDialog.js";

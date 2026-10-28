@@ -1,4 +1,4 @@
-import type { AccountScope, Platform } from "@baize/shared";
+import type { AccountScope, Platform } from "@zhixingbot/shared";
 
 /** 发带图的帖子要的授权范围。GitHub App 的权限在应用上定，令牌端点不回 scope，没得比。 */
 export const IMAGE_SCOPE: Partial<Record<Platform, AccountScope>> = { x: "media.write" };

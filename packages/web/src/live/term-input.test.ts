@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LiveInput } from "@baize/shared";
+import { LiveInput } from "@zhixingbot/shared";
 import { resizeInput, termInputs } from "./term-input.js";
 
 describe("终端输入按协议上限切帧", () => {

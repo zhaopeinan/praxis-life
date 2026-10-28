@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BotId, Routine, Skill } from "@baize/shared";
+import { BotId, Routine, Skill } from "@zhixingbot/shared";
 import { MY_ROUTINES, reduceRoutines } from "./routines.js";
 import { reduceSkills } from "./skills.js";
 import { createClock, emptyShelf } from "./stamped.js";

@@ -15,8 +15,8 @@ import {
   type RecallEntry,
   RunId,
   type WorkAppend,
-} from "@baize/shared";
-import { createRetainer } from "@baize/shared/work-record";
+} from "@zhixingbot/shared";
+import { createRetainer } from "@zhixingbot/shared/work-record";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { afterEach, describe, expect, it, vi } from "vitest";

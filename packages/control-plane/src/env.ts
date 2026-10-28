@@ -1,4 +1,4 @@
-import type { GatewayModels } from "@baize/shared";
+import type { GatewayModels } from "@zhixingbot/shared";
 import { DEFAULT_GATEWAY_LIMITS, type GatewayLimits } from "./http/gateway-limits.js";
 import { log, type LogFormat } from "./log.js";
 

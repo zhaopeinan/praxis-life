@@ -13,7 +13,7 @@ import {
   type PokerAction,
   type PokerSeatNo,
   type PokerTableView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { apply, newHand, replay, type HandState } from "../src/poker/engine.js";
@@ -188,7 +188,7 @@ async function finish(prompt: Prompt): Promise<void> {
 }
 async function barrier(prompt: Prompt): Promise<void> {
   const runId = RunId.parse(randomUUID());
-  const messageId = randomUUID() as import("@baize/shared").MessageId;
+  const messageId = randomUUID() as import("@zhixingbot/shared").MessageId;
   await database.sql`INSERT INTO runs (id, bot_id, group_id, computer_id, started_at) VALUES (${runId}, ${prompt.botId}, ${table.groupId}, ${table.computer.computerId}, now())`;
   table.agent.send({
     type: "bot_text",

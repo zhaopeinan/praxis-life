@@ -1,4 +1,4 @@
-import { LiveId, LiveViewerClose, type User } from "@baize/shared";
+import { LiveId, LiveViewerClose, type User } from "@zhixingbot/shared";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { WebSocketServer } from "ws";

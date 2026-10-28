@@ -1,4 +1,4 @@
-import { BrandResponse, type Draft, type Grant } from "@baize/shared";
+import { BrandResponse, type Draft, type Grant } from "@zhixingbot/shared";
 import type { Route } from "@playwright/test";
 import { expect, test, login, type Page } from "./fixtures";
 

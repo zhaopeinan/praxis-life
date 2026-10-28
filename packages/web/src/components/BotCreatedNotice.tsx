@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import type { Bot } from "@baize/shared";
+import type { Bot } from "@zhixingbot/shared";
 
 const SHOWN_MS = 10_000;
 

@@ -11,7 +11,7 @@ import {
   type RunId,
   type UsageRecord,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { TransactionRollbackError, eq } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { runs } from "../db/schema.js";

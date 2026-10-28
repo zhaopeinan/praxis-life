@@ -1,7 +1,7 @@
 import { type RawData, WebSocket } from "ws";
-import { createRunner } from "@baize/bot-runner";
-import { type AgentHandle, type AgentOptions, startAgent } from "@baize/computer-agent";
-import { DEV_EMAIL, DEV_PASSWORD } from "@baize/control-plane";
+import { createRunner } from "@zhixingbot/bot-runner";
+import { type AgentHandle, type AgentOptions, startAgent } from "@zhixingbot/computer-agent";
+import { DEV_EMAIL, DEV_PASSWORD } from "@zhixingbot/control-plane";
 import {
   ComputerListResponse,
   type ComputerId,
@@ -13,7 +13,7 @@ import {
   type LiveInput,
   LiveToViewer,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { Stack } from "./stack.js";
 
 /**

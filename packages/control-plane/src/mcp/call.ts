@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { McpProxyCallResponse, redactCredential, type ToolConnection } from "@baize/shared";
+import { McpProxyCallResponse, redactCredential, type ToolConnection } from "@zhixingbot/shared";
 import { McpHttpTransport, McpResponseEndedError, McpResultTooLargeError, MCP_MAX_BODY_BYTES } from "./transport.js";
 
 export { McpResultTooLargeError, MCP_MAX_BODY_BYTES } from "./transport.js";

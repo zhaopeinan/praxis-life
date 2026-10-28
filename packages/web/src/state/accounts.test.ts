@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Account, AccountId, Computer, ComputerId, Draft, LoginAttemptId, TodayPendingItem } from "@baize/shared";
+import { Account, AccountId, Computer, ComputerId, Draft, LoginAttemptId, TodayPendingItem } from "@zhixingbot/shared";
 import { rememberLoginCards, withLoginCards } from "./accounts.js";
 import { EMPTY_CONTENT, reduceContent } from "./content.js";
 import { createClock } from "./stamped.js";

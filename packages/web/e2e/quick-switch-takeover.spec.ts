@@ -1,4 +1,4 @@
-import { LiveFromViewer, type LiveInput } from "@baize/shared";
+import { LiveFromViewer, type LiveInput } from "@zhixingbot/shared";
 import { z } from "zod";
 import { expect, login, openSeededBot, SHOT, TEAM_TITLE, test, type APIRequestContext, type Page } from "./fixtures";
 

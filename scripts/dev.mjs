@@ -1,7 +1,7 @@
 /**
  * 合并后的开发启动：知行人生后端（8787，含白泽子系统）+ 知行人生 Vite（5174，/assistant 代理到 8787）。
  * 读 .env 的 KEY=value（不展开变量），shell 里已有的变量优先。白泽 Web 要单独调试用 5173 起
- * `pnpm --filter @baize/web dev`（proxy 已认 BAIZE_BASE）。
+ * `pnpm --filter @zhixingbot/web dev`（proxy 已认 ZHIXINGBOT_BASE）。
  */
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";

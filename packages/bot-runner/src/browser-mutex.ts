@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
-import type { BotId } from "@baize/shared";
+import type { BotId } from "@zhixingbot/shared";
 
 const aborted = (): Error => new Error("这次浏览器操作被中止了");
 export class BotPausedError extends Error {

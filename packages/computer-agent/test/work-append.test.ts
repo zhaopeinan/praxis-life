@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AGENT_FRAME_MAX_BYTES, BotId, GroupId, RunId, type WorkAppend, type UplinkRejection } from "@baize/shared";
+import { AGENT_FRAME_MAX_BYTES, BotId, GroupId, RunId, type WorkAppend, type UplinkRejection } from "@zhixingbot/shared";
 import { describe, expect, it } from "vitest";
 import { ReliableOutbox } from "../src/reliable-transport.js";
 import { WorkAppendChannel } from "../src/work-append.js";

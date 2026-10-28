@@ -1,4 +1,4 @@
-import { DecideSkillOfferResponse, MessageListResponse } from "@baize/shared";
+import { DecideSkillOfferResponse, MessageListResponse } from "@zhixingbot/shared";
 import { expect, it } from "vitest";
 import { runMigrations } from "../src/db/migrate.js";
 import { hashPassword } from "../src/password.js";

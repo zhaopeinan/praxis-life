@@ -8,7 +8,7 @@ import {
   validateMcpDiscoveryOperations,
   type McpDiscoveryReason,
   type CreateToolRequest,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 
 const DISCOVERY_TIMEOUT_MS = 10_000;
 

@@ -11,7 +11,7 @@ import {
   type GroupId,
   type RunId,
   type ToolView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { AgentHub } from "../src/agent/hub.js";
 import { STALE_APPROVAL_MS, remindStaleApprovals } from "../src/repo/approvals.js";

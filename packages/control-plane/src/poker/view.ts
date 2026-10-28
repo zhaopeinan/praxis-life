@@ -10,7 +10,7 @@ import {
   type SeatStatus,
   type Street,
 } from "./engine.js";
-import { describePokerHand, evaluatePokerHand, pokerRankName } from "@baize/shared";
+import { describePokerHand, evaluatePokerHand, pokerRankName } from "@zhixingbot/shared";
 
 // 某个座位能看到的一手牌。这是可见范围的基础：只拼公开信息加这个座位自己的底牌，
 // 种子和剩余牌堆也不出现，拿到种子就能推出所有人的牌。

@@ -1,4 +1,4 @@
-import { BotId, GroupId, RoutineId, type Routine, type RunId, type UserId } from "@baize/shared";
+import { BotId, GroupId, RoutineId, type Routine, type RunId, type UserId } from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import { log } from "../log.js";
 import type { Db } from "../db/client.js";

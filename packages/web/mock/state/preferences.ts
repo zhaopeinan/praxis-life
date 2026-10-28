@@ -1,4 +1,4 @@
-import { Preference, type BotId, type MessageId } from "@baize/shared";
+import { Preference, type BotId, type MessageId } from "@zhixingbot/shared";
 import { at, groups, nextSuffix, skills } from "./store.js";
 
 export const preferences = new Map<string, Preference>();

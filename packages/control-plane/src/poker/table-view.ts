@@ -1,4 +1,4 @@
-import { PokerTableView, type PokerSeatNo, type PokerHandId } from "@baize/shared";
+import { PokerTableView, type PokerSeatNo, type PokerHandId } from "@zhixingbot/shared";
 import type { HandState } from "./engine.js";
 import { engineSeatId, seatNoOf } from "./seating.js";
 import { viewFor } from "./view.js";

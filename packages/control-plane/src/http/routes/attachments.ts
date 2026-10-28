@@ -7,7 +7,7 @@ import {
   AttachmentUploadQuery,
   AttachmentUploadResponse,
   imageMime,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { Hono } from "hono";
 import type { Db } from "../../db/client.js";
 import { canUploadAttachment, findOwnedAttachment, storeAttachment } from "../../repo/attachments.js";

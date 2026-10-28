@@ -16,7 +16,7 @@ import {
   type ControlToAgent,
   type UserId,
   type WorkAppend,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as schema from "../src/db/schema.js";
 import { databaseUrl } from "../src/env.js";
@@ -27,7 +27,7 @@ import { ApiClient, TEST_CREDENTIALS_KEY } from "./helpers/client.js";
 import { createTestDb, type TestDb } from "./helpers/db.js";
 import { PASSWORD, makeComputer, makeUser } from "./helpers/fixtures.js";
 
-// BENCH_RETAIN_READ=1 pnpm --filter @baize/control-plane exec vitest run test/bench-retain-read.test.ts
+// BENCH_RETAIN_READ=1 pnpm --filter @zhixingbot/control-plane exec vitest run test/bench-retain-read.test.ts
 // 可选：BENCH_RETAIN_READ_REPORT=<json 路径>、BENCH_RETAIN_READ_RUNS=<次数，默认 7>、BENCH_RETAIN_READ_ENTRIES=<条数，默认 10000>
 const enabled = process.env["BENCH_RETAIN_READ"] !== undefined;
 const RUNS = Number(process.env["BENCH_RETAIN_READ_RUNS"] ?? 7);

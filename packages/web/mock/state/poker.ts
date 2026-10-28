@@ -18,7 +18,7 @@ import {
   type PokerStreet,
   type ServerPush,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { currentGeneration, messagesByGroupId, nextSuffix, user } from "./store.js";
 
 // 牌桌的 mock：一手固定的剧本，照原型 HAND 的四步（翻牌前、翻牌、转牌、河牌）。

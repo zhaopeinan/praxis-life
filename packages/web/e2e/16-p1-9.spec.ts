@@ -1,11 +1,11 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { TestInfo } from "@playwright/test";
-import { BotListResponse, DecideProjectOfferResponse, GroupListResponse, MessageListResponse } from "@baize/shared";
+import { BotListResponse, DecideProjectOfferResponse, GroupListResponse, MessageListResponse } from "@zhixingbot/shared";
 import { ServerPush, expect, login, openBot, openSeededBot, teamCard, test, type Page } from "./fixtures";
 
 const screenshotPath = async (testInfo: TestInfo, name: string): Promise<string> => {
-  const auditDir = process.env["BAIZE_P1_9_AUDIT_DIR"];
+  const auditDir = process.env["ZHIXINGBOT_P1_9_AUDIT_DIR"];
   const target = auditDir === undefined ? testInfo.outputPath(name) : join(auditDir, name);
   await mkdir(dirname(target), { recursive: true });
   return target;

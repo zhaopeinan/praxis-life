@@ -1,4 +1,4 @@
-import { CreatePokerTableRequest, Group, TaskId, TopicTask, type PokerTableResponse } from "@baize/shared";
+import { CreatePokerTableRequest, Group, TaskId, TopicTask, type PokerTableResponse } from "@zhixingbot/shared";
 import { groups, nextTaskNumber, tasks, user } from "./store.js";
 import { pokerCreateTable, pokerPublish, pokerView, type MockPokerTable } from "./poker.js";
 import { readBody, send, type Route } from "../routes/http.js";

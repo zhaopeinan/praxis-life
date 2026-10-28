@@ -1,4 +1,4 @@
-import type { AccountId, ComputerId } from "@baize/shared";
+import type { AccountId, ComputerId } from "@zhixingbot/shared";
 import { log } from "../log.js";
 import type { AgentHub } from "../agent/hub.js";
 import type { AccountTokens } from "../credentials.js";

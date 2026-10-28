@@ -6,7 +6,7 @@ import {
   type Routine,
   type UserId,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { TransactionRollbackError, and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { bots, groupMembers, groups, messages } from "../db/schema.js";

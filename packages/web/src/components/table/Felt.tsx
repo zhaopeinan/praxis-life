@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { PokerTableView } from "@baize/shared";
+import type { PokerTableView } from "@zhixingbot/shared";
 import { feltOf, formatChips, type FeltSeat } from "../../state/poker.js";
 import { BotAvatar } from "../BotAvatar.js";
 import { CardBack, CardFace } from "./CardFace.js";

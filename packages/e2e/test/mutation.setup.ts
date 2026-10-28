@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, vi } from "vitest";
 import { WebSocket } from "ws";
-import { AgentHub, computers } from "@baize/control-plane/testing";
+import { AgentHub, computers } from "@zhixingbot/control-plane/testing";
 
 // 仅 mutation.config.ts 加载；故障注入不改其他包的源码，也不参与默认验收。
 beforeEach(() => {

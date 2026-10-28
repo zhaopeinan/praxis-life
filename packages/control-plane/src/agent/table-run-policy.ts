@@ -1,4 +1,4 @@
-import type { AgentToControl, BotId, GroupId, PokerTableRole, RunId, Viewer } from "@baize/shared";
+import type { AgentToControl, BotId, GroupId, PokerTableRole, RunId, Viewer } from "@zhixingbot/shared";
 import type { Db } from "../db/client.js";
 import { tableRoleOfRun } from "../repo/runs.js";
 

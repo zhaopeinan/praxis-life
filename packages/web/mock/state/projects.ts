@@ -1,4 +1,4 @@
-import { BotId, type Bot, type Group, type Message, type MessageBody, type TopicTask } from "@baize/shared";
+import { BotId, type Bot, type Group, type Message, type MessageBody, type TopicTask } from "@zhixingbot/shared";
 import { createBot, createGroup } from "./groups.js";
 import { findMessage, writeMessageBody } from "./messages.js";
 import { groups, tasks } from "./store.js";

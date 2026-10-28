@@ -75,7 +75,7 @@ docker compose exec control-plane node --import tsx src/scripts/seed.ts   # 只�
 
 ## 启动文件
 
-远程电脑不从环境变量拿身份。`COMPUTER_ID`、`AGENT_TOKEN`、`CONTROL_PLANE_AGENT_URL`、`BAIZE_DATA_DIR` 出现在容器环境里，看护进程直接拒绝启动。身份只走一个启动文件：
+远程电脑不从环境变量拿身份。`COMPUTER_ID`、`AGENT_TOKEN`、`CONTROL_PLANE_AGENT_URL`、`ZHIXINGBOT_DATA_DIR` 出现在容器环境里，看护进程直接拒绝启动。身份只走一个启动文件：
 
 ```
 ./put-launch.sh [账号邮箱]            # 不给邮箱就是 seed 的开发账号
@@ -146,7 +146,7 @@ compose 里有两张网。`data` 挂 postgres、migrate 和控制面，`edge` �
 这些情况会让登录态不见：
 
 - `docker compose down -v`。卷删了，profile 跟着没了。
-- 换 compose 项目名。卷的实际名字是 `<项目名>_bots`，`docker-compose.yml` 写死了 `name: baize-remote`。用 `-p` 指别的名字，或者用另一份项目名不同的 compose 文件起远程电脑，挂上的是另一个空卷，Chrome 拿到的是新 profile。旧卷还在，`docker volume ls | grep _bots` 能看到，换回原来的项目名就回来了。
+- 换 compose 项目名。卷的实际名字是 `<项目名>_bots`，`docker-compose.yml` 写死了 `name: zhixingbot-remote`。用 `-p` 指别的名字，或者用另一份项目名不同的 compose 文件起远程电脑，挂上的是另一个空卷，Chrome 拿到的是新 profile。旧卷还在，`docker volume ls | grep _bots` 能看到，换回原来的项目名就回来了。
 - 网站自己让会话过期，或者用户在别处退出了登录。这和部署无关。
 
 查登录态在不在，只看 cookie 名字和条数，不打印值：

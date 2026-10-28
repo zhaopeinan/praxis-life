@@ -1,4 +1,4 @@
-import { BotId, GroupId, RunId, UsageResponse } from "@baize/shared";
+import { BotId, GroupId, RunId, UsageResponse } from "@zhixingbot/shared";
 import { bots, groups, settings } from "./store.js";
 
 const MONTHLY_SPEND = [

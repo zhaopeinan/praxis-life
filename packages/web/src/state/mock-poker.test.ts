@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PokerTableResponse, PokerTableView, ServerPush, type Message, type PokerAction } from "@baize/shared";
+import { PokerTableResponse, PokerTableView, ServerPush, type Message, type PokerAction } from "@zhixingbot/shared";
 import { pokerRoutes } from "../../mock/routes/poker.js";
 import { pokerTableList, reseed, resetPoker } from "../../mock/state.js";
 

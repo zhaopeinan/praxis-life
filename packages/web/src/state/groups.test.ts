@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BotId, GroupId, Message, MessageId, type Bot, type ToolConnection } from "@baize/shared";
+import { BotId, GroupId, Message, MessageId, type Bot, type ToolConnection } from "@zhixingbot/shared";
 import { reduceGroups } from "./groups.js";
 import { createClock, emptyShelf, type Seq } from "./stamped.js";
 import type { Action, ReadyState } from "./types.js";

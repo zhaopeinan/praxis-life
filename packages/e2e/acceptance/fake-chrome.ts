@@ -1,6 +1,6 @@
-import type { CdpConnection, CdpEvent } from "@baize/bot-runner";
-import { type AgentOptions, defaultLoginPages } from "@baize/computer-agent";
-import { chromeProfileDir } from "@baize/computer-agent/chrome-process";
+import type { CdpConnection, CdpEvent } from "@zhixingbot/bot-runner";
+import { type AgentOptions, defaultLoginPages } from "@zhixingbot/computer-agent";
+import { chromeProfileDir } from "@zhixingbot/computer-agent/chrome-process";
 
 type ChromeFactory = NonNullable<AgentOptions["makeChrome"]>;
 

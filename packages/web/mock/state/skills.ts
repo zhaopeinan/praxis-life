@@ -1,4 +1,4 @@
-import { Skill, SkillId, type SkillSource } from "@baize/shared";
+import { Skill, SkillId, type SkillSource } from "@zhixingbot/shared";
 import { nextSuffix, skills } from "./store.js";
 
 export const skillsOf = (botId: string): Skill[] => [...skills.values()].filter((skill) => skill.botId === botId);

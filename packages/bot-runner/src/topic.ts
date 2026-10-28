@@ -7,7 +7,7 @@ import {
   type ProjectGoal,
   type TaskMetric,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { type Static, Type } from "typebox";
 import { z } from "zod";
 import type { Project } from "./assistant.js";

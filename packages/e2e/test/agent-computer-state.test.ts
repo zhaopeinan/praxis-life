@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { BotListResponse, ComputerTokenResponse, type UplinkFrame } from "@baize/shared";
-import { startAgent, type AgentHandle } from "@baize/computer-agent";
-import { createRunner } from "@baize/bot-runner";
+import { BotListResponse, ComputerTokenResponse, type UplinkFrame } from "@zhixingbot/shared";
+import { startAgent, type AgentHandle } from "@zhixingbot/computer-agent";
+import { createRunner } from "@zhixingbot/bot-runner";
 import { startStack, type Stack } from "../src/stack.js";
 import { startUpstream } from "../src/upstream.js";
 

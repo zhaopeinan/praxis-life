@@ -11,7 +11,7 @@ import {
   type ToolConnection,
   type ToolOperation,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { botPreferences, skills, toolConnectionBots, toolConnections, users } from "../db/schema.js";

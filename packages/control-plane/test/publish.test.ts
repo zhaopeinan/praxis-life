@@ -18,7 +18,7 @@ import {
   type GroupId,
   type RunId,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CredentialCrypto, saveAccessToken } from "../src/credentials.js";

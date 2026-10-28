@@ -10,7 +10,7 @@ import {
   SwitchComputerResponse,
   WorkStream,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { computerAvailability, type AvailabilityAgents } from "../agent/computer-availability.js";

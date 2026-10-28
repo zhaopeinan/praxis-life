@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { DecideDraftResponse, type ControlToAgent } from "@baize/shared";
+import { DecideDraftResponse, type ControlToAgent } from "@zhixingbot/shared";
 import { afterEach, expect, it } from "vitest";
 import { DEFAULT_RUNTIME_CONFIG, startServer } from "../src/server.js";
 import { helloAgent } from "./helpers/agent.js";

@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BotId, GroupId, MessageId, RunId, type AgentToControl } from "@baize/shared";
+import { BotId, GroupId, MessageId, RunId, type AgentToControl } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // 在 imageOf 做完 realpath、还没 open 的那一刻把上级目录换成指向禁区的链接，复现核验者说的竞争窗口。

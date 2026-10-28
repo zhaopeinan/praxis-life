@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PokerTableView } from "@baize/shared";
+import { PokerTableView } from "@zhixingbot/shared";
 import { isPokerTable, reducePoker } from "./poker.js";
 import type { ReadyState } from "./types.js";
 

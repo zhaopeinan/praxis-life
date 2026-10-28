@@ -1,4 +1,4 @@
-import { GroupId, type AgentToControl } from "@baize/shared";
+import { GroupId, type AgentToControl } from "@zhixingbot/shared";
 import { log } from "../../log.js";
 import { findAssistant, findBot } from "../../repo/bots.js";
 import { appendMessage, findGroupId } from "../../repo/messages.js";

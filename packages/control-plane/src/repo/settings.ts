@@ -1,4 +1,4 @@
-import type { Settings, UserId } from "@baize/shared";
+import type { Settings, UserId } from "@zhixingbot/shared";
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { settings } from "../db/schema.js";

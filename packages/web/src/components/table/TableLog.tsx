@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { PokerTableView } from "@baize/shared";
+import type { PokerTableView } from "@zhixingbot/shared";
 import { BotAvatar } from "../BotAvatar.js";
 import { publicLines } from "./table-side.js";
 import { useTableMessages } from "./use-table-messages.js";

@@ -9,7 +9,7 @@ import {
   type AccountId,
   type Notice,
   type OAuthPlatform,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, eq } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccountTokens, CredentialCrypto, addAccountWithToken } from "../src/credentials.js";

@@ -8,7 +8,7 @@ import {
   type ComputerId,
   type PokerTableView,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { sendHiddenRun } from "../agent/hidden-run.js";
 import type { AgentHub } from "../agent/hub.js";

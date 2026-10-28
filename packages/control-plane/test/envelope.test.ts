@@ -13,7 +13,7 @@ import {
   type AgentToControl,
   type BotId,
   type GroupId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { helloAgent, openAgent, type AgentClient } from "./helpers/agent.js";

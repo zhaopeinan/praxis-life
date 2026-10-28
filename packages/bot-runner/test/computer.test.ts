@@ -14,7 +14,7 @@ import {
   RunId,
   TaskId,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { renderComputerSection } from "../src/computer.js";
 import { botDirs, createRunner, type PromptMessage, type RunnerConfig } from "../src/index.js";

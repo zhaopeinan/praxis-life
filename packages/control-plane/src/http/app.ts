@@ -84,7 +84,7 @@ import {
   type TriggerInput,
   type User,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";

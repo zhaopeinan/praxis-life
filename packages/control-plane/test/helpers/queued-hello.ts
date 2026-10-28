@@ -1,4 +1,4 @@
-import type { ComputerId, RunId } from "@baize/shared";
+import type { ComputerId, RunId } from "@zhixingbot/shared";
 import { vi } from "vitest";
 import * as computersRepo from "../../src/repo/computers.js";
 import { openAgent, sendHello, type AgentClient } from "./agent.js";

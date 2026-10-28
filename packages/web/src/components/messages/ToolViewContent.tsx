@@ -1,4 +1,4 @@
-import type { JsonValue, ToolConnection, ToolView } from "@baize/shared";
+import type { JsonValue, ToolConnection, ToolView } from "@zhixingbot/shared";
 
 const valueText = (value: JsonValue): string => {
   if (value === null) return "空";

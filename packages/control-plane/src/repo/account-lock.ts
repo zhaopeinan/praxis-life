@@ -1,4 +1,4 @@
-import type { AccountId } from "@baize/shared";
+import type { AccountId } from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { accounts } from "../db/schema.js";

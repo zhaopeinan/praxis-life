@@ -1,4 +1,4 @@
-import { BotTemplate } from "@baize/shared";
+import { BotTemplate } from "@zhixingbot/shared";
 
 // D11：整包放在链接的 # 后面，不经服务器。导入方在自己的 App 里粘贴，Web 解出来再交给控制面。
 

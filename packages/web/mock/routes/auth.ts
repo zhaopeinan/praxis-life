@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type IncomingMessage } from "node:http";
-import { LoginRequest, RegisterRequest, RegisterResponse, User } from "@baize/shared";
+import { LoginRequest, RegisterRequest, RegisterResponse, User } from "@zhixingbot/shared";
 import { MOCK_EMAIL, MOCK_PASSWORD, user } from "../state.js";
 import { readBody, send, type Route } from "./http.js";
 

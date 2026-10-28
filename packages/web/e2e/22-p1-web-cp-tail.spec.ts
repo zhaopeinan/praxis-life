@@ -1,4 +1,4 @@
-import { MessageListResponse, RoutineListResponse } from "@baize/shared";
+import { MessageListResponse, RoutineListResponse } from "@zhixingbot/shared";
 import { expect, login, openSettings, test, type Page } from "./fixtures";
 
 const GREETING = "想让我帮你做成什么事？说一句就行";

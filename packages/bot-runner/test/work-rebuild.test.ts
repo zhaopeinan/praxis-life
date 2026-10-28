@@ -1,8 +1,8 @@
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EMPTY_WORK_HEAD, BotId, ComputerId, GroupId, MessageId, RunId, type HubLaneSnapshot } from "@baize/shared";
-import { createRetainer } from "@baize/shared/work-record";
+import { EMPTY_WORK_HEAD, BotId, ComputerId, GroupId, MessageId, RunId, type HubLaneSnapshot } from "@zhixingbot/shared";
+import { createRetainer } from "@zhixingbot/shared/work-record";
 import { afterEach, expect, it, vi } from "vitest";
 import { createRunner, type Runner, type RunnerConfig, type PromptMessage } from "../src/index.js";
 import { startGateway } from "./fixtures/gateway.js";

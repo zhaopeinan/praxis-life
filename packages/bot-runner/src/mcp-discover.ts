@@ -5,7 +5,7 @@ import {
   validateMcpDiscoveryOperations,
   type McpDiscoveryResult,
   type ToolOperation,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
@@ -29,7 +29,7 @@ export async function discoverMcpTools(
   const parsedUrl = McpHttpUrl.safeParse(input.url);
   if (!parsedUrl.success) return { ok: false, reason: "not_mcp" };
 
-  const client = new Client({ name: "baize-bot-runner", version: "0.1.0" });
+  const client = new Client({ name: "zhixingbot-bot-runner", version: "0.1.0" });
   const transport = new StreamableHTTPClientTransport(new URL(parsedUrl.data), {
     requestInit: input.authorization === undefined ? {} : { headers: { Authorization: input.authorization } },
     reconnectionOptions: {

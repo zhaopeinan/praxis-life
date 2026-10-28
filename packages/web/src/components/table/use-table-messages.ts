@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { GroupId, Message } from "@baize/shared";
+import type { GroupId, Message } from "@zhixingbot/shared";
 import { useApp } from "../../state/app.js";
 import type { Seq } from "../../state/stamped.js";
 

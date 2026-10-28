@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
-import { advanceWorkHead, EMPTY_WORK_HEAD, type WorkAppend } from "@baize/shared";
+import { advanceWorkHead, EMPTY_WORK_HEAD, type WorkAppend } from "@zhixingbot/shared";
 
 export async function startAttachmentHub() {
   const uploads: Array<{

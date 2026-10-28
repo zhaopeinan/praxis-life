@@ -5,7 +5,7 @@ import {
   OPEN_AT_LOGIN_SET,
   type DesktopBridge,
   type OpenAtLogin,
-} from "@baize/shared/desktop-bridge";
+} from "@zhixingbot/shared/desktop-bridge";
 
 const bridge: DesktopBridge = {
   openAtLogin: {

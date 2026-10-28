@@ -5,7 +5,7 @@ import {
   recallPlaceholder,
   type RecallEntry,
   type RunId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { Type } from "typebox";
 import type { RunnerTool } from "./bot-session.js";
 

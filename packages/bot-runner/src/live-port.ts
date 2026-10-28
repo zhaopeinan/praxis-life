@@ -1,4 +1,4 @@
-import type { LiveId, LivePurpose, LiveUserEnd } from "@baize/shared";
+import type { LiveId, LivePurpose, LiveUserEnd } from "@zhixingbot/shared";
 
 // 运行器要的「把一页摆到人眼前」的端口，由电脑代理的屏实现。运行器拿不到画面：结果里没有图像，帧进不了工作记录。
 

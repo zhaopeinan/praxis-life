@@ -1,4 +1,4 @@
-import type { ActionKind, ToolView } from "@baize/shared";
+import type { ActionKind, ToolView } from "@zhixingbot/shared";
 import { setTimeout as delay } from "node:timers/promises";
 import { type Static, Type } from "typebox";
 import type { RunnerTool } from "./bot-session.js";

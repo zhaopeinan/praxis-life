@@ -1,4 +1,4 @@
-import { GroupId, PokerSessionId, type AgentToControl } from "@baize/shared";
+import { GroupId, PokerSessionId, type AgentToControl } from "@zhixingbot/shared";
 import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { pokerSessions, pokerTables, runs } from "../../db/schema.js";
 import { answersKeyHands, keyHandsOf } from "../../poker/leave.js";

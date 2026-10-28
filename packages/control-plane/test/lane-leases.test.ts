@@ -10,7 +10,7 @@ import {
   type ControlToAgent,
   type GroupId,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { AgentHub } from "../src/agent/hub.js";
 import { startServer, type RunningServer } from "../src/server.js";

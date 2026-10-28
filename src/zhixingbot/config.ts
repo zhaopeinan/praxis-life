@@ -1,6 +1,6 @@
 /**
- * 知行Bot 子系统的环境配置。知行人生本身只用 DUOWEI_* 变量，这里全部 BAIZE_ 前缀，避免撞名。
- * 不设 BAIZE_ENABLED=1 时整个挂载不发生（测试、纯知行人生部署都不受影响）。
+ * 知行Bot 子系统的环境配置。知行人生本身只用 DUOWEI_* 变量，这里全部 ZHIXINGBOT_ 前缀，避免撞名。
+ * 不设 ZHIXINGBOT_ENABLED=1 时整个挂载不发生（测试、纯知行人生部署都不受影响）。
  */
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -15,18 +15,18 @@ export type BaizeConfig = {
 };
 
 export function baizeConfig(): BaizeConfig | null {
-  if (process.env.BAIZE_ENABLED !== "1") return null;
+  if (process.env.ZHIXINGBOT_ENABLED !== "1") return null;
   return {
-    dbUrl: required("BAIZE_DATABASE_URL"),
-    toolSecretKey: required("BAIZE_TOOL_SECRET_KEY"),
-    credentialsKey: required("BAIZE_CREDENTIALS_KEY"),
-    webDir: process.env.BAIZE_WEB_DIR ?? defaultWebDir(),
+    dbUrl: required("ZHIXINGBOT_DATABASE_URL"),
+    toolSecretKey: required("ZHIXINGBOT_TOOL_SECRET_KEY"),
+    credentialsKey: required("ZHIXINGBOT_CREDENTIALS_KEY"),
+    webDir: process.env.ZHIXINGBOT_WEB_DIR ?? defaultWebDir(),
   };
 }
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} 未设置：知行Bot子系统（BAIZE_ENABLED=1）起不来`);
+  if (!value) throw new Error(`${name} 未设置：知行Bot子系统（ZHIXINGBOT_ENABLED=1）起不来`);
   return value;
 }
 

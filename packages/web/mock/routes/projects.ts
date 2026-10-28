@@ -1,4 +1,4 @@
-import { DecideProjectOfferRequest, GroupId } from "@baize/shared";
+import { DecideProjectOfferRequest, GroupId } from "@zhixingbot/shared";
 import { findMessage, groupIdByBotId, startProject, writeMessageBody } from "../state.js";
 import { readBody, send, type Route } from "./http.js";
 

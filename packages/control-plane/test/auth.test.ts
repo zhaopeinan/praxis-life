@@ -1,4 +1,4 @@
-import { ApiError, LoginResponse, MeResponse, RegisterResponse } from "@baize/shared";
+import { ApiError, LoginResponse, MeResponse, RegisterResponse } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SESSION_COOKIE } from "../src/repo/sessions.js";
 import { startTestServer, type TestServer } from "./helpers/client.js";

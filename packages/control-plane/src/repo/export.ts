@@ -13,7 +13,7 @@ import {
   type Trigger,
   type User,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { agentOutbox, bots, computers, drafts, handoffs, runs, users } from "../db/schema.js";

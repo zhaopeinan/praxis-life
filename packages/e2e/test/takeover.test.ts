@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { CdpConnection, CdpEvent } from "@baize/bot-runner";
-import type { AgentHandle, AgentOptions } from "@baize/computer-agent";
-import { chromeProfileDir } from "@baize/computer-agent/chrome-process";
-import { BotListResponse, type ComputerId, type Message, type ServerPush } from "@baize/shared";
+import type { CdpConnection, CdpEvent } from "@zhixingbot/bot-runner";
+import type { AgentHandle, AgentOptions } from "@zhixingbot/computer-agent";
+import { chromeProfileDir } from "@zhixingbot/computer-agent/chrome-process";
+import { BotListResponse, type ComputerId, type Message, type ServerPush } from "@zhixingbot/shared";
 import { FAKE_FRAME_JPEG } from "../acceptance/fake-chrome.js";
 import { cookieFor, startRemoteComputer, watchLive } from "../src/live.js";
 import { startStack, type Stack } from "../src/stack.js";

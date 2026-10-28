@@ -12,7 +12,7 @@ import {
   type ServerPush,
   type TopicTask,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addAccountWithToken, CredentialCrypto } from "../src/credentials.js";
 import { newId } from "../src/ids.js";

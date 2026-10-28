@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Pin, Target } from "lucide-react";
-import { metricKeyOf, ProjectGoal, type Bot, type BotId, type ChecklistItem, type TopicTask } from "@baize/shared";
+import { metricKeyOf, ProjectGoal, type Bot, type BotId, type ChecklistItem, type TopicTask } from "@zhixingbot/shared";
 import { TaskRefreshFailed, useApp } from "../state/app.js";
 import { goalProgressOf, goalText, metricNameOf } from "../state/project.js";
 import { BotAvatar } from "./BotAvatar.js";

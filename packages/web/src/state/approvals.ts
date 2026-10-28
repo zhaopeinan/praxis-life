@@ -1,4 +1,4 @@
-import type { Approval, Handoff } from "@baize/shared";
+import type { Approval, Handoff } from "@zhixingbot/shared";
 import type { Action, ReadyState } from "./types.js";
 
 type Settling = { id: string; status: Approval["status"] | Handoff["status"] };

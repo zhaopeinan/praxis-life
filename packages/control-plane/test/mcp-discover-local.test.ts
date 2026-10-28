@@ -7,7 +7,7 @@ import {
   ToolListResponse,
   ToolResponse,
   type ToolOperation,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { helloAgent, type AgentClient } from "./helpers/agent.js";
 import { ApiClient, startTestServer, type TestServer } from "./helpers/client.js";
 import { createTestDb, type TestDb } from "./helpers/db.js";

@@ -1,4 +1,4 @@
-import { UserId, type Message } from "@baize/shared";
+import { UserId, type Message } from "@zhixingbot/shared";
 import { inArray } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { groups } from "../db/schema.js";

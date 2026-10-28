@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CdpConnection, CdpEvent } from "@baize/bot-runner";
+import type { CdpConnection, CdpEvent } from "@zhixingbot/bot-runner";
 import {
   AccountId,
   decodeLive,
@@ -8,7 +8,7 @@ import {
   type LiveDown,
   LiveUp,
   LoginAttemptId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { createLiveScreen } from "../src/live-screen.js";
 import { createLogins, defaultLoginPages, type LoginRequest, runLogin } from "../src/login.js";
 

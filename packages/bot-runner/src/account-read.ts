@@ -1,4 +1,4 @@
-import { type AccountConfig, type ControlToAgent } from "@baize/shared";
+import { type AccountConfig, type ControlToAgent } from "@zhixingbot/shared";
 import { DEFAULT_MAX_BYTES, formatSize } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
 import { resultText } from "./assistant.js";

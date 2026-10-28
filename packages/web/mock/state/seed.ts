@@ -15,7 +15,7 @@ import {
   type BotShape,
   type MessageBody,
   type ToolOperation,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import {
   TEAM_BOT_IDS,
   TEAM_CHECKLIST,

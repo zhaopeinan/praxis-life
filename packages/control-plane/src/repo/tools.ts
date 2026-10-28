@@ -8,7 +8,7 @@ import {
   type ToolOperation,
   type UpdateToolRequest,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { ToolCrypto } from "../crypto.js";
 import type { Db } from "../db/client.js";

@@ -1,4 +1,4 @@
-import type { Routine } from "@baize/shared";
+import type { Routine } from "@zhixingbot/shared";
 import type { Conversation } from "../../state/app.js";
 
 export type RoutineSection = { key: string; title: string; note: string; routines: Routine[] };

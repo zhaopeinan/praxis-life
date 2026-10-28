@@ -1,4 +1,4 @@
-import { ApiError, ComputerListResponse, ComputerTokenResponse, type ComputerId } from "@baize/shared";
+import { ApiError, ComputerListResponse, ComputerTokenResponse, type ComputerId } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEV_EMAIL, DEV_PASSWORD, seed } from "../src/seed.js";
 import {

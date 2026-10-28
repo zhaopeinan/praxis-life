@@ -1,4 +1,4 @@
-# @baize/control-plane
+# @zhixingbot/control-plane
 
 控制面。Hono 加 @hono/node-server，PostgreSQL 用 drizzle-orm 加 postgres.js。同一个 3001 端口按路径分流：`/api` 给 Web 客户端，`/api/ws` 往客户端推，`/agent` 给电脑代理，`/gateway/v1` 是模型网关，`/mcp-proxy` 代执行工具，`/hub/v1` 提供附件、工作记录快照和改稿。认身份、建电脑、发 config 那套写在仓库 docs/开发.md 的「控制面」一节。
 
@@ -100,9 +100,9 @@ hub 认连接用 `#onHello` 入表时登记的 WeakMap，再校验它还是 `#co
 
 可靠上行 `work_append` 带 `{lane: {botId, groupId, stream, epoch}, runId, fromSeq, lines, head, cause}`。`stream` 是 `chat` 或 `table`，每帧至多 64 行。服务器先查持有者与代际，再逐行解析 Pi 条目的 `type`、`id`、`parentId`，拒绝 SessionHeader。保存的是留存过滤之后的原样 JSONL 字符串；服务器接受的行已经是过滤器的不动点，所以 `work_entries.retention` 为 `verbatim`，不能据此推断本机原文是否被过滤过。搜索文本只抽 user、assistant 和 toolResult 的文字，图片和 thinking 不入索引。
 
-服务器从该归属人的 `tool_connections` 里取所有 `localOnly: true` 连接的操作名，包含目前未分配给这个 Bot 的操作；帧自报的名单不起作用。`@baize/shared/work-record` 的 `checkFrame` 逐帧复查图片块、超过 16 KiB 的文字、本机工具结果原文、重复 id、畸形已知条目，以及针对本机结果或未知目标的上下文编辑。有一行失败就整帧拒收，不保存合规前缀、不认领导入道。`work_streams.retain_snapshot` 保存 `RetainSnapshot`；读取 jsonb 时先按其 schema parse，成功追加时新快照和条目、信封游标在同一事务提交。旧流没有快照时从 `emptySnapshot` 开始重放已有行，避免遗失历史 id 和本机结果状态。
+服务器从该归属人的 `tool_connections` 里取所有 `localOnly: true` 连接的操作名，包含目前未分配给这个 Bot 的操作；帧自报的名单不起作用。`@zhixingbot/shared/work-record` 的 `checkFrame` 逐帧复查图片块、超过 16 KiB 的文字、本机工具结果原文、重复 id、畸形已知条目，以及针对本机结果或未知目标的上下文编辑。有一行失败就整帧拒收，不保存合规前缀、不认领导入道。`work_streams.retain_snapshot` 保存 `RetainSnapshot`；读取 jsonb 时先按其 schema parse，成功追加时新快照和条目、信封游标在同一事务提交。旧流没有快照时从 `emptySnapshot` 开始重放已有行，避免遗失历史 id 和本机结果状态。
 
-`work_streams` 还保存 `next_seq`、链头、末条 id 和连接报告的 Pi 版本。追加的条件 UPDATE 同时要求起始序号相等及租约的电脑、安装标识、代际匹配。序号从 0 开始，链头按 `sha256(上一个32字节摘要 || sha256(原样行))` 重算；空流的摘要是 32 个零字节。共享函数是 `@baize/shared` 的 `advanceWorkHead`。
+`work_streams` 还保存 `next_seq`、链头、末条 id 和连接报告的 Pi 版本。追加的条件 UPDATE 同时要求起始序号相等及租约的电脑、安装标识、代际匹配。序号从 0 开始，链头按 `sha256(上一个32字节摘要 || sha256(原样行))` 重算；空流的摘要是 32 个零字节。共享函数是 `@zhixingbot/shared` 的 `advanceWorkHead`。
 
 工具连接新建、改本机范围、改名、补授权和删除时，在修改事务里立即按新名单复查归属人全部 Bot 的两条流。名单是归属人全局操作名集合，因此未分配的 Bot 也受影响。连接修改持归属人排它锁，与追加互斥；即使改名、删除、补授权没有改变操作名集合，也完成复查。从第一条不合规旧行起删除整个后缀（包括 `search_text`），重算合规前缀的链头，同时回退 `next_seq`、`tail_entry_id` 和快照；旧行全部合规就只更新快照。HTTP 返回前已提交撤回，不等新上传。后缀随后由运行器从本地原文按新名单重新过滤补传，本机 JSONL 不动。在途旧帧收到 `seq_mismatch`，按 Hub 的合规前缀对齐；下一轮 prompt 也按新 config 过滤本地前缀核对，保留本地会话。
 
@@ -1017,8 +1017,8 @@ Bot 读 GitHub、X（查 issue、搜推文）不直接打平台，打控制面�
 ## 迁移
 
 ```
-pnpm --filter @baize/control-plane generate   # 改完 src/db/schema.ts 生成新迁移，只读 schema，不连库
-pnpm --filter @baize/control-plane migrate    # 应用
+pnpm --filter @zhixingbot/control-plane generate   # 改完 src/db/schema.ts 生成新迁移，只读 schema，不连库
+pnpm --filter @zhixingbot/control-plane migrate    # 应用
 ```
 
 已生成的迁移文件不改，只往后加。测试每个文件建一个随机库，从头跑全部迁移。
@@ -1027,7 +1027,7 @@ pnpm --filter @baize/control-plane migrate    # 应用
 
 ```
 docker compose up -d
-pnpm --filter @baize/control-plane test
+pnpm --filter @zhixingbot/control-plane test
 ```
 
 测试只通过 HTTP 和两条 WebSocket 碰控制面，不直接调路由函数。等异步效果时不靠超时：发一条确定会落地的报文，断言它先到，前面那步要是偷偷做了什么就会排在它前面。

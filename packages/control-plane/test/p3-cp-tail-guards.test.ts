@@ -8,7 +8,7 @@ import {
   type ControlToAgent,
   type GroupId,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { startServer, type RunningServer } from "../src/server.js";

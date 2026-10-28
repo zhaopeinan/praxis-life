@@ -1,4 +1,4 @@
-import { ComputerTokenResponse, CreateBotResponse, type ControlToAgent, type GroupId } from "@baize/shared";
+import { ComputerTokenResponse, CreateBotResponse, type ControlToAgent, type GroupId } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { helloAgent } from "./helpers/agent.js";
 import { startTestServer, type ApiClient, type TestServer } from "./helpers/client.js";

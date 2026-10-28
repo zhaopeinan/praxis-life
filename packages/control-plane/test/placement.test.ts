@@ -10,7 +10,7 @@ import {
   type GroupId,
   type ServerPush,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addAccount } from "../src/repo/accounts.js";
 import { DEFAULT_RUNTIME_CONFIG, startServer } from "../src/server.js";

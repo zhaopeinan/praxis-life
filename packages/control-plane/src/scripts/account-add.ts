@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { AccountTier, Platform } from "@baize/shared";
+import { AccountTier, Platform } from "@zhixingbot/shared";
 import { addAccountWithToken, CredentialCrypto } from "../credentials.js";
 import { connect } from "../db/client.js";
 import { credentialsKey, databaseUrl } from "../env.js";
@@ -10,7 +10,7 @@ import { findUserByEmail } from "../repo/users.js";
 // 只给开发用：手里有一把令牌，想跳过授权页直接挂一个 GitHub、X 账号调发布器。令牌加密进 account_credentials，
 // 没有 refresh 令牌，过期了控制面刷不了，只能再跑一次。用户连账号走账号页的 OAuth（/api/oauth/:platform/start）。
 const USAGE =
-  "用法：pnpm --filter @baize/control-plane account-add -- --owner <邮箱> --platform github|x --handle <名> --token <令牌> [--tier draft|confirm_publish|direct_publish|read_only]";
+  "用法：pnpm --filter @zhixingbot/control-plane account-add -- --owner <邮箱> --platform github|x --handle <名> --token <令牌> [--tier draft|confirm_publish|direct_publish|read_only]";
 // 挂的是走接口的账号；小红书只能走电脑上的浏览器登录，没有令牌可挂。
 const API_PLATFORMS = Platform.extract(["github", "x"]);
 

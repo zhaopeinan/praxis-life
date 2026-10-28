@@ -1,6 +1,6 @@
 import { ChevronLeft, Play } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { GroupId, PokerTableView } from "@baize/shared";
+import type { GroupId, PokerTableView } from "@zhixingbot/shared";
 import { ActionBar } from "../components/table/ActionBar.js";
 import { Felt } from "../components/table/Felt.js";
 import { HandEnd } from "../components/table/HandEnd.js";

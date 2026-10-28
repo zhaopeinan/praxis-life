@@ -13,7 +13,7 @@ import {
   type RoutineBoundary,
   type ToolOperation,
   type Verdict,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { parse, type ControlOperator, type ParseEntry } from "shell-quote";
 import { ACCOUNT_READ_TOOL } from "./account-read.js";
 import { BROWSER_TOOL_ACTIONS } from "./browser.js";

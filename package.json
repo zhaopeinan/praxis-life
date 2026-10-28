@@ -26,12 +26,12 @@
     "scrape:feishu": "tsx scripts/scrape-feishu-bitable.mts",
     "scrape:feishu:parallel": "tsx scripts/scrape-feishu-bitable-parallel.mts",
     "scrape:feishu:all": "bash scripts/scrape-feishu-until-done.sh",
-    "build:web": "vite build && VITE_BAIZE_BASE=/assistant BAIZE_BASE=/assistant pnpm --filter @baize/web build",
+    "build:web": "vite build && VITE_ZHIXINGBOT_BASE=/assistant ZHIXINGBOT_BASE=/assistant pnpm --filter @zhixingbot/web build",
     "db:own": "node scripts/db-own.mjs"
   },
   "dependencies": {
-    "@baize/control-plane": "workspace:*",
-    "@baize/shared": "workspace:*",
+    "@zhixingbot/control-plane": "workspace:*",
+    "@zhixingbot/shared": "workspace:*",
     "@hono/node-server": "^1.19.6",
     "@libsql/client": "^0.15.15",
     "@modelcontextprotocol/sdk": "^1.18.1",

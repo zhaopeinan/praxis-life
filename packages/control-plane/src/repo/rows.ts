@@ -17,7 +17,7 @@ import {
   User,
   UNREAD_METRIC,
   metricKeyOf,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type * as schema from "../db/schema.js";
 
 // 数据库行是外部输入。品牌化 ID 和字面量联合只在这里产生，往上全是可信的领域类型。

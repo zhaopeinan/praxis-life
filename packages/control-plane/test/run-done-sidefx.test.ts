@@ -15,7 +15,7 @@ import {
   type Routine,
   type RunId,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { databaseUrl } from "../src/env.js";
 import { helloAgent, type AgentClient } from "./helpers/agent.js";

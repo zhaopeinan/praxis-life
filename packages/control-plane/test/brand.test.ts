@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { BrandResponse, ContentPlanId, GrantListResponse, type UpdateBrandRequest } from "@baize/shared";
+import { BrandResponse, ContentPlanId, GrantListResponse, type UpdateBrandRequest } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { helloAgent, type AgentClient } from "./helpers/agent.js";
 import { startTestServer, type ApiClient, type TestServer } from "./helpers/client.js";

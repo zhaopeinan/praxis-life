@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PokerTableView, type PokerEvent } from "@baize/shared";
+import { PokerTableView, type PokerEvent } from "@zhixingbot/shared";
 import { actionBarOf, feltOf, quickAction, raiseCheck } from "./poker.js";
 
 type SeatSpec = {

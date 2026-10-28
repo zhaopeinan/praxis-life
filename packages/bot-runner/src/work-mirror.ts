@@ -22,8 +22,8 @@ import {
   type RunId,
   type WorkAppend,
   type WorkStream,
-} from "@baize/shared";
-import { createRetainer, toolListFingerprint, type RetainSnapshot } from "@baize/shared/work-record";
+} from "@zhixingbot/shared";
+import { createRetainer, toolListFingerprint, type RetainSnapshot } from "@zhixingbot/shared/work-record";
 import {
   CURRENT_SESSION_VERSION,
   SessionManager,

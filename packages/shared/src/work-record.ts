@@ -1,5 +1,5 @@
 // 工作记录上服务器之前的纯函数，只认 Pi 会话 JSONL 的一行字符串。
-// 单开子路径 @baize/shared/work-record 导出：用了 node:crypto，不能进被 Web 引用的根导出。
+// 单开子路径 @zhixingbot/shared/work-record 导出：用了 node:crypto，不能进被 Web 引用的根导出。
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { KEPT_EDGE_BYTES, RETAIN_TEXT_LIMIT_BYTES } from "./retention.js";

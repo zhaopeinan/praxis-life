@@ -1,4 +1,4 @@
-import type { Bot, BotId } from "@baize/shared";
+import type { Bot, BotId } from "@zhixingbot/shared";
 import type { Conversation } from "../state/app.js";
 import { pathOf } from "../routes/screen.js";
 

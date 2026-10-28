@@ -1,4 +1,4 @@
-import { GroupId, ReportMetricRequest, UpdateTaskResponse, metricKeyOf } from "@baize/shared";
+import { GroupId, ReportMetricRequest, UpdateTaskResponse, metricKeyOf } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import type { Db } from "../../db/client.js";
 import { recordSample } from "../../repo/metrics.js";

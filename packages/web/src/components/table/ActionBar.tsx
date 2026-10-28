@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PokerAction, PokerTableView } from "@baize/shared";
+import type { PokerAction, PokerTableView } from "@zhixingbot/shared";
 import { RequestFailed } from "../../api/client.js";
 import { useApp } from "../../state/app.js";
 import {

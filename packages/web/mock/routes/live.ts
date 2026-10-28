@@ -17,7 +17,7 @@ import {
   type LiveUserEnd,
   type MessageBody,
   type MessageId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { z } from "zod";
 import { LIVE_FRAME_JPEG } from "../state/live-frame.js";
 import { computersOf } from "../state/content.js";

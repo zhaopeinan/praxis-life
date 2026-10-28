@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Gauge, LifeBuoy, LogOut, Settings as SettingsIcon } from "lucide-react";
-import type { User } from "@baize/shared";
+import type { User } from "@zhixingbot/shared";
 
 type Props = {
   user: User;

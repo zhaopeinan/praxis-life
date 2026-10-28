@@ -1,4 +1,4 @@
-import { CreateBotResponse, ServerPush } from "@baize/shared";
+import { CreateBotResponse, ServerPush } from "@zhixingbot/shared";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 import type { Sql } from "../src/db/client.js";

@@ -12,7 +12,7 @@ import {
   type PokerPersona,
   type TopicTask,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, count, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import {

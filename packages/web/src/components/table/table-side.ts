@@ -1,4 +1,4 @@
-import type { BotHue, BotId, BotShape, Message, PokerSeatView, PokerTableView } from "@baize/shared";
+import type { BotHue, BotId, BotShape, Message, PokerSeatView, PokerTableView } from "@zhixingbot/shared";
 import { formatChips, showdownHands } from "../../state/poker.js";
 
 // 牌桌右栏、老白的建议和一手结束这三块要读的东西。都从整张桌视图和群消息里算，不存状态。

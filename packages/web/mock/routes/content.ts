@@ -6,7 +6,7 @@ import {
   LoginAccountRequest,
   OAuthPlatform,
   UpdateAccountRequest,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import {
   accounts,
   brand,

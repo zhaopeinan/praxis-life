@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Account, Computer, LoginAttemptId } from "@baize/shared";
+import { Account, Computer, LoginAttemptId } from "@zhixingbot/shared";
 import { createClock } from "../state/stamped.js";
 import type { LoginFlow } from "../state/types.js";
 import { LoginCard } from "./LoginCard.js";

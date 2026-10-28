@@ -8,7 +8,7 @@ import {
   type BotId,
   type GroupId,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { Db } from "../db/client.js";
 import type { ToolCrypto } from "../crypto.js";
 import {

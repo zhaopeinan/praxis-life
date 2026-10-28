@@ -14,7 +14,7 @@ import {
   type WorkAppend,
   type WorkAppendResult,
   type WorkStream,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import {
   RetainSnapshot,
   checkFrame,
@@ -22,7 +22,7 @@ import {
   emptySnapshot,
   toolListFingerprint,
   type RetainContext,
-} from "@baize/shared/work-record";
+} from "@zhixingbot/shared/work-record";
 import { and, asc, desc, eq, gt, gte, isNull, lt, ne, sql } from "drizzle-orm";
 import type { AgentConnection } from "../agent/hub.js";
 import {

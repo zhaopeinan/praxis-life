@@ -1,4 +1,4 @@
-import { ComputerTokenResponse, type OAuthPlatform, type User } from "@baize/shared";
+import { ComputerTokenResponse, type OAuthPlatform, type User } from "@zhixingbot/shared";
 import { expect } from "vitest";
 import type { OAuthConfig, RuntimeConfig } from "../../src/env.js";
 import { startFakePlatforms, type FakePlatforms } from "../../src/fake-platforms.js";

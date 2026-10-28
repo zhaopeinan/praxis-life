@@ -8,7 +8,7 @@ import {
   type DraftId,
   type UpdateBrandRequest,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, eq, getTableColumns } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "../db/client.js";

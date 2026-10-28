@@ -1,4 +1,4 @@
-import type { AccountId, ComputerId, LiveId, LivePurpose, LiveSession, LoginAttemptId } from "@baize/shared";
+import type { AccountId, ComputerId, LiveId, LivePurpose, LiveSession, LoginAttemptId } from "@zhixingbot/shared";
 import type { Seq } from "./stamped.js";
 import type { ContentBook, LiveEntry, LoginFlow } from "./types.js";
 

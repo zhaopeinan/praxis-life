@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { BotListResponse, ComputerListResponse, ComputerTokenResponse, type ServerPush } from "@baize/shared";
-import { createRunner, type PromptMessage } from "@baize/bot-runner";
-import { startAgent, type AgentHandle } from "@baize/computer-agent";
+import { BotListResponse, ComputerListResponse, ComputerTokenResponse, type ServerPush } from "@zhixingbot/shared";
+import { createRunner, type PromptMessage } from "@zhixingbot/bot-runner";
+import { startAgent, type AgentHandle } from "@zhixingbot/computer-agent";
 import { startStack, type Stack } from "../src/stack.js";
 import { type ChatRequest, startUpstream } from "../src/upstream.js";
 

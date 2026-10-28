@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ComputerTokenResponse, DeleteAccountRequest, Settings, UpdateSettingsRequest } from "@baize/shared";
+import { ComputerTokenResponse, DeleteAccountRequest, Settings, UpdateSettingsRequest } from "@zhixingbot/shared";
 import {
   bots,
   brand,

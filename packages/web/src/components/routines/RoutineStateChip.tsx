@@ -1,4 +1,4 @@
-import type { RoutineState } from "@baize/shared";
+import type { RoutineState } from "@zhixingbot/shared";
 
 export const ROUTINE_STATE: Record<RoutineState, { label: string; badge: string }> = {
   on: { label: "在跑", badge: "badge-accepted" },

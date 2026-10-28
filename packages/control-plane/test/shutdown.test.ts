@@ -1,4 +1,4 @@
-import type { ComputerId } from "@baize/shared";
+import type { ComputerId } from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import { expect, it, vi } from "vitest";
 import * as events from "../src/agent/events.js";

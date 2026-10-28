@@ -10,7 +10,7 @@ import {
   type ReadMetric,
   type TaskMetric,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, eq, exists, gte, inArray, isNull, lt, notExists, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { accounts, groups, metricSamples, tasks } from "../db/schema.js";

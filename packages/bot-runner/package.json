@@ -1,5 +1,5 @@
 {
-  "name": "@baize/bot-runner",
+  "name": "@zhixingbot/bot-runner",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@baize/shared": "workspace:*",
+    "@zhixingbot/shared": "workspace:*",
     "@earendil-works/pi-coding-agent": "1.3.0",
     "@modelcontextprotocol/sdk": "1.30.0",
     "shell-quote": "^1.10.0",

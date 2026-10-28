@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { LiveId, type ToolView } from "@baize/shared";
+import { LiveId, type ToolView } from "@zhixingbot/shared";
 import { Type } from "typebox";
 import { z } from "zod";
 import type { RunnerTool } from "./bot-session.js";

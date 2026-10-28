@@ -5,7 +5,7 @@ import {
   type BotId,
   type GroupId,
   type RunId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_RUNTIME_CONFIG, startServer } from "../src/server.js";
 import { ApiClient, TEST_CREDENTIALS_KEY, type TestServer } from "./helpers/client.js";

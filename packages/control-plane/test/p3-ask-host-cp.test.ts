@@ -9,7 +9,7 @@ import {
   type ControlToAgent,
   type GroupId,
   type PokerTableView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
 import { newHand, replay, type HandState } from "../src/poker/engine.js";

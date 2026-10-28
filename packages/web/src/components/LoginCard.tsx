@@ -1,5 +1,5 @@
 import { Check, TriangleAlert } from "lucide-react";
-import type { Account, AccountId, Computer } from "@baize/shared";
+import type { Account, AccountId, Computer } from "@zhixingbot/shared";
 import type { LoginFlow } from "../state/types.js";
 import { useFailureToast } from "./Toasts.js";
 import { LOGIN_FAILURE_TEXT, PLATFORM, beforeChinese, computerName, timeText } from "./messages/content.js";

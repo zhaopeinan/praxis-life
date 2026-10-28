@@ -1,4 +1,4 @@
-import type { PokerSeatNo, PokerTableSeat } from "@baize/shared";
+import type { PokerSeatNo, PokerTableSeat } from "@zhixingbot/shared";
 import { legalActions, type Action, type HandState } from "./engine.js";
 import { fallbackAction } from "./fallback.js";
 import { engineSeatId, seatNoOf } from "./seating.js";

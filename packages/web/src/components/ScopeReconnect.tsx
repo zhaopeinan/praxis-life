@@ -1,4 +1,4 @@
-import { OAuthPlatform, type Account } from "@baize/shared";
+import { OAuthPlatform, type Account } from "@zhixingbot/shared";
 import { oauthStartUrl } from "../api/client.js";
 import { ACCOUNT_SCOPE_TEXT, PLATFORM } from "./messages/content.js";
 

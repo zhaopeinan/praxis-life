@@ -10,7 +10,7 @@ import {
   type TeamOfferStatus,
   type UserId,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { TransactionRollbackError, and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { bots, groupMembers, groups, messages } from "../db/schema.js";

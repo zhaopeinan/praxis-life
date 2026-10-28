@@ -9,7 +9,7 @@ import {
   type Grant,
   type GrantId,
   type GroupId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { useApp, type RemotePairing } from "../state/app.js";
 import { openTerminal } from "../state/live.js";
 import type { LoginFlow } from "../state/types.js";

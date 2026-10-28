@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronDown, Laptop, Server } from "lucide-react";
-import type { AccountId, BrowserPlatform, Computer, ComputerId, OAuthPlatform } from "@baize/shared";
+import type { AccountId, BrowserPlatform, Computer, ComputerId, OAuthPlatform } from "@zhixingbot/shared";
 import { oauthStartUrl } from "../api/client.js";
 import { useApp } from "../state/app.js";
 import { COMPUTER_KIND_TEXT, PLATFORM, beforeChinese, computerName } from "./messages/content.js";

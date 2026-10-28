@@ -9,7 +9,7 @@ import {
   SwapSeatRequest,
   type PokerTableResponse,
   type PokerTableView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { z } from "zod";
 import {
   PokerMockError,

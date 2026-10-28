@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MonitorUp } from "lucide-react";
-import type { LiveId } from "@baize/shared";
+import type { LiveId } from "@zhixingbot/shared";
 import { useApp } from "../state/app.js";
 import { shownLive } from "../state/live.js";
 import { LIVE_TEXT } from "../components/messages/content.js";

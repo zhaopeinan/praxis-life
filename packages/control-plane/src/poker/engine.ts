@@ -1,5 +1,5 @@
 import { shuffledDeck, type Card } from "./cards.js";
-import { comparePokerHands, evaluatePokerHand, type PokerHandValue } from "@baize/shared";
+import { comparePokerHands, evaluatePokerHand, type PokerHandValue } from "@zhixingbot/shared";
 
 // 一手德州从发牌到结算的确定性引擎。纯函数：不读时钟、不读全局随机数，洗牌只看种子，
 // 所以种子加动作日志就能重放出同一个状态。apply 返回新状态，不改传入的那份。

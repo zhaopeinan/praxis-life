@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { AccountId, BotId, Draft, DraftId, GroupId } from "@baize/shared";
+import { AccountId, BotId, Draft, DraftId, GroupId } from "@zhixingbot/shared";
 import type { ContentBook } from "../../state/types.js";
 import { DraftCard, type ContentActions } from "./DraftCards.js";
 

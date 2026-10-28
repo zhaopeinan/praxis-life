@@ -1,4 +1,4 @@
-import type { BotId, Message } from "@baize/shared";
+import type { BotId, Message } from "@zhixingbot/shared";
 import { byCreatedAt } from "../../state/order.js";
 
 export type Turn =

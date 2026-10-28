@@ -6,7 +6,7 @@ import {
   type RunId,
   type WorkAppend,
   type WorkAppendResult,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { GateDecision } from "./gate.js";
 

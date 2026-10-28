@@ -1,4 +1,4 @@
-import type { Grant, GrantId, UserId } from "@baize/shared";
+import type { Grant, GrantId, UserId } from "@zhixingbot/shared";
 import { and, asc, eq } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { grants } from "../db/schema.js";

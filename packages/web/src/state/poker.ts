@@ -1,4 +1,4 @@
-import { describePokerHand, evaluatePokerHand } from "@baize/shared";
+import { describePokerHand, evaluatePokerHand } from "@zhixingbot/shared";
 import type {
   BotHue,
   BotShape,
@@ -13,7 +13,7 @@ import type {
   PokerSeatStatus,
   PokerSeatView,
   PokerTableView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { Action, ReadyState } from "./types.js";
 
 // 一张桌一份整视图，推送和接口回的都是整份，都走 poker_table_set。控制面的广播不保证按版本先后到，

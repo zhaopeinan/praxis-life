@@ -5,7 +5,7 @@ import {
   type DraftImage,
   type GroupId,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { attachments, bots, groupMembers, groups } from "../db/schema.js";

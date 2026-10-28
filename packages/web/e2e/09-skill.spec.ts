@@ -1,4 +1,4 @@
-import type { SkillChange } from "@baize/shared";
+import type { SkillChange } from "@zhixingbot/shared";
 import type { z } from "zod";
 import {
   expect,

@@ -1,4 +1,4 @@
-import { ApiError } from "@baize/shared";
+import { ApiError } from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {

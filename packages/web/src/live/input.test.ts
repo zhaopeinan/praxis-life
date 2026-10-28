@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LiveInput } from "@baize/shared";
+import { LiveInput } from "@zhixingbot/shared";
 import {
   createClickCounter,
   createMoveCoalescer,

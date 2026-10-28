@@ -1,4 +1,4 @@
-import type { BotHue, BotShape } from "@baize/shared";
+import type { BotHue, BotShape } from "@zhixingbot/shared";
 
 type Size = "xs" | "sm" | "md" | "lg";
 export type BotAvatarState = "idle" | "working" | "confirm" | "happy" | "sleep";

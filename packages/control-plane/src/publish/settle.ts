@@ -1,4 +1,4 @@
-import type { Draft, Platform, PublishFailureReason, UserId } from "@baize/shared";
+import type { Draft, Platform, PublishFailureReason, UserId } from "@zhixingbot/shared";
 import type { AgentHub } from "../agent/hub.js";
 import type { Db } from "../db/client.js";
 import type { NoticePublisher } from "../notifications.js";

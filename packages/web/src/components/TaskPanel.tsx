@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import type { Bot, BotId, TopicTask } from "@baize/shared";
+import type { Bot, BotId, TopicTask } from "@zhixingbot/shared";
 import { BotAvatar } from "./BotAvatar.js";
 import { dueTextOf } from "./TaskCard.js";
 

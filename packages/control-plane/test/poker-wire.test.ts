@@ -1,4 +1,4 @@
-import { PokerSeatView } from "@baize/shared";
+import { PokerSeatView } from "@zhixingbot/shared";
 import { describe, expect, it } from "vitest";
 import { apply, newHand, type SeatId } from "../src/poker/engine.js";
 import { viewFor } from "../src/poker/view.js";

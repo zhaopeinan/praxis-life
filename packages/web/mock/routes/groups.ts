@@ -8,7 +8,7 @@ import {
   UpdateTaskRequest,
   type ProjectGoal,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import {
   appendMessage,
   approvals,

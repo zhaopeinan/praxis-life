@@ -1,4 +1,4 @@
-import type { Settings } from "@baize/shared";
+import type { Settings } from "@zhixingbot/shared";
 
 const DARK = "(prefers-color-scheme: dark)";
 

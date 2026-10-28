@@ -1,4 +1,4 @@
-import { BotId, GroupId, PutComputerChoiceRequest } from "@baize/shared";
+import { BotId, GroupId, PutComputerChoiceRequest } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import { computerAvailability, type AvailabilityAgents } from "../../agent/computer-availability.js";
 import { CHOICE_REFUSED, chooseComputer, listComputerChoices } from "../../agent/computer-choice.js";

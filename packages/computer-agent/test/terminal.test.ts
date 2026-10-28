@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { decodeLive, encodeLive, type LiveDown, LiveId, LiveUp } from "@baize/shared";
+import { decodeLive, encodeLive, type LiveDown, LiveId, LiveUp } from "@zhixingbot/shared";
 import { createLiveScreen } from "../src/live-screen.js";
 import {
   createTerminals,

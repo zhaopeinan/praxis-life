@@ -3,7 +3,7 @@ import { backoffDelay, type BackoffOptions, defaultBackoff } from "./backoff.js"
 import { takeLaunchFile } from "./launch-file.js";
 
 /** 启动配置只走启动文件和代理的 stdin，这四个名字在看护进程和代理的环境里都不许出现。 */
-export const FORBIDDEN_ENV = ["COMPUTER_ID", "AGENT_TOKEN", "CONTROL_PLANE_AGENT_URL", "BAIZE_DATA_DIR"] as const;
+export const FORBIDDEN_ENV = ["COMPUTER_ID", "AGENT_TOKEN", "CONTROL_PLANE_AGENT_URL", "ZHIXINGBOT_DATA_DIR"] as const;
 
 // 和桌面壳传给代理的一样，外加远程电脑上 Chrome 要画到的 Xvfb。
 const AGENT_ENV_KEYS = [

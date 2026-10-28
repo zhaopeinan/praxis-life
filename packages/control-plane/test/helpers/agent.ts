@@ -11,7 +11,7 @@ import {
   type AgentToControl,
   type ComputerId,
   type RunId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { WebSocket } from "ws";
 import { AGENT_PATH } from "../../src/agent/hub.js";
 import { bytesOf } from "../../src/live/relay.js";

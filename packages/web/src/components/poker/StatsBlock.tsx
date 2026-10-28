@@ -1,4 +1,4 @@
-import type { PokerTableView } from "@baize/shared";
+import type { PokerTableView } from "@zhixingbot/shared";
 import { formatChips } from "../../state/poker.js";
 
 const signed = (chips: number): string => (chips > 0 ? `+${formatChips(chips)}` : formatChips(chips));

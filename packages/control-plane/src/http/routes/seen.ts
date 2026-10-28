@@ -1,4 +1,4 @@
-import { GroupId, RoutineId } from "@baize/shared";
+import { GroupId, RoutineId } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import type { Db } from "../../db/client.js";
 import { loadRoutine, markGroupRoutineRunsSeen } from "../../repo/routines.js";

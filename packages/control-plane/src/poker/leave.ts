@@ -10,7 +10,7 @@ import {
   type PokerTableView,
   type TablePrompt,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { sendHiddenRun, type HiddenRunOutcome } from "../agent/hidden-run.js";
 import type { Db } from "../db/client.js";

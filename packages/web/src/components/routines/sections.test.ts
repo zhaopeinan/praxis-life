@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Routine } from "@baize/shared";
+import { Routine } from "@zhixingbot/shared";
 import type { Conversation } from "../../state/app.js";
 import { routineSectionsOf } from "./sections.js";
 

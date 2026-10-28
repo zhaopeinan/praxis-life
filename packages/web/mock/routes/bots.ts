@@ -1,4 +1,4 @@
-import { Bot, CreateBotRequest, UpdateBotRequest } from "@baize/shared";
+import { Bot, CreateBotRequest, UpdateBotRequest } from "@zhixingbot/shared";
 import {
   bots,
   createBot,

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# 在阿里云上把白泽的「远程电脑」跑起来（Bot 的活就在这台容器里干）。
+# 在阿里云上把知行Bot的「远程电脑」跑起来（Bot 的活就在这台容器里干）。
 # 前置：scripts/deploy-aliyun.sh 已经成功部署过合并应用（服务器上有 /opt/duowei-src 源码、
-# $REMOTE_BAIZE_ENV、baize-net 网络、baize-postgres）。本脚本幂等，可重复跑（重复跑会轮换 token）。
+# $REMOTE_ZHIXINGBOT_ENV、zhixingbot-net 网络、zhixingbot-postgres）。本脚本幂等，可重复跑（重复跑会轮换 token）。
 #
-# 步骤：登记电脑行 + 写启动文件 → 传 seccomp 配置 → 服务器侧构建 baize-remote 镜像
+# 步骤：登记电脑行 + 写启动文件 → 传 seccomp 配置 → 服务器侧构建 zhixingbot-remote 镜像
 # （chromium+xvfb+bwrap，只在不存在时构建，极重）→ 起容器 → 冒烟。
 #
 # 资源提醒：chromium+xvfb 建议 ≥4G 内存。机器只有 1.7G 时会告警——能跑，但浏览器一开会抖。
@@ -14,17 +14,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 ENV_FILE="$ROOT/aliyun.env"
 
-REMOTE_BAIZE_DIR="/opt/duowei/baize"
-REMOTE_BAIZE_ENV="$REMOTE_BAIZE_DIR/baize.env"
+REMOTE_ZHIXINGBOT_DIR="/opt/duowei/zhixingbot"
+REMOTE_ZHIXINGBOT_ENV="$REMOTE_ZHIXINGBOT_DIR/zhixingbot.env"
 REMOTE_BOTS_DIR="/opt/duowei/bots"
-REMOTE_RUN_DIR="$REMOTE_BAIZE_DIR/run"
-BAIZE_NETWORK="baize-net"
-REMOTE_IMAGE="localhost/baize-remote:latest"
-REMOTE_CONTAINER="baize-remote"
+REMOTE_RUN_DIR="$REMOTE_ZHIXINGBOT_DIR/run"
+ZHIXINGBOT_NETWORK="zhixingbot-net"
+REMOTE_IMAGE="localhost/zhixingbot-remote:latest"
+REMOTE_CONTAINER="zhixingbot-remote"
 REMOTE_SRC_DIR="/opt/duowei-src"
-# 合并应用容器在 baize-net 里的名字就是 duowei。
+# 合并应用容器在 zhixingbot-net 里的名字就是 duowei。
 AGENT_URL="ws://duowei:8787/assistant/agent"
-APT_MIRROR="${BAIZE_APT_MIRROR:-mirrors.aliyun.com}"
+APT_MIRROR="${ZHIXINGBOT_APT_MIRROR:-mirrors.aliyun.com}"
 MIN_MEM_KB=$((3 * 1024 * 1024))
 APP_IMAGE="docker.io/library/duowei:latest"
 
@@ -51,13 +51,13 @@ remote 'set -e
 step "登记远程电脑（owner = 知行人生第一位 admin）并写启动文件（600）"
 remote 'set -euo pipefail
   APP_IMAGE="'"$APP_IMAGE"'"
-  DB_URL=$(grep "^BAIZE_DATABASE_URL=" '"$REMOTE_BAIZE_ENV"' | cut -d= -f2-)
+  DB_URL=$(grep "^ZHIXINGBOT_DATABASE_URL=" '"$REMOTE_ZHIXINGBOT_ENV"' | cut -d= -f2-)
   test -n "$DB_URL"
   ADMIN_EMAIL=$(podman run --rm -v /opt/duowei/data:/data:ro "$APP_IMAGE" \
     node -e "const {createClient}=require(\"@libsql/client\");createClient({url:\"file:/data/duowei.db\"}).execute(\"SELECT email FROM users WHERE role=\x27admin\x27 ORDER BY created_at LIMIT 1\").then(r=>{if(!r.rows[0])process.exit(1);console.log(r.rows[0].email)})")
   test -n "$ADMIN_EMAIL"
   echo "admin: $ADMIN_EMAIL"
-  ISSUED=$(podman run --rm --network '"$BAIZE_NETWORK"' -e DATABASE_URL="$DB_URL" "$APP_IMAGE" \
+  ISSUED=$(podman run --rm --network '"$ZHIXINGBOT_NETWORK"' -e DATABASE_URL="$DB_URL" "$APP_IMAGE" \
     ./node_modules/.bin/tsx packages/control-plane/src/scripts/computer-token.ts remote "$ADMIN_EMAIL")
   COMPUTER_ID=$(printf "%s\n" "$ISSUED" | sed -n "s/^COMPUTER_ID=//p")
   AGENT_TOKEN=$(printf "%s\n" "$ISSUED" | sed -n "s/^AGENT_TOKEN=//p")
@@ -70,9 +70,9 @@ remote 'set -euo pipefail
   echo "launch.json 已写好（computer ${COMPUTER_ID}）"'
 
 step "传 bwrap seccomp 配置"
-sshpass -e scp "${SSH_OPTS[@]}" "$ROOT/docs/baize/deploy/remote/seccomp-bwrap.json" "$SSH_USER@$HOST:$REMOTE_BAIZE_DIR/seccomp-bwrap.json"
+sshpass -e scp "${SSH_OPTS[@]}" "$ROOT/docs/baize/deploy/remote/seccomp-bwrap.json" "$SSH_USER@$HOST:$REMOTE_ZHIXINGBOT_DIR/seccomp-bwrap.json"
 
-step "服务器侧构建 baize-remote 镜像（只在不存在时；chromium 层很重）"
+step "服务器侧构建 zhixingbot-remote 镜像（只在不存在时；chromium 层很重）"
 remote 'set -e
   cd '"$REMOTE_SRC_DIR"'
   if podman image exists '"$REMOTE_IMAGE"'; then
@@ -88,8 +88,8 @@ step "（重）起远程电脑容器"
 remote 'set -e
   podman rm '"$REMOTE_CONTAINER"' >/dev/null 2>&1 || true
   podman run -d --name '"$REMOTE_CONTAINER"' --restart unless-stopped \
-    --network '"$BAIZE_NETWORK"' \
-    --security-opt seccomp='"$REMOTE_BAIZE_DIR"'/seccomp-bwrap.json \
+    --network '"$ZHIXINGBOT_NETWORK"' \
+    --security-opt seccomp='"$REMOTE_ZHIXINGBOT_DIR"'/seccomp-bwrap.json \
     --security-opt apparmor=unconfined \
     --shm-size 1g --init \
     -v '"$REMOTE_BOTS_DIR"':/home/node/.baize/bots \
@@ -102,9 +102,9 @@ step "冒烟：代理握手 + 电脑在线"
 sleep 8
 remote 'set -e
   podman logs --tail 8 '"$REMOTE_CONTAINER"' 2>&1 | grep -E "已发 hello|config|online" || { podman logs --tail 20 '"$REMOTE_CONTAINER"'; exit 1; }
-  STATUS=$(podman exec baize-postgres psql -U baize -tAc "SELECT status FROM computers WHERE kind='"'"'remote'"'"'")
+  STATUS=$(podman exec zhixingbot-postgres psql -U baize -tAc "SELECT status FROM computers WHERE kind='"'"'remote'"'"'")
   test "$STATUS" = "online"
   echo "远程电脑在线（status=online）"'
 
 echo
-echo "完成。Bot 的活现在跑在 baize-remote 容器里。换 token：重跑本脚本；排障：podman logs -f baize-remote"
+echo "完成。Bot 的活现在跑在 zhixingbot-remote 容器里。换 token：重跑本脚本；排障：podman logs -f zhixingbot-remote"

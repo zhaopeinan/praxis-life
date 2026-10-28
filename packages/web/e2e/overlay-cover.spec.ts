@@ -1,4 +1,4 @@
-import { PokerTableResponse } from "@baize/shared";
+import { PokerTableResponse } from "@zhixingbot/shared";
 import { expect, login, openBot, openSettings, test, type Page } from "./fixtures";
 
 // 遮罩必须铺满整个视口。视口比内容区最大宽度（1120px）宽，遮罩挂在 .page 里被它的子元素规则夹窄就会露白。

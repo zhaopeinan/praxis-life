@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useEscapeToClose } from "./useEscapeToClose.js";
-import type { BotId } from "@baize/shared";
+import type { BotId } from "@zhixingbot/shared";
 import { useApp } from "../state/app.js";
 import { templateFromLink } from "./shareLink.js";
 import { trapTab } from "./trapTab.js";

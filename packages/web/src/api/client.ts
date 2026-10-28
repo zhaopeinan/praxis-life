@@ -98,7 +98,7 @@ import {
   type UpdateToolRequest,
   type UpdateBrandRequest,
   type UpdateRoutineRequest,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { BASE } from "../base.js";
 
 // 授权要整页跳去平台再跳回来，fetch 跟不了，给的是地址，界面拿它当链接。

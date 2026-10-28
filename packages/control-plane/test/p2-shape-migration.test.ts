@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { BotListResponse, MessageListResponse, UserId } from "@baize/shared";
+import { BotListResponse, MessageListResponse, UserId } from "@zhixingbot/shared";
 import { expect, it } from "vitest";
 import { migrationsDir, runMigrations } from "../src/db/migrate.js";
 import { helloAgent } from "./helpers/agent.js";

@@ -1,4 +1,4 @@
-import type { Bot, BotId, GroupId } from "@baize/shared";
+import type { Bot, BotId, GroupId } from "@zhixingbot/shared";
 import type { Conversation } from "../../state/app.js";
 
 // 改例行、新建例行都回主助理的对话，预填一句话。预填跟着这一次跳转的 location state 走，刷新不会再填一遍。

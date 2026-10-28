@@ -10,7 +10,7 @@ import {
   RunId,
   SendMessageResponse,
   type Message,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accounts, contentPlans, drafts, messages, publications } from "../src/db/schema.js";

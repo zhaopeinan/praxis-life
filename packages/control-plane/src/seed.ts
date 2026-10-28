@@ -1,4 +1,4 @@
-import type { BotHue, BotShape, ComputerId, User } from "@baize/shared";
+import type { BotHue, BotShape, ComputerId, User } from "@zhixingbot/shared";
 import type { Db } from "./db/client.js";
 import { createBot, ensureAssistant, listBots } from "./repo/bots.js";
 import { ensureComputer } from "./repo/computers.js";

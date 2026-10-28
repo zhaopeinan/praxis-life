@@ -1,4 +1,4 @@
-import { AccountListResponse } from "@baize/shared";
+import { AccountListResponse } from "@zhixingbot/shared";
 import { expect, login, openSettings, test, type APIRequestContext, type Page } from "./fixtures";
 
 const EXPIRED_ID = "acc_today_xhs";

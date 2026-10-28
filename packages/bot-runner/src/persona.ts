@@ -1,4 +1,4 @@
-import type { PokerPersona } from "@baize/shared";
+import type { PokerPersona } from "@zhixingbot/shared";
 
 const PERSONAS: Readonly<Record<PokerPersona, string>> = {
   leopard: "你是阿豹，爱加注，进攻果断，话不多，只在加注时撂一句狠话。",

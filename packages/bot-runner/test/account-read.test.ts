@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { AccountConfig } from "@baize/shared";
+import { AccountConfig } from "@zhixingbot/shared";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ACCOUNT_READ_MAX_BYTES,

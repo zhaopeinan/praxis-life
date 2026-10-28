@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { CreateToolRequest, ToolConnection, UpdateToolRequest } from "@baize/shared";
+import { CreateToolRequest, ToolConnection, UpdateToolRequest } from "@zhixingbot/shared";
 import { bots, tools, user } from "../state.js";
 import { defined, readBody, send, type Route } from "./http.js";
 

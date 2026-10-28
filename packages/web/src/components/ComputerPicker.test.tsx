@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BotId, Computer, GroupId, type ComputerKind } from "@baize/shared";
+import { BotId, Computer, GroupId, type ComputerKind } from "@zhixingbot/shared";
 import { ComputerPicker, hasChoice, pickerNotes } from "./ComputerPicker.js";
 
 const computer = (kind: ComputerKind, reach: { status: Computer["status"]; dispatchable: boolean }) =>

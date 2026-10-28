@@ -5,7 +5,7 @@ import {
   RoutineResponse,
   type Routine,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import * as botsRepo from "../src/repo/bots.js";
 import { expectHello, helloAgent, openAgent, sendHello } from "./helpers/agent.js";

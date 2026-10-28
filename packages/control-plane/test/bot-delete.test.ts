@@ -8,7 +8,7 @@ import {
   type ControlToAgent,
   type GroupId,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { NO_TARGET_NOTICE } from "../src/agent/dispatch.js";
 import { dispatchFailedNotice } from "../src/agent/group-turn.js";

@@ -6,7 +6,7 @@ import {
   type DraftImage,
   draftImageRules,
   type ComputerPublishFailure,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";

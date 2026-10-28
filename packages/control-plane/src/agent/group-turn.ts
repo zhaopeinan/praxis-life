@@ -11,7 +11,7 @@ import type {
   RunId,
   ServerPush,
   UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { Db } from "../db/client.js";
 import { saveTurnBotMessages } from "../repo/groups.js";
 import { dropQueuedHandoffs, listQueuedHandoffs } from "../repo/handoffs.js";

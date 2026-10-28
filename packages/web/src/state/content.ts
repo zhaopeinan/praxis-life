@@ -1,5 +1,5 @@
 import { loadTable, removeFromTable, writeTable, type Stamped } from "./stamped.js";
-import type { Account, AccountId, LiveSession, LoginAttemptId } from "@baize/shared";
+import type { Account, AccountId, LiveSession, LoginAttemptId } from "@zhixingbot/shared";
 import { closeScreens, loginScreen } from "./live.js";
 import type { Action, ContentBook, LiveEntry, LoginFlow, ReadyState } from "./types.js";
 

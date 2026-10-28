@@ -1,4 +1,4 @@
-import { CreateRoutineRequest, UpdateRoutineRequest, type Routine } from "@baize/shared";
+import { CreateRoutineRequest, UpdateRoutineRequest, type Routine } from "@zhixingbot/shared";
 import {
   bots,
   createRoutine,

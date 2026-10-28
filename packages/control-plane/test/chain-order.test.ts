@@ -1,4 +1,4 @@
-import { AccountId, AccountListResponse, CreateBotResponse, LoginAttemptId, type ServerPush } from "@baize/shared";
+import { AccountId, AccountListResponse, CreateBotResponse, LoginAttemptId, type ServerPush } from "@zhixingbot/shared";
 import { expect, it, vi } from "vitest";
 import { accounts, computers } from "../src/db/schema.js";
 import { hashSecret, newId } from "../src/ids.js";

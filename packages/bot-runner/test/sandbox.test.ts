@@ -19,7 +19,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { createBashToolDefinition } from "@earendil-works/pi-coding-agent";
-import { BotId, ComputerId, GroupId } from "@baize/shared";
+import { BotId, ComputerId, GroupId } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { toolboxSearchPath } from "../src/contained.js";
 import { decide, type GateAccess, type GateCall } from "../src/gate.js";
@@ -823,7 +823,7 @@ describe("bash 沙箱性能", () => {
           PATH: "/bin",
           HOME: "/Users/test",
           DISPLAY: ":99",
-          BAIZE_GATE_SENTINEL: "secret",
+          ZHIXINGBOT_GATE_SENTINEL: "secret",
           PI_SESSION_ID: "session-1",
         },
         "/work",

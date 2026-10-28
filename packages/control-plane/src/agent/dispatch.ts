@@ -26,7 +26,7 @@ import {
   type TeamOfferStatus,
   type ToolCallStatus,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { Db } from "../db/client.js";
 import { and, eq, inArray, lte, type SQL } from "drizzle-orm";
 import { approvals as approvalRows, groups, runs } from "../db/schema.js";

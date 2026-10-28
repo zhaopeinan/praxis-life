@@ -18,7 +18,7 @@ import {
   type RunId,
   type ServerPush,
   type User,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { expect } from "vitest";
 import { addAccountWithToken, CredentialCrypto } from "../../src/credentials.js";
 import type { Db } from "../../src/db/client.js";

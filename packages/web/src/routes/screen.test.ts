@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GroupId } from "@baize/shared";
+import { GroupId } from "@zhixingbot/shared";
 import { pathOf, screenOf, type Screen } from "./screen.js";
 
 describe("screenOf", () => {

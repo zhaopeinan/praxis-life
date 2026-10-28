@@ -7,7 +7,7 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
-import { Message, MessageListResponse, ServerPush, SkillResponse, UsageResponse } from "@baize/shared";
+import { Message, MessageListResponse, ServerPush, SkillResponse, UsageResponse } from "@zhixingbot/shared";
 
 export { expect, Message, MessageListResponse, ServerPush, SkillResponse, UsageResponse };
 export type { APIRequestContext, Page };

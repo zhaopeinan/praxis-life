@@ -10,7 +10,7 @@ import {
   type TopicTask,
   type UserId,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { TransactionRollbackError, and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { groups, messages, routines, tasks } from "../db/schema.js";

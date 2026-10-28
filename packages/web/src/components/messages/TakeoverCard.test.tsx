@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Computer, LiveSession, MessageBody, MessageId, ToolCallStatus } from "@baize/shared";
+import { Computer, LiveSession, MessageBody, MessageId, ToolCallStatus } from "@zhixingbot/shared";
 import { EMPTY_CONTENT, reduceContent } from "../../state/content.js";
 import { createClock } from "../../state/stamped.js";
 import type { ContentBook, ReadyState } from "../../state/types.js";

@@ -1,4 +1,4 @@
-import { GroupId, LeaveTableRequest, PokerTableResponse, RetryReviewRequest } from "@baize/shared";
+import { GroupId, LeaveTableRequest, PokerTableResponse, RetryReviewRequest } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import { concealed, log } from "../../log.js";
 import type { AgentHub } from "../../agent/hub.js";

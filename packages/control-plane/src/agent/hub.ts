@@ -23,7 +23,7 @@ import {
   type MessageId,
   type RunId,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { WebSocket } from "ws";
 import { TransactionRollbackError } from "drizzle-orm";
 import type { Db } from "../db/client.js";

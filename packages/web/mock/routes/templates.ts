@@ -6,7 +6,7 @@ import {
   Preference,
   ToolConnection,
   ToolConnectionId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import {
   bots,
   createBot,

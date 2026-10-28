@@ -1,4 +1,4 @@
-import type { BotId, GroupId } from "@baize/shared";
+import type { BotId, GroupId } from "@zhixingbot/shared";
 import { shelfLoad, shelfRow, shelfWrite } from "./stamped.js";
 import type { Action, ChoiceEntry, ReadyState } from "./types.js";
 

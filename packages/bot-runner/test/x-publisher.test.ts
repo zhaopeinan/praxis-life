@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AccountId, ControlToAgent, type DraftContent, DraftId } from "@baize/shared";
+import { AccountId, ControlToAgent, type DraftContent, DraftId } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type PublishDraftMessage, publishDraft, type PublisherDeps, X_PAGES } from "../src/publisher.js";
 import { chromeBinary, launchTestChrome, type TestChrome } from "./helpers/chrome.js";

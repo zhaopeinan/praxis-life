@@ -6,7 +6,7 @@ import {
   type BotId,
   type ControlToAgent,
   type GroupId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 
 type Config = Extract<ControlToAgent, { type: "config" }>;
 

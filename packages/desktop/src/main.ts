@@ -37,9 +37,9 @@ import {
   type GroupId,
   type NotifyKind,
   type OpenAtLogin,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import WebSocket from "ws";
-import { chromeProfileDir, reapProfileChromes } from "@baize/computer-agent/chrome-process";
+import { chromeProfileDir, reapProfileChromes } from "@zhixingbot/computer-agent/chrome-process";
 import {
   currentAgentChild,
   isCurrentAgent,

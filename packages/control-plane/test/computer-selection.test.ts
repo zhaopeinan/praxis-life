@@ -1,4 +1,4 @@
-import { AccountConfig, AccountId, ComputerId, UserId } from "@baize/shared";
+import { AccountConfig, AccountId, ComputerId, UserId } from "@zhixingbot/shared";
 import { describe, expect, it } from "vitest";
 import type { ComputerAvailability, ComputerReach } from "../src/agent/computer-availability.js";
 import {

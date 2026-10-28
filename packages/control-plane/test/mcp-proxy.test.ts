@@ -8,7 +8,7 @@ import {
   type BotId,
   type ControlToAgent,
   type GroupId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { Server as HttpServer } from "node:http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ensureComputer } from "../src/repo/computers.js";

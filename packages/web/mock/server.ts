@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
-import { type ServerPush } from "@baize/shared";
+import { type ServerPush } from "@zhixingbot/shared";
 import { accountRoutes } from "./routes/account.js";
 import { authRoutes, authed, expireSessions } from "./routes/auth.js";
 import { botRoutes } from "./routes/bots.js";

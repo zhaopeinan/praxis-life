@@ -1,4 +1,4 @@
-import type { MetricSource, OAuthPlatform } from "@baize/shared";
+import type { MetricSource, OAuthPlatform } from "@zhixingbot/shared";
 import { z } from "zod";
 import type { ApiBases } from "../publish/platforms.js";
 

@@ -1,4 +1,4 @@
-import { BotListResponse, POKER_PERSONAS, PokerPersona, type UserId } from "@baize/shared";
+import { BotListResponse, POKER_PERSONAS, PokerPersona, type UserId } from "@zhixingbot/shared";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { helloAgent } from "./helpers/agent.js";

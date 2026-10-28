@@ -19,7 +19,7 @@ import {
   type UpdateToolRequest,
   type UsageResponse,
   type User,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { BotAvatar } from "./BotAvatar.js";
 import { ToolsPage } from "./ToolsPage.js";
 import { AccountsPage } from "./AccountsPage.js";

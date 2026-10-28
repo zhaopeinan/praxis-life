@@ -1,4 +1,4 @@
-import { CreateBotResponse, type ComputerId } from "@baize/shared";
+import { CreateBotResponse, type ComputerId } from "@zhixingbot/shared";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";

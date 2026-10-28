@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BrandBook, type BrandEdit } from "@baize/shared";
+import { BrandBook, type BrandEdit } from "@zhixingbot/shared";
 import { editKey, lengthOf, requestOf, textsOf } from "./BrandBookDialog.js";
 
 const edit = (draftId: string, after: string): BrandEdit =>

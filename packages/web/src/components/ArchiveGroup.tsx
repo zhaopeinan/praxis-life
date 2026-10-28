@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { GroupId } from "@baize/shared";
+import type { GroupId } from "@zhixingbot/shared";
 
 type Props = {
   groupId: GroupId;

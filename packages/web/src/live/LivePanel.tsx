@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Globe, MonitorUp } from "lucide-react";
-import { liveEndActions, type ComputerKind, type LiveInput, type LiveUserEnd } from "@baize/shared";
+import { liveEndActions, type ComputerKind, type LiveInput, type LiveUserEnd } from "@zhixingbot/shared";
 import { useApp } from "../state/app.js";
 import type { ScreenSession } from "../state/live.js";
 import { reconnectDelay } from "../state/reconnect.js";

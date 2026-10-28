@@ -1,4 +1,4 @@
-import type { DesktopBridge } from "@baize/shared";
+import type { DesktopBridge } from "@zhixingbot/shared";
 
 declare global {
   interface Window {

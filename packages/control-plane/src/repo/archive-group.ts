@@ -1,4 +1,4 @@
-import { BotId, type Approval, type ComputerId, type GroupId, RunId, type UserId } from "@baize/shared";
+import { BotId, type Approval, type ComputerId, type GroupId, RunId, type UserId } from "@zhixingbot/shared";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { cancelGroupLanes, lockLaneComputers } from "../agent/place-run.js";
 import type { Db } from "../db/client.js";

@@ -1,4 +1,4 @@
-import { CreateBotResponse, CreateGroupResponse, ProjectResponse } from "@baize/shared";
+import { CreateBotResponse, CreateGroupResponse, ProjectResponse } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startTestServer, type TestServer } from "./helpers/client.js";
 import { createTestDb, type TestDb } from "./helpers/db.js";

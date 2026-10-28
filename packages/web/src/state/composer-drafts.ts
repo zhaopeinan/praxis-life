@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { GroupId } from "@baize/shared";
+import type { GroupId } from "@zhixingbot/shared";
 
 const draftsUntilReload = new Map<GroupId, string>();
 const listeners = new Set<() => void>();

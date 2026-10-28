@@ -10,7 +10,7 @@ import {
   MessageId,
   RunId,
   type ToolView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { DownlinkCursor, ReliableOutbox } from "../src/reliable-transport.js";
 
 const directories: string[] = [];

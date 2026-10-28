@@ -14,7 +14,7 @@ import {
   type MessageBody,
   type ServerPush,
   type TeamOfferMember,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { connect, type Sql } from "../src/db/client.js";
 import { databaseUrl } from "../src/env.js";

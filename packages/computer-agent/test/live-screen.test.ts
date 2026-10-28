@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import type { CdpConnection, CdpEvent, LiveOutcome, LiveRequest } from "@baize/bot-runner";
+import type { CdpConnection, CdpEvent, LiveOutcome, LiveRequest } from "@zhixingbot/bot-runner";
 import {
   AccountId,
   BotId,
@@ -12,7 +12,7 @@ import {
   type LivePurpose,
   LiveUp,
   LoginAttemptId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { createLiveScreen } from "../src/live-screen.js";
 
 interface Sent {

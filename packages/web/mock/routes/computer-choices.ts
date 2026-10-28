@@ -1,4 +1,4 @@
-import { PutComputerChoiceRequest, type ComputerKind } from "@baize/shared";
+import { PutComputerChoiceRequest, type ComputerKind } from "@zhixingbot/shared";
 import { appendMessage, bots, chooseComputer, choicesOf, groups, hasComputer } from "../state.js";
 import { readBody, send, type Route } from "./http.js";
 

@@ -1,4 +1,4 @@
-import { type ComputerId, GroupId, PokerHandId, PokerSessionId, RunId, UserId, type Message } from "@baize/shared";
+import { type ComputerId, GroupId, PokerHandId, PokerSessionId, RunId, UserId, type Message } from "@zhixingbot/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { AgentHub } from "../agent/hub.js";
 import { sendHiddenRun } from "../agent/hidden-run.js";

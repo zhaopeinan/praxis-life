@@ -1,4 +1,4 @@
-import { ComputerId, type Computer, type ComputerKind, type ComputerView, type UserId } from "@baize/shared";
+import { ComputerId, type Computer, type ComputerKind, type ComputerView, type UserId } from "@zhixingbot/shared";
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { computers } from "../db/schema.js";

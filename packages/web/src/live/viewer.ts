@@ -6,7 +6,7 @@ import {
   type LiveFromViewer,
   type LiveId,
   type LiveSession,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { BASE } from "../base.js";
 
 export type LiveCloseReason = "gone" | "replaced" | "not_found" | "network";

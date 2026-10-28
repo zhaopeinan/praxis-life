@@ -13,9 +13,9 @@ import {
   type AccountId,
   type AgentToControl,
   type Draft,
-} from "@baize/shared";
-import { createRunner, type PromptMessage } from "@baize/bot-runner";
-import { startAgent, type AgentHandle } from "@baize/computer-agent";
+} from "@zhixingbot/shared";
+import { createRunner, type PromptMessage } from "@zhixingbot/bot-runner";
+import { startAgent, type AgentHandle } from "@zhixingbot/computer-agent";
 import { startStack, type Stack } from "../src/stack.js";
 import { isFollowUpTurn, startUpstream, type ChatRequest, type ScriptedTurn } from "../src/upstream.js";
 

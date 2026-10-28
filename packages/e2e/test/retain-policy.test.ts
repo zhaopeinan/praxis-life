@@ -9,7 +9,7 @@ import {
   ToolResponse,
   advanceWorkHead,
   type WorkAppend,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { describe, expect, it, vi } from "vitest";
 import { startTestMcp } from "../src/mcp.js";
 import { startStack, type Stack } from "../src/stack.js";

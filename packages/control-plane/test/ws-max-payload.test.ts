@@ -1,4 +1,4 @@
-import { AgentCloseCode, CreateBotResponse, SendMessageResponse, UplinkAck, type ServerPush } from "@baize/shared";
+import { AgentCloseCode, CreateBotResponse, SendMessageResponse, UplinkAck, type ServerPush } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { RawData } from "ws";
 import { helloAgent, openAgent, type AgentClient } from "./helpers/agent.js";

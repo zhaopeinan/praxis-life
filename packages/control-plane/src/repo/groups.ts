@@ -7,7 +7,7 @@ import {
   type Message,
   type TopicTask,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, count, eq, gt, inArray, isNull, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { bots, groupMembers, groups, pokerTables, tasks, userCounters } from "../db/schema.js";

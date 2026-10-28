@@ -11,7 +11,7 @@ import {
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useEscapeToClose } from "./useEscapeToClose.js";
-import { UpdateBrandRequest, type BrandBook, type BrandEdit } from "@baize/shared";
+import { UpdateBrandRequest, type BrandBook, type BrandEdit } from "@zhixingbot/shared";
 import { RequestFailed } from "../api/client.js";
 import { useApp } from "../state/app.js";
 import type { SessionId } from "../state/types.js";

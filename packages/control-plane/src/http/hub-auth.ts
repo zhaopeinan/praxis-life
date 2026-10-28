@@ -1,4 +1,4 @@
-import type { ComputerId, UserId } from "@baize/shared";
+import type { ComputerId, UserId } from "@zhixingbot/shared";
 import type { MiddlewareHandler } from "hono";
 import type { Db } from "../db/client.js";
 import { findComputerByGatewayKey } from "../repo/computers.js";

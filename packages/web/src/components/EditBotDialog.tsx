@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useEscapeToClose } from "./useEscapeToClose.js";
-import { BotTags, UpdateBotRequest, type Bot } from "@baize/shared";
+import { BotTags, UpdateBotRequest, type Bot } from "@zhixingbot/shared";
 import type { BotDraft } from "../api/client.js";
 import { BotAvatar } from "./BotAvatar.js";
 import { trapTab } from "./trapTab.js";

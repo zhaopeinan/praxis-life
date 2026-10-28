@@ -1,6 +1,6 @@
 import { ArrowRightLeft, Hand, MessageSquare, Plus, Repeat, Settings as SettingsIcon, Sun, Users } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { Bot, BotId, GroupId, PokerTableView, User } from "@baize/shared";
+import type { Bot, BotId, GroupId, PokerTableView, User } from "@zhixingbot/shared";
 import { BotAvatar, resolveBotAvatarState } from "./BotAvatar.js";
 import { activityOf } from "./messages/preview.js";
 import type { Conversation, GroupTurn } from "../state/app.js";

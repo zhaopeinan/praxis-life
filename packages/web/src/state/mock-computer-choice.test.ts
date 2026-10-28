@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { beforeEach, describe, expect, it } from "vitest";
-import { BotId, ComputerChoices, ServerPush } from "@baize/shared";
+import { BotId, ComputerChoices, ServerPush } from "@zhixingbot/shared";
 import { computerChoiceRoutes } from "../../mock/routes/computer-choices.js";
 import {
   messagesByGroupId,

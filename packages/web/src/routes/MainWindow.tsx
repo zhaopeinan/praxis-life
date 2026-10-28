@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
-import type { Bot, BotHue, BotId, BotShape, ChecklistItem, GroupId, Message, MessageId } from "@baize/shared";
+import type { Bot, BotHue, BotId, BotShape, ChecklistItem, GroupId, Message, MessageId } from "@zhixingbot/shared";
 import type { Seq } from "../state/stamped.js";
 import { Sidebar } from "../components/Sidebar.js";
 import { NewProjectDialog } from "../components/NewProjectDialog.js";

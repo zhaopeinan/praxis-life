@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BrandBook } from "@baize/shared";
+import { BrandBook } from "@zhixingbot/shared";
 import { reduceBrand } from "./brand.js";
 import type { ReadyState } from "./types.js";
 

@@ -14,7 +14,7 @@ import {
   type GroupId,
   type Routine,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import type { TransactionSql } from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";

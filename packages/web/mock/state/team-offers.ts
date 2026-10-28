@@ -8,7 +8,7 @@ import {
   type DecideTeamOfferRequest,
   type TodayPendingItem,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { createBot, createGroup } from "./groups.js";
 import { appendMessage, findMessage, writeMessageBody } from "./messages.js";
 import { bots, groupIdByBotId, groups, messagesByGroupId } from "./store.js";

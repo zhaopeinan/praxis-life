@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Computer } from "@baize/shared";
+import { Computer } from "@zhixingbot/shared";
 import { beforeChinese, blockedTier, computerName } from "./content.js";
 
 const computer = (kind: Computer["kind"], host: string | null) =>

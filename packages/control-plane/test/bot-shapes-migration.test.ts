@@ -1,4 +1,4 @@
-import { BotListResponse, POKER_PERSONAS } from "@baize/shared";
+import { BotListResponse, POKER_PERSONAS } from "@zhixingbot/shared";
 import { expect, it } from "vitest";
 import { runMigrations } from "../src/db/migrate.js";
 import { hashPassword } from "../src/password.js";

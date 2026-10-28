@@ -4,7 +4,7 @@ import {
   startFakePlatforms as startBasePlatforms,
   type FakePlatformRequest,
   type FakePlatforms as BasePlatforms,
-} from "@baize/control-plane/testing";
+} from "@zhixingbot/control-plane/testing";
 
 export type FakePlatforms = BasePlatforms & {
   setGithubStars(repo: string, value: number): void;

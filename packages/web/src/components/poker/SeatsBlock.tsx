@@ -1,4 +1,4 @@
-import { POKER_PERSONAS, type PokerSeatNo, type PokerTableView } from "@baize/shared";
+import { POKER_PERSONAS, type PokerSeatNo, type PokerTableView } from "@zhixingbot/shared";
 import { BotAvatar } from "../BotAvatar.js";
 
 type Props = {

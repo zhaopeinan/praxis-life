@@ -1,4 +1,4 @@
-import { BotHue, BotShape } from "@baize/shared";
+import { BotHue, BotShape } from "@zhixingbot/shared";
 
 export const HUE_ROTATION = BotHue.options;
 export const SHAPE_ROTATION = BotShape.options;

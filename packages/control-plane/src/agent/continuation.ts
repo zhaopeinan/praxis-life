@@ -10,7 +10,7 @@ import {
   type Message,
   type ServerPush,
   type SwitchComputerResponse,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, eq, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { computers, groupMembers, routineRuns, routines, runs } from "../db/schema.js";

@@ -1,4 +1,4 @@
-import type { ComputerId } from "@baize/shared";
+import type { ComputerId } from "@zhixingbot/shared";
 
 export type GatewayLimits = {
   readonly firstByteTimeoutMs: number;

@@ -1,6 +1,6 @@
 # 控制面、Postgres 和一台远程电脑。用法和要准备的东西见同目录 README.md。
-# 项目名写死成 baize-remote，和仓库根的 baize 项目（baize-postgres 容器）互不相干。
-name: baize-remote
+# 项目名写死成 zhixingbot-remote，和仓库根的 baize 项目（zhixingbot-postgres 容器）互不相干。
+name: zhixingbot-remote
 
 # 两张网。远程电脑只在 edge 上，够不着 postgres：批准联网的 bash 沙箱和容器共用网络命名空间，
 # 远程电脑能连到谁，批了联网的命令就能连到谁。
@@ -97,7 +97,7 @@ services:
       target: remote-computer
       args:
         APT_MIRROR: ${APT_MIRROR:-}
-    image: baize-remote-computer:remote
+    image: zhixingbot-remote-computer:remote
     depends_on:
       - control-plane
     # 只放开 bubblewrap 和 Chromium 沙箱建命名空间要的几个系统调用，不给 privileged，不加 CAP_SYS_ADMIN。

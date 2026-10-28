@@ -21,7 +21,7 @@ import {
   draftImagesRefusal,
   imageMime,
   type Platform,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { type Static, Type } from "typebox";
 import { parseOrThrow, resultText } from "./assistant.js";
 import type { RunnerTool } from "./bot-session.js";

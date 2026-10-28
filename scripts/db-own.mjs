@@ -47,7 +47,7 @@ function withValue(lines, key, value) {
 }
 
 function controlPlane(script, databaseUrl) {
-  const result = spawnSync("pnpm", ["--silent", "--filter", "@baize/control-plane", script], {
+  const result = spawnSync("pnpm", ["--silent", "--filter", "@zhixingbot/control-plane", script], {
     cwd: root,
     env: { ...process.env, DATABASE_URL: databaseUrl },
     stdio: ["ignore", "pipe", "inherit"],
@@ -55,7 +55,7 @@ function controlPlane(script, databaseUrl) {
   });
   process.stdout.write(result.stdout ?? "");
   if (result.status !== 0) {
-    console.error(`pnpm --filter @baize/control-plane ${script} 失败，code ${result.status ?? result.signal}`);
+    console.error(`pnpm --filter @zhixingbot/control-plane ${script} 失败，code ${result.status ?? result.signal}`);
     process.exit(1);
   }
   return result.stdout.split("\n");

@@ -5,7 +5,7 @@ import {
   UsageResponse,
   type BotId,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { messages, routineRuns, routines, runs } from "../src/db/schema.js";

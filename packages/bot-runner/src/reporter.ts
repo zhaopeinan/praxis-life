@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { AgentToControl, type BotId, type GroupId, MessageId, type RunId, type ToolView } from "@baize/shared";
+import { AgentToControl, type BotId, type GroupId, MessageId, type RunId, type ToolView } from "@zhixingbot/shared";
 import type { AgentSession, SessionStats } from "@earendil-works/pi-coding-agent";
 import { HELPER_TOOL, helperToolView } from "./helper.js";
 import { TAKEOVER_TOOL, takeoverToolView } from "./takeover.js";

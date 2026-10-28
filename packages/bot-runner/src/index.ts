@@ -15,7 +15,7 @@ import {
   type ToolConnectionConfig,
   EMPTY_WORK_HEAD,
   MessageId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { ACCOUNT_READ_TOOL, createAccountReadTool, readableAccounts } from "./account-read.js";
 import { type ApprovalGate, createApprovalGate } from "./approvals.js";
 import { ASSISTANT_TOOL_NAMES, createAssistantTools, renderProjects } from "./assistant.js";

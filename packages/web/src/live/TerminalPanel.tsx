@@ -3,7 +3,7 @@ import { SquareTerminal } from "lucide-react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { liveEndActions, type LiveInput, type LiveSession, type LiveUserEnd } from "@baize/shared";
+import { liveEndActions, type LiveInput, type LiveSession, type LiveUserEnd } from "@zhixingbot/shared";
 import { reconnectDelay } from "../state/reconnect.js";
 import { LIVE_TEXT, TERMINAL_TEXT, liveEndText } from "../components/messages/content.js";
 import { resizeInput, termInputs } from "./term-input.js";

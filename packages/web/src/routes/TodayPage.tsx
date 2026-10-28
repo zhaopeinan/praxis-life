@@ -20,7 +20,7 @@ import type {
   MessageId,
   TodayAssistantLine,
   TodayResponse,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { PLATFORM, draftText, timeText } from "../components/messages/content.js";
 import { DraftCard, PlanCard, type ContentActions } from "../components/messages/DraftCards.js";
 import type { BotLookup } from "../components/messages/MessageView.js";

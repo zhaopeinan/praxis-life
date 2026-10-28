@@ -18,7 +18,7 @@ import {
   UplinkFrame,
   UPLINK_DELIVERY,
   UplinkAck,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import {
   cliHomeDir,
   createRunner,
@@ -29,7 +29,7 @@ import {
   type RunnerConfig,
   sandboxKind,
   terminalSpawn,
-} from "@baize/bot-runner";
+} from "@zhixingbot/bot-runner";
 import { backoffDelay, type BackoffOptions, defaultBackoff } from "./backoff.js";
 import { type AssistantChrome, type AssistantChromeOptions, startAssistantChrome } from "./chrome.js";
 import { createLiveScreen } from "./live-screen.js";
@@ -55,7 +55,7 @@ export interface AgentOptions {
   readonly heartbeatMs?: number;
   readonly backoff?: BackoffOptions;
   readonly log?: (line: string) => void;
-  /** 每个 Bot 的 Pi 目录建在这下面。main.ts 从 BAIZE_DATA_DIR 读，不给就落到 ~/.baize/bots。 */
+  /** 每个 Bot 的 Pi 目录建在这下面。main.ts 从 ZHIXINGBOT_DATA_DIR 读，不给就落到 ~/.zhixingze/bots。 */
   readonly dataDir?: string;
   /** 换掉真运行器。测试用它免去起真模型网关。 */
   readonly makeRunner?: RunnerFactory;
@@ -93,7 +93,7 @@ export function startAgent(options: AgentOptions): AgentHandle {
   const heartbeatMs = options.heartbeatMs ?? 15_000;
   const backoff = options.backoff ?? defaultBackoff;
   const log = options.log ?? ((line: string) => console.log(`[computer-agent] ${line}`));
-  const dataDir = options.dataDir ?? join(homedir(), ".baize", "bots");
+  const dataDir = options.dataDir ?? join(homedir(), ".zhixingbot", "bots");
   const makeRunner: RunnerFactory = options.makeRunner ?? ((config) => createRunner(config));
   const runnerStopTimeoutMs = options.runnerStopTimeoutMs ?? 3_000;
   // 远程登录要等人看到提示、拿出手机扫码或收验证码，2 分钟不够。

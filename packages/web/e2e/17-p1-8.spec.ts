@@ -1,4 +1,4 @@
-import { GroupListResponse, ProjectResponse } from "@baize/shared";
+import { GroupListResponse, ProjectResponse } from "@zhixingbot/shared";
 import { TEAM_TITLE, expect, login, teamItem, test, type APIRequestContext, type Page } from "./fixtures";
 
 const seedProject = async (request: APIRequestContext) => {

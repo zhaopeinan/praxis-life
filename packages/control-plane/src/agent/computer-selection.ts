@@ -1,4 +1,4 @@
-import type { AccountConfig, ComputerKind } from "@baize/shared";
+import type { AccountConfig, ComputerKind } from "@zhixingbot/shared";
 import type { ComputerRecord } from "../repo/rows.js";
 import type { ComputerAvailability } from "./computer-availability.js";
 

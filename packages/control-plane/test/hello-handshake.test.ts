@@ -1,4 +1,4 @@
-import { BotResponse, CreateBotResponse, type BotId, type ControlToAgent } from "@baize/shared";
+import { BotResponse, CreateBotResponse, type BotId, type ControlToAgent } from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ensureComputer } from "../src/repo/computers.js";
 import * as toolsRepo from "../src/repo/tools.js";

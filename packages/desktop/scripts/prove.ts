@@ -463,7 +463,7 @@ async function launch(
 async function main(): Promise<void> {
   if (!existsSync(join(appPath, "Contents/Info.plist"))) throw new Error("没有打包 App");
   if (!(await portFree(controlPort))) throw new Error(`${controlPort} 端口已被占用`);
-  const postgresReady = spawnSync("docker", ["exec", "baize-postgres", "pg_isready", "-U", "baize"], {
+  const postgresReady = spawnSync("docker", ["exec", "zhixingbot-postgres", "pg_isready", "-U", "baize"], {
     encoding: "utf8",
   });
   if (postgresReady.status !== 0) run("docker", ["compose", "up", "-d"]);
@@ -488,8 +488,8 @@ async function main(): Promise<void> {
       CREDENTIALS_KEY: randomBytes(32).toString("base64"),
       TOOL_SECRET_KEY: randomBytes(32).toString("hex"),
     };
-    run("pnpm", ["--filter", "@baize/control-plane", "migrate"], baseEnv);
-    control = spawn("pnpm", ["--filter", "@baize/control-plane", "start"], {
+    run("pnpm", ["--filter", "@zhixingbot/control-plane", "migrate"], baseEnv);
+    control = spawn("pnpm", ["--filter", "@zhixingbot/control-plane", "start"], {
       cwd: repo,
       env: cleanEnv(baseEnv),
       detached: true,

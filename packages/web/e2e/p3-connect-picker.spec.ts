@@ -1,4 +1,4 @@
-import { AccountListResponse } from "@baize/shared";
+import { AccountListResponse } from "@zhixingbot/shared";
 import { SHOT, expect, login, openSettings, test, type APIRequestContext, type Page } from "./fixtures";
 
 // 账号页「接入小红书」：号挂在哪台电脑上就在哪台登录。mock 预置本机和远程两台，用例按需摘掉一台或改状态。

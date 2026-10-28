@@ -1,5 +1,5 @@
 {
-  "name": "@baize/computer-agent",
+  "name": "@zhixingbot/computer-agent",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,8 +15,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@baize/bot-runner": "workspace:*",
-    "@baize/shared": "workspace:*",
+    "@zhixingbot/bot-runner": "workspace:*",
+    "@zhixingbot/shared": "workspace:*",
     "ws": "^8.21.3",
     "zod": "^3.23.8"
   },

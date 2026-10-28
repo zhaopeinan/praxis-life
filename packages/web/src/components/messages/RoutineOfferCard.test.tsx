@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { Message } from "@baize/shared";
+import { Message } from "@zhixingbot/shared";
 import { RoutineOfferCard } from "./RoutineOfferCard.js";
 
 vi.mock("../../state/app.js", () => ({ useApp: () => ({ state: { status: "loading" }, actions: {} }) }));

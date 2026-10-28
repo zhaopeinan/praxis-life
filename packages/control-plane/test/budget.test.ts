@@ -10,7 +10,7 @@ import {
   type Routine,
   type ServerPush,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { newId } from "../src/ids.js";
 import { runs } from "../src/db/schema.js";

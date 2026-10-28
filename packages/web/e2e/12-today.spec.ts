@@ -4,7 +4,7 @@ import { EMAIL, PASSWORD, expect, test, login, openBot, type APIRequestContext }
 import type { TestInfo } from "@playwright/test";
 
 const screenshotPath = async (testInfo: TestInfo, name: string): Promise<string> => {
-  const auditDir = process.env["BAIZE_P1_7_AUDIT_DIR"];
+  const auditDir = process.env["ZHIXINGBOT_P1_7_AUDIT_DIR"];
   const target = auditDir === undefined ? testInfo.outputPath(name) : join(auditDir, name);
   await mkdir(dirname(target), { recursive: true });
   return target;

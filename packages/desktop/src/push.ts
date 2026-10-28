@@ -1,4 +1,4 @@
-import { ServerPush, type GroupId, type NotifyKind } from "@baize/shared";
+import { ServerPush, type GroupId, type NotifyKind } from "@zhixingbot/shared";
 
 export type DesktopNotice = { readonly kind: NotifyKind; readonly text: string; readonly groupId: GroupId | null };
 

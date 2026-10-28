@@ -9,7 +9,7 @@ import {
   ServerPush,
   UpdateTaskResponse,
   type BotId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { groupRoutes } from "../../mock/routes/groups.js";
 import {
   bots,

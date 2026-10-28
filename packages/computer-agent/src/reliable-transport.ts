@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { AgentToControl, UPLINK_DELIVERY, type AgentToControl as AgentMessage, type RunId } from "@baize/shared";
+import { AgentToControl, UPLINK_DELIVERY, type AgentToControl as AgentMessage, type RunId } from "@zhixingbot/shared";
 import { fitUplink, OversizedUplink, type FittedUplink } from "./frame-limit.js";
 
 interface StoredUplink {

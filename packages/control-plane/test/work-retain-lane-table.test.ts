@@ -11,7 +11,7 @@ import {
   type UserId,
   type WorkAppend,
   type WorkStream,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { startServer, type RunningServer } from "../src/server.js";

@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { WebSocketServer } from "ws";
 import { supervise, type SupervisorHandle } from "../src/supervisor.js";
 
-const FORBIDDEN_ENV = ["COMPUTER_ID", "AGENT_TOKEN", "CONTROL_PLANE_AGENT_URL", "BAIZE_DATA_DIR"] as const;
+const FORBIDDEN_ENV = ["COMPUTER_ID", "AGENT_TOKEN", "CONTROL_PLANE_AGENT_URL", "ZHIXINGBOT_DATA_DIR"] as const;
 
 const directories: string[] = [];
 const children: ChildProcessByStdio<null, Readable, Readable>[] = [];
@@ -231,7 +231,7 @@ describe("看护进程", () => {
     handles.push(
       await supervise({
         launchFile,
-        env: cleanEnv({ DISPLAY: ":99", BAIZE_CANARY: "不该传下去" }),
+        env: cleanEnv({ DISPLAY: ":99", ZHIXINGBOT_CANARY: "不该传下去" }),
         agentCommand: [process.execPath, "--import", "tsx", fixture, record],
         log: () => {},
       }),
@@ -245,7 +245,7 @@ describe("看护进程", () => {
 
     expect(envKeys.filter((key) => (FORBIDDEN_ENV as readonly string[]).includes(key))).toEqual([]);
     expect(envKeys, "Chrome 要用的 DISPLAY 传下去了").toContain("DISPLAY");
-    expect(envKeys, "白名单外的变量不传").not.toContain("BAIZE_CANARY");
+    expect(envKeys, "白名单外的变量不传").not.toContain("ZHIXINGBOT_CANARY");
   }, 60_000);
 
   it.each(FORBIDDEN_ENV)(

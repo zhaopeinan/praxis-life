@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ContentPlan, ContentPlanId, Draft, DraftId } from "@baize/shared";
+import { ContentPlan, ContentPlanId, Draft, DraftId } from "@zhixingbot/shared";
 import { EMPTY_CONTENT, reduceContent } from "./content.js";
 import { createClock, type Seq } from "./stamped.js";
 import type { Action, ReadyState } from "./types.js";

@@ -1,4 +1,4 @@
-import { type AgentToControl, BotId, type TeamOfferMember } from "@baize/shared";
+import { type AgentToControl, BotId, type TeamOfferMember } from "@zhixingbot/shared";
 import { type Static, Type } from "typebox";
 import { parseOrThrow, resultText } from "./assistant.js";
 import type { RunnerTool } from "./bot-session.js";

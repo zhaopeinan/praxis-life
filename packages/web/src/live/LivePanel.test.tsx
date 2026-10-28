@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { LiveSession } from "@baize/shared";
+import { LiveSession } from "@zhixingbot/shared";
 import type { ScreenSession } from "../state/live.js";
 import { LivePanel } from "./LivePanel.js";
 

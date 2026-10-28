@@ -1,4 +1,4 @@
-import type { ComputerId, GroupId, Notice, ServerPush } from "@baize/shared";
+import type { ComputerId, GroupId, Notice, ServerPush } from "@zhixingbot/shared";
 import type { Action, AppState, ReadyState, SessionId } from "./types.js";
 import { finishingElsewhere } from "./computer-choices.js";
 import { lookingAtPage, notifyNotice } from "./notify.js";

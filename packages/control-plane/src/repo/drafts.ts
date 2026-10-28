@@ -26,7 +26,7 @@ import {
   draftImageCountRefusal,
   draftImageRules,
   draftImagesRefusal,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import {
   and,
   asc,

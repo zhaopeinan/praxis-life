@@ -17,7 +17,7 @@ import {
   type Message,
   type ToolView,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { TransactionRollbackError, and, count, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { approvals, grants, groups, messages, runs } from "../db/schema.js";

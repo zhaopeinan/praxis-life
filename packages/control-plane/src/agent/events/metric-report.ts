@@ -1,4 +1,4 @@
-import { landReported, type AgentToControl } from "@baize/shared";
+import { landReported, type AgentToControl } from "@zhixingbot/shared";
 import { log } from "../../log.js";
 import { recordSample } from "../../repo/metrics.js";
 import { findGroupId } from "../../repo/messages.js";

@@ -12,7 +12,7 @@ import type {
   DraftId,
   DraftStatus,
   LiveId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { ContentBook } from "../../state/types.js";
 import { BrandBookOpener } from "../BrandBookDialog.js";
 import { ScopeReconnect } from "../ScopeReconnect.js";

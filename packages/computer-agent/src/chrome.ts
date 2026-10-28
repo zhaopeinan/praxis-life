@@ -2,8 +2,8 @@ import { execFile, spawn } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
-import type { ComputerKind } from "@baize/shared";
-import { type CdpConnection, type CdpPipe, connectPipe } from "@baize/bot-runner";
+import type { ComputerKind } from "@zhixingbot/shared";
+import { type CdpConnection, type CdpPipe, connectPipe } from "@zhixingbot/bot-runner";
 import { backoffDelay, type BackoffOptions } from "./backoff.js";
 import { chromeProfileDir, isAlive, reapProfileChromes, terminate } from "./chrome-process.js";
 

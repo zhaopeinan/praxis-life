@@ -1,4 +1,4 @@
-import type { OAuthPlatform, UserId } from "@baize/shared";
+import type { OAuthPlatform, UserId } from "@zhixingbot/shared";
 import { and, desc, eq, gt, lte, notInArray, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { oauthStates } from "../db/schema.js";

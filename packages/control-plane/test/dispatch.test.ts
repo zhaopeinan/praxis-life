@@ -8,7 +8,7 @@ import {
   type BotId,
   type GroupId,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { CONTEXT_MESSAGES, dispatchUserMessage } from "../src/agent/dispatch.js";

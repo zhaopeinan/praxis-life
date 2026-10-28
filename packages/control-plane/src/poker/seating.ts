@@ -1,4 +1,4 @@
-import type { PokerSeatNo } from "@baize/shared";
+import type { PokerSeatNo } from "@zhixingbot/shared";
 import type { SeatId } from "./engine.js";
 
 // 桌子的座位号 1 到 4 和引擎的座位 id 是同一个数的两种写法：引擎 id 恒为座位号的十进制字符串。

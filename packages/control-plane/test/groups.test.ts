@@ -10,7 +10,7 @@ import {
   type BotId,
   type Group,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HUE_ROTATION } from "../src/naming.js";
 import { appendMessage } from "../src/repo/messages.js";

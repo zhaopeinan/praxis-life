@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MCP_DISCOVERY_MAX_BYTES, MCP_DISCOVERY_MAX_OPERATIONS } from "@baize/shared";
+import { MCP_DISCOVERY_MAX_BYTES, MCP_DISCOVERY_MAX_OPERATIONS } from "@zhixingbot/shared";
 import { discoverMcpTools } from "../src/mcp-discover.js";
 
 interface McpReplyOptions {

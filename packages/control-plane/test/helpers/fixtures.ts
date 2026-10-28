@@ -1,4 +1,4 @@
-import type { ComputerId, User, UserId } from "@baize/shared";
+import type { ComputerId, User, UserId } from "@zhixingbot/shared";
 import type { Db } from "../../src/db/client.js";
 import { ensureComputer } from "../../src/repo/computers.js";
 import { createUser } from "../../src/repo/users.js";

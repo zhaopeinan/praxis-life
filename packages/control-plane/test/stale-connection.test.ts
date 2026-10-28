@@ -5,7 +5,7 @@ import {
   LoginAttemptId,
   type AgentToControl,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { expect, it } from "vitest";
 import { accounts } from "../src/db/schema.js";
 import { newId } from "../src/ids.js";

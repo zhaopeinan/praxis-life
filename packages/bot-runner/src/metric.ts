@@ -1,4 +1,4 @@
-import { landReported, type AgentToControl, type ReportRefusal } from "@baize/shared";
+import { landReported, type AgentToControl, type ReportRefusal } from "@zhixingbot/shared";
 import { type Static, Type } from "typebox";
 import { parseOrThrow, resultText } from "./assistant.js";
 import type { RunnerTool } from "./bot-session.js";

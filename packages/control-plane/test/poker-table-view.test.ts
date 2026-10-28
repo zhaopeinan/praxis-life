@@ -1,5 +1,5 @@
-import { PokerHandId, PokerSessionId, PokerTableView } from "@baize/shared";
-import type { BotId, GroupId } from "@baize/shared";
+import { PokerHandId, PokerSessionId, PokerTableView } from "@zhixingbot/shared";
+import type { BotId, GroupId } from "@zhixingbot/shared";
 import { describe, expect, it } from "vitest";
 import { apply, newHand, type HandState, type SeatId } from "../src/poker/engine.js";
 import { buildTableView, type TableState } from "../src/poker/table-view.js";

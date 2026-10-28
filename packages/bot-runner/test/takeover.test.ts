@@ -12,7 +12,7 @@ import {
   MessageId,
   RoutineId,
   RunId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { acquireBotBrowserMutex } from "../src/browser-mutex.js";
 import type { CdpConnection, CdpEvent } from "../src/cdp.js";

@@ -7,7 +7,7 @@ import {
   ReturnPlanResponse,
   TodayResponse,
   type DraftSpec,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addAccount } from "../src/repo/accounts.js";
 import { startTestServer, type TestServer } from "./helpers/client.js";

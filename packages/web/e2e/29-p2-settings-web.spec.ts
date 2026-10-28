@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { ComputerListResponse } from "@baize/shared";
+import { ComputerListResponse } from "@zhixingbot/shared";
 import { expect, login, openSettings, test, SHOT } from "./fixtures";
 
 test("设置有五个导航项", async ({ page }) => {

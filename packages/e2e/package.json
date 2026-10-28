@@ -1,18 +1,18 @@
 {
-  "name": "@baize/e2e",
+  "name": "@zhixingbot/e2e",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "acceptance": "pnpm --filter @baize/web exec tsx ../e2e/acceptance/run.ts"
+    "acceptance": "pnpm --filter @zhixingbot/web exec tsx ../e2e/acceptance/run.ts"
   },
   "dependencies": {
-    "@baize/bot-runner": "workspace:*",
-    "@baize/computer-agent": "workspace:*",
-    "@baize/control-plane": "workspace:*",
-    "@baize/shared": "workspace:*",
+    "@zhixingbot/bot-runner": "workspace:*",
+    "@zhixingbot/computer-agent": "workspace:*",
+    "@zhixingbot/control-plane": "workspace:*",
+    "@zhixingbot/shared": "workspace:*",
     "postgres": "^3.4.5",
     "ws": "^8.21.3",
     "@modelcontextprotocol/sdk": "1.30.0"

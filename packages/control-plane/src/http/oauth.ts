@@ -1,4 +1,4 @@
-import { OAuthPlatform, type Account, type OAuthResult, type User } from "@baize/shared";
+import { OAuthPlatform, type Account, type OAuthResult, type User } from "@zhixingbot/shared";
 import { Hono, type Context } from "hono";
 import { log } from "../log.js";
 import type { AgentHub } from "../agent/hub.js";

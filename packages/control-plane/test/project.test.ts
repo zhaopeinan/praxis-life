@@ -6,7 +6,7 @@ import {
   type BotId,
   type GroupId,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accounts, drafts, messages, publications, runs, tasks } from "../src/db/schema.js";

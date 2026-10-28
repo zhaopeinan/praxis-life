@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server";
-import { AGENT_FRAME_MAX_BYTES, SESSION_SWEEP_INTERVAL_MS, type User } from "@baize/shared";
+import { AGENT_FRAME_MAX_BYTES, SESSION_SWEEP_INTERVAL_MS, type User } from "@zhixingbot/shared";
 import { parse as parseCookie } from "hono/utils/cookie";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";

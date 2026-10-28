@@ -6,7 +6,7 @@ import {
   type BotId,
   type GroupId,
   type Message,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { startStack, type Stack } from "../src/stack.js";
 import { type ChatRequest, type ScriptedTurn, startUpstream } from "../src/upstream.js";
 

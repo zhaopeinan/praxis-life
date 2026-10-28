@@ -1,4 +1,4 @@
-import { ReportMetricRequest } from "@baize/shared";
+import { ReportMetricRequest } from "@zhixingbot/shared";
 import { recordSample } from "../state.js";
 import { readBody, send, type Route } from "./http.js";
 

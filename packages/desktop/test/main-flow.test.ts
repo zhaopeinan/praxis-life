@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, type Mock, type MockInstance, vi } from "vitest";
-import type { ComputerId } from "@baize/shared";
+import type { ComputerId } from "@zhixingbot/shared";
 
 process.setMaxListeners(30);
 
@@ -258,9 +258,9 @@ vi.mock("node:child_process", async () => {
   };
 });
 
-vi.mock("@baize/computer-agent/chrome-process", async () => {
-  const actual = await vi.importActual<typeof import("@baize/computer-agent/chrome-process")>(
-    "@baize/computer-agent/chrome-process",
+vi.mock("@zhixingbot/computer-agent/chrome-process", async () => {
+  const actual = await vi.importActual<typeof import("@zhixingbot/computer-agent/chrome-process")>(
+    "@zhixingbot/computer-agent/chrome-process",
   );
   return {
     ...actual,

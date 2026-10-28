@@ -12,7 +12,7 @@ import {
   type LiveId,
   type LiveSession,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { RawData, WebSocket } from "ws";
 import { log } from "../log.js";
 import type { PushHub } from "../ws/hub.js";

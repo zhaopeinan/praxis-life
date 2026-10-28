@@ -1,4 +1,4 @@
-import type { ComputerChoices, ComputerKind, Group } from "@baize/shared";
+import type { ComputerChoices, ComputerKind, Group } from "@zhixingbot/shared";
 import { computerChoices, computerStatus, removedComputers, runsOnComputer } from "./store.js";
 
 const COMPUTER_ID: Record<ComputerKind, string> = { local: "cmp_local", remote: "cmp_remote" };

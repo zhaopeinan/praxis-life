@@ -1,4 +1,4 @@
-import { POKER_PERSONAS, type PokerPersona } from "@baize/shared";
+import { POKER_PERSONAS, type PokerPersona } from "@zhixingbot/shared";
 import { type ChatRequest, type ScriptedTurn } from "../src/upstream.js";
 
 export const POKER_HINT = "A♠ K♦ 可以先加注到 40，观察牌友的回应。";

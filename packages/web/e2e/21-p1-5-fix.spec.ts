@@ -1,4 +1,4 @@
-import { AccountResponse, LoginAccountResponse } from "@baize/shared";
+import { AccountResponse, LoginAccountResponse } from "@zhixingbot/shared";
 import { expect, login, openSettings, test, type APIRequestContext, type Page } from "./fixtures";
 
 // 核验轮 verify-p1-5-web 的反例。页面里的 WebSocket 换成能从测试里掐断、也能往里塞一条推送的壳，

@@ -1,4 +1,4 @@
-import { GrantId } from "@baize/shared";
+import { GrantId } from "@zhixingbot/shared";
 import { grants } from "../state.js";
 import { send, type Route } from "./http.js";
 

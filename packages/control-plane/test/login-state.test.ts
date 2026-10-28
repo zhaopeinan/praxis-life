@@ -10,7 +10,7 @@ import {
   type Notice,
   type ServerPush,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accounts } from "../src/db/schema.js";
 import { newId } from "../src/ids.js";

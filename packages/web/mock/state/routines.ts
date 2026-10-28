@@ -7,7 +7,7 @@ import {
   type Message,
   type TriggerInput,
   type UpdateRoutineRequest,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { appendMessage } from "./messages.js";
 import { groupIdByBotId, groups, nextSuffix, routines } from "./store.js";
 

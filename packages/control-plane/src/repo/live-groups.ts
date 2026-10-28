@@ -1,4 +1,4 @@
-import { GroupId, type UserId } from "@baize/shared";
+import { GroupId, type UserId } from "@zhixingbot/shared";
 import { and, eq, exists, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { groupMembers, groups } from "../db/schema.js";

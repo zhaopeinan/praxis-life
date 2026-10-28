@@ -5,7 +5,7 @@ import {
   type ComputerId,
   type GatewayModels,
   type GroupId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";

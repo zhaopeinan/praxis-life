@@ -1,4 +1,4 @@
-import { BotId } from "@baize/shared";
+import { BotId } from "@zhixingbot/shared";
 import { describe, expect, it } from "vitest";
 import { parseMentions, routeTargets, type RoutingMember } from "../src/agent/routing.js";
 

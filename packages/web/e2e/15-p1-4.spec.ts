@@ -15,7 +15,7 @@ import {
 import type { TestInfo, WebSocketRoute } from "@playwright/test";
 
 const screenshotPath = async (testInfo: TestInfo, name: string): Promise<string> => {
-  const auditDir = process.env["BAIZE_P1_4_AUDIT_DIR"];
+  const auditDir = process.env["ZHIXINGBOT_P1_4_AUDIT_DIR"];
   const target = auditDir === undefined ? testInfo.outputPath(name) : join(auditDir, name);
   await mkdir(dirname(target), { recursive: true });
   return target;

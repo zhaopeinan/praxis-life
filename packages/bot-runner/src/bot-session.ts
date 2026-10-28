@@ -5,8 +5,8 @@ import {
   gatewayAlias,
   ModelPurpose,
   type ToolView,
-} from "@baize/shared";
-import { PRUNED_IMAGE_TEXT } from "@baize/shared/work-record";
+} from "@zhixingbot/shared";
+import { PRUNED_IMAGE_TEXT } from "@zhixingbot/shared/work-record";
 import {
   type AgentSession,
   createAgentSession,

@@ -18,7 +18,7 @@ import {
   UNREAD_METRIC,
   type TodayAssistantLine,
   type TodayPendingItem,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { appendMessage } from "./messages.js";
 import { hasMembers, metricOf } from "./project-page.js";
 import { isDeferredTeamOffer, pendingTeamOffers } from "./team-offers.js";

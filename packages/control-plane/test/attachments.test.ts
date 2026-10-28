@@ -10,7 +10,7 @@ import {
   CreateGroupResponse,
   type BotId,
   type GroupId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { helloAgent, type AgentClient } from "./helpers/agent.js";
 import { startTestServer, type TestServer } from "./helpers/client.js";

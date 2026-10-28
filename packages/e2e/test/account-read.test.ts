@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { BotListResponse, type AccountId } from "@baize/shared";
-import { startFakePlatforms } from "@baize/control-plane/testing";
+import { BotListResponse, type AccountId } from "@zhixingbot/shared";
+import { startFakePlatforms } from "@zhixingbot/control-plane/testing";
 import { startStack, type Stack } from "../src/stack.js";
 import { isFollowUpTurn, startUpstream, type ChatRequest, type ScriptedTurn } from "../src/upstream.js";
 

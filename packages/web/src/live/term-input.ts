@@ -1,4 +1,4 @@
-import type { LiveInput } from "@baize/shared";
+import type { LiveInput } from "@zhixingbot/shared";
 
 // 和 shared 里 LiveInput 的上限对齐：超了整帧会被中继丢掉，人打的字就没了。
 const TERM_CHUNK = 8192;

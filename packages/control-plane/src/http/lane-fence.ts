@@ -1,4 +1,4 @@
-import { BotId, GroupId, LaneIdentity } from "@baize/shared";
+import { BotId, GroupId, LaneIdentity } from "@zhixingbot/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { bots, computers, groupMembers, groups, laneLeases } from "../db/schema.js";

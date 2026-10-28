@@ -1,4 +1,4 @@
-import { DeleteAccountRequest } from "@baize/shared";
+import { DeleteAccountRequest } from "@zhixingbot/shared";
 import { Hono } from "hono";
 import { deleteCookie } from "hono/cookie";
 import type { AgentHub } from "../../agent/hub.js";

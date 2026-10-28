@@ -5,7 +5,7 @@ import {
   type BotId,
   type ControlToAgent,
   type GroupId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import { expectHello, helloAgent, openAgent, sendHello, type AgentClient } from "./helpers/agent.js";

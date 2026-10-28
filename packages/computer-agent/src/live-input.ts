@@ -1,4 +1,4 @@
-import type { LiveInput } from "@baize/shared";
+import type { LiveInput } from "@zhixingbot/shared";
 
 /** 最近一帧的 deviceWidth / deviceHeight，单位是 CSS 像素，也就是 Input.dispatch* 要的坐标系。 */
 export interface Viewport {

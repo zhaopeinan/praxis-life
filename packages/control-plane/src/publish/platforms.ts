@@ -5,7 +5,7 @@ import type {
   Platform,
   PublishFailureReason,
   PublishVia,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { PublishStep } from "./forbidden.js";
 
 /** externalId 为 null：电脑那边发出去了，但没读到平台上的 id。走接口的一定有。 */

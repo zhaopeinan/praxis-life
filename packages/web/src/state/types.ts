@@ -41,8 +41,8 @@ import {
   type TopicTask,
   type User,
   type UsageResponse,
-} from "@baize/shared";
-import type { BotListItem, GroupListItem } from "@baize/shared";
+} from "@zhixingbot/shared";
+import type { BotListItem, GroupListItem } from "@zhixingbot/shared";
 import type { MY_ROUTINES } from "./routines.js";
 import type { Seq, Shelf, Stamps } from "./stamped.js";
 

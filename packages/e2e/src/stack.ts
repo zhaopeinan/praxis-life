@@ -22,10 +22,10 @@ import {
   type ComputerId,
   type Platform,
   type WorkAppend,
-} from "@baize/shared";
-import { createRunner, CURRENT_SESSION_VERSION, type PromptMessage } from "@baize/bot-runner";
-import { type AgentOptions, startAgent } from "@baize/computer-agent";
-import { chromeProfileDir, reapProfileChromes } from "@baize/computer-agent/chrome-process";
+} from "@zhixingbot/shared";
+import { createRunner, CURRENT_SESSION_VERSION, type PromptMessage } from "@zhixingbot/bot-runner";
+import { type AgentOptions, startAgent } from "@zhixingbot/computer-agent";
+import { chromeProfileDir, reapProfileChromes } from "@zhixingbot/computer-agent/chrome-process";
 import {
   connect,
   databaseUrl,
@@ -38,8 +38,8 @@ import {
   type Db,
   type Sql,
   WS_PATH,
-} from "@baize/control-plane";
-import { addAccountWithToken, CredentialCrypto } from "@baize/control-plane/testing";
+} from "@zhixingbot/control-plane";
+import { addAccountWithToken, CredentialCrypto } from "@zhixingbot/control-plane/testing";
 
 const AGENT_VERSION = "0.1.0-e2e";
 
@@ -291,7 +291,7 @@ export async function startStack(options: StackOptions): Promise<Stack> {
         delete agentEnv["COMPUTER_ID"];
         delete agentEnv["AGENT_TOKEN"];
         delete agentEnv["CONTROL_PLANE_AGENT_URL"];
-        delete agentEnv["BAIZE_DATA_DIR"];
+        delete agentEnv["ZHIXINGBOT_DATA_DIR"];
         delete agentEnv["UPSTREAM_API_KEY"];
         delete agentEnv["DATABASE_URL"];
 

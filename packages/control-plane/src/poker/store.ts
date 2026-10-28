@@ -9,7 +9,7 @@ import {
   type BotHue,
   type Message,
   type PokerTableView,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import type { Db } from "../db/client.js";

@@ -11,7 +11,7 @@ import {
   type MessageId,
   type PokerTableRole,
   type ServerPush,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sendHiddenRun, type HiddenRunDeps, type HiddenRunInput } from "../src/agent/hidden-run.js";

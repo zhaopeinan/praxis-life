@@ -46,7 +46,7 @@ import {
   type ToolConnectionConfig,
   type ToolOperation,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { CdpConnection, CdpEvent, LiveEnd, LiveOutcome, LiveRequest, PresentPage } from "@baize/bot-runner";
+import type { CdpConnection, CdpEvent, LiveEnd, LiveOutcome, LiveRequest, PresentPage } from "@zhixingbot/bot-runner";
 import {
   decodeLive,
   encodeLive,
@@ -9,7 +9,7 @@ import {
   LiveDown,
   liveEndActions,
   type LiveId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import type { AssistantChrome } from "./chrome.js";
 import { toCdpInput, type Viewport } from "./live-input.js";
 import type { Terminals } from "./terminal.js";

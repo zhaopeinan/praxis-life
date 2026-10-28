@@ -22,7 +22,7 @@ import {
   type ActionKind,
   type Grant,
   type GrantTarget,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BROWSER_TOOL_NAMES } from "../src/browser.js";
 import { DRAFT_TOOL_NAMES } from "../src/drafts.js";

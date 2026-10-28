@@ -11,6 +11,7 @@ FROM ${NODE_BASE}
 
 WORKDIR /app
 ENV NODE_ENV=production \
+    COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
     DUOWEI_HOST=0.0.0.0 \
     DUOWEI_PORT=8787 \
     DUOWEI_WEB_ROOT=/app/dist-web \

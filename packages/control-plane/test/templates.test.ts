@@ -14,7 +14,7 @@ import {
   type GroupId,
   type ServerPush,
   type ToolConnection,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { shareableUrl } from "../src/repo/templates.js";
 import { helloAgent, type AgentClient } from "./helpers/agent.js";

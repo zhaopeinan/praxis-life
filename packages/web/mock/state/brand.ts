@@ -1,4 +1,4 @@
-import { BrandBook, Grant, GrantId, type BrandEdit, type UpdateBrandRequest } from "@baize/shared";
+import { BrandBook, Grant, GrantId, type BrandEdit, type UpdateBrandRequest } from "@zhixingbot/shared";
 import type { Outcome } from "./content.js";
 import { grants, nextSuffix } from "./store.js";
 

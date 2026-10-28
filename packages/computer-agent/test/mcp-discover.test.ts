@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocketServer, type WebSocket } from "ws";
-import { AgentToControl, BareUplinkFrame, ComputerId, type McpDiscoveryResult } from "@baize/shared";
+import { AgentToControl, BareUplinkFrame, ComputerId, type McpDiscoveryResult } from "@zhixingbot/shared";
 import { startAgent, type AgentOptions } from "../src/agent.js";
 
 const closers: (() => Promise<void>)[] = [];

@@ -38,21 +38,21 @@ ROLLBACK_IMAGE="docker.io/library/duowei:rollback"
 CONTAINER="duowei"
 REMOTE_DATA_DIR="/opt/duowei/data"
 REMOTE_SRC_DIR="/opt/duowei-src"
-# 白泽子系统（BAIZE_ENABLED=1 时生效）的服务器侧落点。
-REMOTE_BAIZE_DIR="/opt/duowei/baize"
-REMOTE_BAIZE_ENV="$REMOTE_BAIZE_DIR/baize.env"
-BAIZE_NETWORK="baize-net"
-BAIZE_PG_CONTAINER="baize-postgres"
-BAIZE_PG_VOLUME="/opt/duowei/pgdata"
+# 知行Bot子系统（ZHIXINGBOT_ENABLED=1 时生效）的服务器侧落点。
+REMOTE_ZHIXINGBOT_DIR="/opt/duowei/zhixingbot"
+REMOTE_ZHIXINGBOT_ENV="$REMOTE_ZHIXINGBOT_DIR/zhixingbot.env"
+ZHIXINGBOT_NETWORK="zhixingbot-net"
+ZHIXINGBOT_PG_CONTAINER="zhixingbot-postgres"
+ZHIXINGBOT_PG_VOLUME="/opt/duowei/pgdata"
 # 容器内 PG 监听 5432，宿主机经 127.0.0.1:5435 维护（pg_dump/排查）。
-BAIZE_PG_PORT_HOST="5435"
+ZHIXINGBOT_PG_PORT_HOST="5435"
 # 国内服务器直连 Docker Hub 不通，基础镜像走镜像加速站。
 NODE_BASE="${DUOWEI_NODE_BASE:-docker.m.daocloud.io/library/node:22-bookworm-slim}"
-PG_BASE="${BAIZE_PG_BASE:-docker.m.daocloud.io/library/postgres:16}"
+PG_BASE="${ZHIXINGBOT_PG_BASE:-docker.m.daocloud.io/library/postgres:16}"
 PUBLIC_URL="${DUOWEI_PUBLIC_URL:-http://47.122.123.1/}"
 
-# 本机 baize.env（gitignored）若存在则上传；模型上游不在里面——前端「模型网关」页配置。
-LOCAL_BAIZE_ENV="$ROOT/baize.env"
+# 本机 zhixingbot.env（gitignored）若存在则上传；模型上游不在里面——前端「模型网关」页配置。
+LOCAL_ZHIXINGBOT_ENV="$ROOT/zhixingbot.env"
 
 BUILD=1
 REMOTE_BUILD=0
@@ -74,19 +74,40 @@ command -v sshpass >/dev/null || { echo "需要 sshpass：brew install hudochenk
 
 remote() { sshpass -e ssh "${SSH_OPTS[@]}" "$SSH_USER@$HOST" "$@"; }
 
+# 旧白泽标识迁移（2026-10 改名 zhixingbot）：目录、env 文件、PG 容器各挪一次，幂等。
+step "迁移旧标识（baize → zhixingbot，已迁过则空转）"
+remote 'set -e
+        if [ -d /opt/duowei/baize ] && [ ! -d /opt/duowei/zhixingbot ]; then
+          mv /opt/duowei/baize /opt/duowei/zhixingbot
+          [ -f /opt/duowei/zhixingbot/baize.env ] && mv /opt/duowei/zhixingbot/baize.env /opt/duowei/zhixingbot/zhixingbot.env
+          echo "配置目录已迁移"
+        fi
+        if podman container exists baize-postgres 2>/dev/null && ! podman container exists zhixingbot-postgres 2>/dev/null; then
+          podman stop baize-postgres >/dev/null 2>&1 || true
+          podman rename baize-postgres zhixingbot-postgres
+          podman start zhixingbot-postgres >/dev/null 2>&1 || true
+          echo "PG 容器已改名"
+        fi
+        if podman container exists baize-remote 2>/dev/null && ! podman container exists zhixingbot-remote 2>/dev/null; then
+          podman stop baize-remote >/dev/null 2>&1 || true
+          podman rename baize-remote zhixingbot-remote
+          echo "远程电脑容器已改名"
+        fi
+        echo "迁移检查完"'
+
 step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 
 # 起容器的命令（正式部署与回滚共用，避免两处漂移）。
-# 白泽子系统经 --env-file 注入 BAIZE_*；BAIZE_ENABLED 不在文件里时应用行为与旧版一致。
+# 知行Bot子系统经 --env-file 注入 ZHIXINGBOT_*；ZHIXINGBOT_ENABLED 不在文件里时应用行为与旧版一致。
 container_run_cmd() {
   cat <<EOF
-podman network exists $BAIZE_NETWORK || podman network create $BAIZE_NETWORK >/dev/null
+podman network exists $ZHIXINGBOT_NETWORK || podman network create $ZHIXINGBOT_NETWORK >/dev/null
 podman rm $CONTAINER >/dev/null 2>&1 || true
 podman run -d --name $CONTAINER --restart unless-stopped \\
-  --network $BAIZE_NETWORK \\
+  --network $ZHIXINGBOT_NETWORK \\
   -p 127.0.0.1:8787:8787 \\
   -v $REMOTE_DATA_DIR:/app/data \\
-  --env-file $REMOTE_BAIZE_ENV \\
+  --env-file $REMOTE_ZHIXINGBOT_ENV \\
   -e DUOWEI_HOST=0.0.0.0 \\
   -e DUOWEI_PORT=8787 \\
   -e DUOWEI_WEB_ROOT=/app/dist-web \\
@@ -106,9 +127,9 @@ smoke_check() {
     test -n "$ASSET"
     curl -fsS -o /dev/null "http://127.0.0.1:8787/$ASSET"
     echo "冒烟通过（健康检查 / 首页 / 前端资源）
-    if grep -q "^BAIZE_ENABLED=1" '"$REMOTE_BAIZE_ENV"' 2>/dev/null; then
+    if grep -q "^ZHIXINGBOT_ENABLED=1" '"$REMOTE_ZHIXINGBOT_ENV"' 2>/dev/null; then
       curl -fsS -m 10 http://127.0.0.1:8787/assistant/api/health | grep -q "\"ok\":true"
-      echo "白泽子系统健康检查通过（/assistant/api/health）"
+      echo "知行Bot子系统健康检查通过（/assistant/api/health）"
     fi"'
 }
 
@@ -196,66 +217,66 @@ remote "podman stop $CONTAINER >/dev/null 2>&1 || true
         tar czf $REMOTE_DATA_DIR/duowei-db-\$(date +%Y%m%d-%H%M%S).tar.gz -C $REMOTE_DATA_DIR duowei.db duowei.db-wal duowei.db-shm 2>/dev/null || true
         ls -1t $REMOTE_DATA_DIR/duowei-db-*.tar.gz | head -1"
 
-# ---- 白泽子系统：env 骨架、Postgres、迁移。幂等，BAIZE_ENABLED 不开时env 文件里没有开关，下面全是空转 ----
-step "白泽：确保服务器侧 ${REMOTE_BAIZE_ENV}（模型上游在前端「模型网关」页配，不写配置文件）"
-if [[ -f "$LOCAL_BAIZE_ENV" ]]; then
-  echo "从本机 $LOCAL_BAIZE_ENV 上传（只放钥匙和开关，上游配置在知行人生里配）"
-  sshpass -e scp "${SSH_OPTS[@]}" "$LOCAL_BAIZE_ENV" "$SSH_USER@$HOST:$REMOTE_BAIZE_ENV.part"
-  remote "mkdir -p $REMOTE_BAIZE_DIR && mv $REMOTE_BAIZE_ENV.part $REMOTE_BAIZE_ENV && chmod 600 $REMOTE_BAIZE_ENV"
+# ---- 知行Bot子系统：env 骨架、Postgres、迁移。幂等，ZHIXINGBOT_ENABLED 不开时env 文件里没有开关，下面全是空转 ----
+step "知行Bot：确保服务器侧 ${REMOTE_ZHIXINGBOT_ENV}（模型上游在前端「模型网关」页配，不写配置文件）"
+if [[ -f "$LOCAL_ZHIXINGBOT_ENV" ]]; then
+  echo "从本机 $LOCAL_ZHIXINGBOT_ENV 上传（只放钥匙和开关，上游配置在知行人生里配）"
+  sshpass -e scp "${SSH_OPTS[@]}" "$LOCAL_ZHIXINGBOT_ENV" "$SSH_USER@$HOST:$REMOTE_ZHIXINGBOT_ENV.part"
+  remote "mkdir -p $REMOTE_ZHIXINGBOT_DIR && mv $REMOTE_ZHIXINGBOT_ENV.part $REMOTE_ZHIXINGBOT_ENV && chmod 600 $REMOTE_ZHIXINGBOT_ENV"
 else
-  remote "mkdir -p $REMOTE_BAIZE_DIR
-          if [[ ! -f $REMOTE_BAIZE_ENV ]]; then
+  remote "mkdir -p $REMOTE_ZHIXINGBOT_DIR
+          if [[ ! -f $REMOTE_ZHIXINGBOT_ENV ]]; then
             umask 077
-            cat > $REMOTE_BAIZE_ENV <<BAIZEENV
-BAIZE_ENABLED=1
-BAIZE_DATABASE_URL=postgres://baize:baize@$BAIZE_PG_CONTAINER:5432/baize
-BAIZE_TOOL_SECRET_KEY=$(openssl rand -hex 32)
-BAIZE_CREDENTIALS_KEY=$(openssl rand -base64 32)
+            cat > $REMOTE_ZHIXINGBOT_ENV <<BAIZEENV
+ZHIXINGBOT_ENABLED=1
+ZHIXINGBOT_DATABASE_URL=postgres://baize:baize@$ZHIXINGBOT_PG_CONTAINER:5432/baize
+ZHIXINGBOT_TOOL_SECRET_KEY=$(openssl rand -hex 32)
+ZHIXINGBOT_CREDENTIALS_KEY=$(openssl rand -base64 32)
 BAIZEENV
-            echo '已生成 baize.env 骨架；模型上游在前端「模型网关」页配置，不配 Bot 干活会 502'
+            echo '已生成 zhixingbot.env 骨架；模型上游在前端「模型网关」页配置，不配 Bot 干活会 502'
           else
-            echo 'baize.env 已存在，保留'
+            echo 'zhixingbot.env 已存在，保留'
           fi"
 fi
 
-step "白泽：确保 Postgres 容器（${BAIZE_PG_CONTAINER}，只绑 127.0.0.1:${BAIZE_PG_PORT_HOST}）"
+step "知行Bot：确保 Postgres 容器（${ZHIXINGBOT_PG_CONTAINER}，只绑 127.0.0.1:${ZHIXINGBOT_PG_PORT_HOST}）"
 remote "set -e
-        mkdir -p $BAIZE_PG_VOLUME
-        podman network exists $BAIZE_NETWORK || podman network create $BAIZE_NETWORK >/dev/null
-        if ! podman container exists $BAIZE_PG_CONTAINER; then
-          podman run -d --name $BAIZE_PG_CONTAINER --restart unless-stopped \
-            --network $BAIZE_NETWORK \
-            -p 127.0.0.1:$BAIZE_PG_PORT_HOST:5432 \
+        mkdir -p $ZHIXINGBOT_PG_VOLUME
+        podman network exists $ZHIXINGBOT_NETWORK || podman network create $ZHIXINGBOT_NETWORK >/dev/null
+        if ! podman container exists $ZHIXINGBOT_PG_CONTAINER; then
+          podman run -d --name $ZHIXINGBOT_PG_CONTAINER --restart unless-stopped \
+            --network $ZHIXINGBOT_NETWORK \
+            -p 127.0.0.1:$ZHIXINGBOT_PG_PORT_HOST:5432 \
             -e POSTGRES_USER=baize -e POSTGRES_PASSWORD=baize -e POSTGRES_DB=baize \
-            -v $BAIZE_PG_VOLUME:/var/lib/postgresql/data \
+            -v $ZHIXINGBOT_PG_VOLUME:/var/lib/postgresql/data \
             $PG_BASE >/dev/null
           echo 'PG 已创建'
         else
-          podman start $BAIZE_PG_CONTAINER >/dev/null 2>&1 || true
+          podman start $ZHIXINGBOT_PG_CONTAINER >/dev/null 2>&1 || true
           echo 'PG 已存在'
         fi
         for i in \$(seq 1 30); do
-          podman exec $BAIZE_PG_CONTAINER pg_isready -U baize >/dev/null 2>&1 && break
+          podman exec $ZHIXINGBOT_PG_CONTAINER pg_isready -U baize >/dev/null 2>&1 && break
           sleep 1
         done"
 
-step "白泽：应用迁移（幂等，advisory 锁）"
+step "知行Bot：应用迁移（幂等，advisory 锁）"
 remote "set -e
-        DB_URL=\$(grep '^BAIZE_DATABASE_URL=' $REMOTE_BAIZE_ENV | cut -d= -f2-)
+        DB_URL=\$(grep '^ZHIXINGBOT_DATABASE_URL=' $REMOTE_ZHIXINGBOT_ENV | cut -d= -f2-)
         test -n \"\$DB_URL\"
-        podman run --rm --network $BAIZE_NETWORK -e DATABASE_URL=\"\$DB_URL\" $RUN_IMAGE \
+        podman run --rm --network $ZHIXINGBOT_NETWORK -e DATABASE_URL=\"\$DB_URL\" $RUN_IMAGE \
           ./node_modules/.bin/tsx packages/control-plane/src/scripts/migrate.ts"
 
-step "备份白泽 PG（pg_dump 进数据目录，跟 SQLite 备份一个节奏）"
-remote "if podman container exists $BAIZE_PG_CONTAINER && grep -q '^BAIZE_ENABLED=1' $REMOTE_BAIZE_ENV 2>/dev/null; then
-          podman exec $BAIZE_PG_CONTAINER pg_dump -U baize -Fc baize > $REMOTE_DATA_DIR/baize-pg-\$(date +%Y%m%d-%H%M%S).dump 2>/dev/null || true
+step "备份知行Bot PG（pg_dump 进数据目录，跟 SQLite 备份一个节奏）"
+remote "if podman container exists $ZHIXINGBOT_PG_CONTAINER && grep -q '^ZHIXINGBOT_ENABLED=1' $REMOTE_ZHIXINGBOT_ENV 2>/dev/null; then
+          podman exec $ZHIXINGBOT_PG_CONTAINER pg_dump -U baize -Fc baize > $REMOTE_DATA_DIR/baize-pg-\$(date +%Y%m%d-%H%M%S).dump 2>/dev/null || true
           ls -1t $REMOTE_DATA_DIR/baize-pg-*.dump 2>/dev/null | head -1
         else
-          echo '白泽未启用，跳过 PG 备份'
+          echo '知行Bot未启用，跳过 PG 备份'
         fi"
 
 step "同步 Caddy 配置（仓库 infra/caddy/duowei.caddyfile 为准）"
-# 白泽挂在同域 /assistant 下（合并应用直接伺服），Caddy 规则不变，这份文件不需要动。
+# 知行Bot挂在同域 /assistant 下（合并应用直接伺服），Caddy 规则不变，这份文件不需要动。
 # scp 偶尔会在认证阶段被客户端提前关掉（服务器忙时更明显，sshd 侧看到的是 preauth 断开），
 # 重试即可；连续三次都失败才让部署停在这里。
 upload_caddy() {

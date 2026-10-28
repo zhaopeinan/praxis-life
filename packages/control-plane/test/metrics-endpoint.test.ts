@@ -1,4 +1,4 @@
-import { CreateBotResponse } from "@baize/shared";
+import { CreateBotResponse } from "@zhixingbot/shared";
 import { afterEach, expect, it } from "vitest";
 import { helloAgent } from "./helpers/agent.js";
 import { startTestServer, type TestServer } from "./helpers/client.js";

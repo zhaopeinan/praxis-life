@@ -1,4 +1,4 @@
-import { GRANTABLE_SCOPES, type ActionKind, type Approval, type ApprovalScope, type GrantTarget } from "@baize/shared";
+import { GRANTABLE_SCOPES, type ActionKind, type Approval, type ApprovalScope, type GrantTarget } from "@zhixingbot/shared";
 
 export const ACTION_TEXT: Record<ActionKind, string> = {
   read: "读取",

@@ -1,4 +1,4 @@
-import type { ComputerId, UserId } from "@baize/shared";
+import type { ComputerId, UserId } from "@zhixingbot/shared";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { expect, it } from "vitest";

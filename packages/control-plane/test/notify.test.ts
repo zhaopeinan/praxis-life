@@ -9,7 +9,7 @@ import {
   type RunId,
   type ServerPush,
   type UserId,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_RUNTIME_CONFIG, startServer } from "../src/server.js";
 import { helloAgent, type AgentClient } from "./helpers/agent.js";

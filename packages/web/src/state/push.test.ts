@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BotId, Group, GroupId, Message, Notice, Settings, type ComputerChoices, type ServerPush } from "@baize/shared";
+import { BotId, Group, GroupId, Message, Notice, Settings, type ComputerChoices, type ServerPush } from "@zhixingbot/shared";
 import { createPushHandlers, dispatchServerPush } from "./push.js";
 import { emptyShelf, type Seq } from "./stamped.js";
 import type { Action, AppState, SessionId } from "./types.js";

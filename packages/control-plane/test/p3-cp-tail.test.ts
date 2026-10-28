@@ -1,4 +1,4 @@
-import { CreateBotResponse, MessageListResponse } from "@baize/shared";
+import { CreateBotResponse, MessageListResponse } from "@zhixingbot/shared";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { helloAgent } from "./helpers/agent.js";
 import { startTestServer, type TestServer } from "./helpers/client.js";

@@ -1,4 +1,4 @@
-import { AccountId, LoginAttemptId } from "@baize/shared";
+import { AccountId, LoginAttemptId } from "@zhixingbot/shared";
 import { inArray } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { accounts } from "../src/db/schema.js";

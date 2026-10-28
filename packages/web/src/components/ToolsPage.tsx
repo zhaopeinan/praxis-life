@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import type { Bot, BotId, CreateToolRequest, ToolConnection, ToolConnectionId, UpdateToolRequest } from "@baize/shared";
+import type { Bot, BotId, CreateToolRequest, ToolConnection, ToolConnectionId, UpdateToolRequest } from "@zhixingbot/shared";
 
 type Props = {
   tools: ToolConnection[];

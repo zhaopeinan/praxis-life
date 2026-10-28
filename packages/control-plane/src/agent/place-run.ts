@@ -10,7 +10,7 @@ import {
   type PokerTableRole,
   type UserId,
   type Viewer,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { computers, groupMembers, groups, laneLeases, runs, workStreams } from "../db/schema.js";

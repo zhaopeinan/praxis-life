@@ -14,7 +14,7 @@ import {
   type RunId,
   type ServerPush,
   type User,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { settings, userCounters, users } from "../src/db/schema.js";
 import { newId } from "../src/ids.js";

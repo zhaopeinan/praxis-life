@@ -1,4 +1,4 @@
-import { Message, MessageId, type MessageBody } from "@baize/shared";
+import { Message, MessageId, type MessageBody } from "@zhixingbot/shared";
 import { messagesByGroupId, nextSuffix } from "./store.js";
 
 // 测试钩子：按消息记接下来几次单拉回 503，造「单拉失败了一次」。

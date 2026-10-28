@@ -10,7 +10,7 @@ import {
   advanceWorkHead,
   type HubLaneSnapshot,
   type WorkAppend,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkAppendOutcome } from "../src/lane-fence.js";

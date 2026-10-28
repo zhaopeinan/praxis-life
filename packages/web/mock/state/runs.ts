@@ -13,7 +13,7 @@ import {
   type Message,
   type ServerPush,
   type ToolCallStatus,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { startRunOn } from "./computer-choices.js";
 import { assignTask, tickFirstUndone } from "./groups.js";
 import { appendMessage, rewriteMessage } from "./messages.js";

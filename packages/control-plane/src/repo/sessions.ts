@@ -1,4 +1,4 @@
-import { SESSION_TTL_MS, type User } from "@baize/shared";
+import { SESSION_TTL_MS, type User } from "@zhixingbot/shared";
 import { and, eq, gt, lte } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { sessions, users } from "../db/schema.js";

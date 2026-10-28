@@ -1,4 +1,4 @@
-import type { ControlOrigin } from "@baize/shared";
+import type { ControlOrigin } from "@zhixingbot/shared";
 import { ACCOUNTS_PROXY_PATH } from "../http/accounts-proxy.js";
 import { GATEWAY_PATH } from "../http/gateway.js";
 import { HUB_PATH } from "../http/hub.js";

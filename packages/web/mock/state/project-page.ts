@@ -12,7 +12,7 @@ import {
   type MetricSource,
   type TaskMetric,
   type TopicTask,
-} from "@baize/shared";
+} from "@zhixingbot/shared";
 import { writeTask } from "./groups.js";
 import { pendingOf } from "./today.js";
 import {
