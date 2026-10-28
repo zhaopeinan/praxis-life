@@ -197,7 +197,7 @@ remote "podman stop $CONTAINER >/dev/null 2>&1 || true
         ls -1t $REMOTE_DATA_DIR/duowei-db-*.tar.gz | head -1"
 
 # ---- 白泽子系统：env 骨架、Postgres、迁移。幂等，BAIZE_ENABLED 不开时env 文件里没有开关，下面全是空转 ----
-step "白泽：确保服务器侧 $REMOTE_BAIZE_ENV（模型上游在前端「模型网关」页配，不写配置文件）"
+step "白泽：确保服务器侧 ${REMOTE_BAIZE_ENV}（模型上游在前端「模型网关」页配，不写配置文件）"
 if [[ -f "$LOCAL_BAIZE_ENV" ]]; then
   echo "从本机 $LOCAL_BAIZE_ENV 上传（只放钥匙和开关，上游配置在知行人生里配）"
   sshpass -e scp "${SSH_OPTS[@]}" "$LOCAL_BAIZE_ENV" "$SSH_USER@$HOST:$REMOTE_BAIZE_ENV.part"
@@ -218,7 +218,7 @@ BAIZEENV
           fi"
 fi
 
-step "白泽：确保 Postgres 容器（$BAIZE_PG_CONTAINER，只绑 127.0.0.1:$BAIZE_PG_PORT_HOST）"
+step "白泽：确保 Postgres 容器（${BAIZE_PG_CONTAINER}，只绑 127.0.0.1:${BAIZE_PG_PORT_HOST}）"
 remote "set -e
         podman network exists $BAIZE_NETWORK || podman network create $BAIZE_NETWORK >/dev/null
         if ! podman container exists $BAIZE_PG_CONTAINER; then

@@ -67,7 +67,7 @@ remote 'set -euo pipefail
     "'"$AGENT_URL"'" "$COMPUTER_ID" "$AGENT_TOKEN" > '"$REMOTE_RUN_DIR"'/launch.json
   chmod 600 '"$REMOTE_RUN_DIR"'/launch.json
   chown -R 1000:1000 '"$REMOTE_BOTS_DIR"' 2>/dev/null || true
-  echo "launch.json 已写好（computer $COMPUTER_ID）"'
+  echo "launch.json 已写好（computer ${COMPUTER_ID}）"'
 
 step "传 bwrap seccomp 配置"
 sshpass -e scp "${SSH_OPTS[@]}" "$ROOT/docs/baize/deploy/remote/seccomp-bwrap.json" "$SSH_USER@$HOST:$REMOTE_BAIZE_DIR/seccomp-bwrap.json"
