@@ -85,6 +85,11 @@ remote 'set -e
           [ -f /opt/duowei/zhixingbot/baize.env ] && mv /opt/duowei/zhixingbot/baize.env /opt/duowei/zhixingbot/zhixingbot.env
           echo "配置目录已迁移"
         fi
+        # 早几轮生成的 env 骨架还是 BAIZE_* 键名和旧 PG 容器名，内容一并改写
+        if [ -f /opt/duowei/zhixingbot/zhixingbot.env ] && grep -q "^BAIZE_" /opt/duowei/zhixingbot/zhixingbot.env; then
+          sed -i -e "s/^BAIZE_/ZHIXINGBOT_/" -e "s/baize-postgres/zhixingbot-postgres/g" /opt/duowei/zhixingbot/zhixingbot.env
+          echo "env 键名已改写为 ZHIXINGBOT_*"
+        fi
         if podman container exists baize-postgres 2>/dev/null && ! podman container exists zhixingbot-postgres 2>/dev/null; then
           podman stop baize-postgres >/dev/null 2>&1 || true
           podman rename baize-postgres zhixingbot-postgres
