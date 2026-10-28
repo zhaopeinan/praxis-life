@@ -79,7 +79,7 @@ remote 'set -euo pipefail
 step "传 bwrap seccomp 配置"
 sshpass -e scp "${SSH_OPTS[@]}" "$ROOT/docs/baize/deploy/remote/seccomp-bwrap.json" "$SSH_USER@$HOST:$REMOTE_ZHIXINGBOT_DIR/seccomp-bwrap.json"
 
-step "同步构建上下文到服务器（$REMOTE_SRC_DIR）"
+step "同步构建上下文到服务器（${REMOTE_SRC_DIR}）"
 tar czf - -C "$ROOT" \
     package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json patches \
     packages/shared packages/control-plane packages/bot-runner packages/computer-agent \
