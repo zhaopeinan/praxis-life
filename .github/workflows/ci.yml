@@ -7,19 +7,44 @@ on:
   workflow_dispatch:
 
 jobs:
-  check:
+  duowei:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: 类型检查
-        run: npm run typecheck
-      - name: 单元测试
-        run: npm test
-      - name: 前端构建
-        run: npm run build:web
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 类型检查（知行人生 + 白泽 7 包）
+        run: |
+          npx tsc --noEmit
+          pnpm -r typecheck
+      - name: 知行人生单元测试
+        run: pnpm test
+      - name: 白泽 control-plane 测试（每个文件一个临时库）
+        run: pnpm --filter @baize/control-plane test
+        env:
+          DATABASE_URL: postgres://baize:baize@localhost:5432/baize
+      - name: 白泽 web 单测
+        run: pnpm --filter @baize/web exec vitest run
+      - name: 前端构建（双 Web）
+        run: pnpm build:web
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: baize
+          POSTGRES_PASSWORD: baize
+          POSTGRES_DB: baize
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U baize"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
