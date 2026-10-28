@@ -24,7 +24,7 @@ REMOTE_CONTAINER="zhixingbot-remote"
 REMOTE_SRC_DIR="/opt/duowei-src"
 # 合并应用容器在 zhixingbot-net 里的名字就是 duowei。
 AGENT_URL="ws://duowei:8787/assistant/agent"
-APT_MIRROR="${ZHIXINGBOT_APT_MIRROR:-mirrors.aliyun.com}"
+APT_MIRROR="${ZHIXINGBOT_APT_MIRROR:-http://mirrors.aliyun.com}"
 MIN_MEM_KB=$((3 * 1024 * 1024))
 APP_IMAGE="docker.io/library/duowei:latest"
 
