@@ -1,5 +1,4 @@
-import type { Context } from "hono";
-import { Hono } from "hono";
+import type { Context } from "hono";import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { serveStatic } from "@hono/node-server/serve-static";
 import fs from "node:fs";
@@ -251,6 +250,48 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
 
   /** 前端按需点亮「AI 助理」入口：BAIZE_ENABLED 才显示。 */
   app.get("/api/features", (c) => c.json({ baize: baizeConfig() !== null }));
+
+  /** 白泽模型网关配置（管理员）。apiKey 只写不读：GET 只回 hasApiKey。 */
+  const MODEL_GATEWAY_KEY = "model_gateway";
+  app.get("/api/admin/model-gateway", async (c) => {
+    await requireAdmin(c);
+    const current = parseModelGateway(await store.getAppSetting(MODEL_GATEWAY_KEY));
+    return c.json({
+      configured: current !== null,
+      upstreamBaseUrl: current?.baseUrl ?? "",
+      planModel: current?.planModel ?? "",
+      fastModel: current?.fastModel ?? "",
+      hasApiKey: current !== null && current.apiKey !== "",
+    });
+  });
+  app.put("/api/admin/model-gateway", async (c) => {
+    await requireAdmin(c);
+    const body = (await readBody(c)) as {
+      upstreamBaseUrl?: unknown;
+      apiKey?: unknown;
+      planModel?: unknown;
+      fastModel?: unknown;
+    };
+    const baseUrl = typeof body.upstreamBaseUrl === "string" ? body.upstreamBaseUrl.trim() : "";
+    if (!/^https?:\/\/.+/.test(baseUrl)) throw new DomainError("上游地址必须是 http(s):// 开头", 400);
+    const planModel = typeof body.planModel === "string" ? body.planModel.trim() : "";
+    const fastModel = typeof body.fastModel === "string" ? body.fastModel.trim() : "";
+    if (planModel === "" || fastModel === "") throw new DomainError("plan 和 fast 两个模型名都要填", 400);
+    const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+    for (const ch of apiKey) {
+      if (ch.charCodeAt(0) > 127) throw new DomainError("API key 必须是 ASCII", 400);
+    }
+    const existing = parseModelGateway(await store.getAppSetting(MODEL_GATEWAY_KEY));
+    const next = {
+      upstreamBaseUrl: baseUrl.replace(/\/+$/, ""),
+      apiKey: apiKey === "" ? (existing?.apiKey ?? "") : apiKey,
+      planModel,
+      fastModel,
+    };
+    if (next.apiKey === "") throw new DomainError("还没配过 API key：首次保存必须填", 400);
+    await store.setAppSetting(MODEL_GATEWAY_KEY, JSON.stringify(next));
+    return c.json({ ok: true });
+  });
 
   app.get("/api/system/backup", async (c) => {
     await requireAdmin(c);
@@ -1822,7 +1863,7 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
   }
 
   // 白泽 Bot 子系统：BAIZE_ENABLED=1 时才真正注册，挂在 /assistant 下，须在静态伺服之前。
-  mountBaize(app, accounts);
+  mountBaize(app, accounts, store);
 
   const webRoot = resolveWebRoot();
   if (webRoot) {
@@ -1860,6 +1901,24 @@ function baizeIndexHtml(): string | null {
   if (handles === null || handles.webDir === null) return null;
   const index = path.join(handles.webDir, "index.html");
   return fs.existsSync(index) ? index : null;
+}
+
+/** 解析 app_settings 里的模型网关 JSON；缺字段或格式不对一律当没配。 */
+function parseModelGateway(raw: string | null): { baseUrl: string; apiKey: string; planModel: string; fastModel: string } | null {
+  if (raw === null) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== "object" || value === null) return null;
+    const v = value as Record<string, unknown>;
+    const baseUrl = typeof v["upstreamBaseUrl"] === "string" ? (v["upstreamBaseUrl"] as string) : "";
+    const apiKey = typeof v["apiKey"] === "string" ? (v["apiKey"] as string) : "";
+    const planModel = typeof v["planModel"] === "string" ? (v["planModel"] as string) : "";
+    const fastModel = typeof v["fastModel"] === "string" ? (v["fastModel"] as string) : "";
+    if (baseUrl === "" || planModel === "" || fastModel === "") return null;
+    return { baseUrl, apiKey, planModel, fastModel };
+  } catch {
+    return null;
+  }
 }
 
 function resolveWebRoot(): string | null {

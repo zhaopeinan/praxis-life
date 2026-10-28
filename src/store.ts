@@ -448,6 +448,13 @@ export class Store {
         portal_json TEXT NOT NULL DEFAULT '{}',
         integrations_json TEXT NOT NULL DEFAULT '{}'
       )`,
+      // 全站键值配置（管理员可写）。目前放白泽模型网关：key='model_gateway'，
+      // value 是 JSON { upstreamBaseUrl, apiKey, planModel, fastModel }。apiKey 只写不读。
+      `CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
       `CREATE TABLE IF NOT EXISTS calendar_feeds (
         id TEXT PRIMARY KEY,
         table_id TEXT NOT NULL REFERENCES tables(id) ON DELETE CASCADE,
@@ -4075,6 +4082,21 @@ export class Store {
       args: [baseId, next.timezone, JSON.stringify(next.portal), JSON.stringify(next.integrations)],
     });
     return next;
+  }
+
+  /** 全站键值配置。key 不存在返回 null。 */
+  async getAppSetting(key: string): Promise<string | null> {
+    const result = await this.db.execute({ sql: "SELECT value FROM app_settings WHERE key = ?", args: [key] });
+    const row = result.rows[0];
+    return row ? asString(row.value) : null;
+  }
+
+  async setAppSetting(key: string, value: string): Promise<void> {
+    await this.db.execute({
+      sql: `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      args: [key, value, Date.now()],
+    });
   }
 
   async watchRecord(userId: string, recordId: string): Promise<void> {

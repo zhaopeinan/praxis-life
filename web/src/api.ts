@@ -486,5 +486,11 @@ export const api = {
   testBackup: () => request<{ ok: true; url: string; remotePath: string }>("/api/system/backup/test", { method: "POST" }),
   runBackup: () => request<{ log: BackupLogDto }>("/api/system/backup/run", { method: "POST" }),
   systemUsage: (days = 14) => request<UsageSummaryDto>(`/api/system/usage?days=${days}`),
+  modelGateway: () =>
+    request<{ configured: boolean; upstreamBaseUrl: string; planModel: string; fastModel: string; hasApiKey: boolean }>(
+      "/api/admin/model-gateway",
+    ),
+  saveModelGateway: (body: { upstreamBaseUrl: string; apiKey?: string; planModel: string; fastModel: string }) =>
+    request<{ ok: true }>("/api/admin/model-gateway", { method: "PUT", body: JSON.stringify(body) }),
 };
 

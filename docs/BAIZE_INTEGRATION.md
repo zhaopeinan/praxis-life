@@ -42,12 +42,11 @@ BAIZE_ENABLED=1
 BAIZE_DATABASE_URL=postgres://baize:baize@localhost:5434/baize
 BAIZE_TOOL_SECRET_KEY=<openssl rand -hex 32>
 BAIZE_CREDENTIALS_KEY=<openssl rand -base64 32>
-BAIZE_UPSTREAM_BASE_URL=<OpenAI 兼容上游>
-BAIZE_UPSTREAM_API_KEY=<ASCII>
-BAIZE_GATEWAY_MODELS=plan=<模型名>,fast=<模型名>
 ```
 
-不设 BAIZE_ENABLED 时，知行人生行为与合并前完全一致（测试也这么跑）。
+模型上游**不写配置文件**：管理员在知行人生顶栏「模型网关」页填上游地址、API key、
+plan/fast 模型名，存进知行人生自己的库（app_settings 表），网关每次请求实时读取
+（2 秒缓存），保存后最迟 2 秒生效。不设 BAIZE_ENABLED 时，知行人生行为与合并前完全一致。
 
 ## 常用命令
 
@@ -65,9 +64,8 @@ scripts/deploy-aliyun.sh              # 应用 + PG + 迁移 + 备份（幂等�
 scripts/setup-baize-remote.sh         # 远程电脑容器（Bot 运行时；镜像极重，只构建一次）
 ```
 
-部署前置：把模型上游写进仓库根 `baize.env`（gitignored，格式同上文 BAIZE_* 段），
-deploy 会把它传到服务器 `/opt/duowei/baize.env`（chmod 600）；不给就生成带空上游的骨架
-（界面能用，Bot 干活 502）。
+模型网关在部署后由管理员登录知行人生，在顶栏「模型网关」页填写（上游地址、API key、
+plan/fast 模型名），不写配置文件、不用重启。
 
 - 回滚：与旧版相同（`duowei:rollback` 镜像 + 容器参数不变）；白泽新增物全是增量，
   回滚到旧镜像时 BAIZE_ENABLED 不在旧 env 里，应用按旧行为跑。
@@ -94,6 +92,6 @@ bwrap 沙箱在容器里要 seccomp 配置（已在 setup 里挂载）；podman 
 | /assistant 404 | 应用容器 env-file 是否带 BAIZE_ENABLED=1；迁移是否跑过 |
 | /assistant/api/* 全 401 | 知行人生会话失效（白泽只认 duowei_session） |
 | 登录知行人生后 /assistant 白屏 | 镜像里 packages/web/dist 是否存在（build:web 是否跑过） |
-| Bot 干活 502 | baize.env 的 BAIZE_UPSTREAM_*；BAIZE_GATEWAY_MODELS 模型名对不对 |
+| Bot 干活 502 | 知行人生「模型网关」页是否已配上游/key/模型名（保存后 2 秒内生效） |
 | 电脑一直离线 | baize-remote 容器状态与日志；launch.json 被读后删是正常行为 |
 | 浏览器自动化卡/崩 | 服务器内存；free -m |

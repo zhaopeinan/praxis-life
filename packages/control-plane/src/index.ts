@@ -16,3 +16,4 @@ export {
 } from "./server.js";
 export { provisionExternalUser } from "./repo/users.js";
 export type { AppDeps } from "./http/app.js";
+export type { UpstreamRoute } from "./http/gateway.js";

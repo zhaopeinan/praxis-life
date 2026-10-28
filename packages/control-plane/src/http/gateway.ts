@@ -32,7 +32,15 @@ export type GatewayDeps = {
   readonly upstreamApiKey: string;
   readonly limits: GatewayLimits;
   readonly responses: StatusCounts;
+  /**
+   * 嵌进宿主（知行人生）时由宿主注入：上游地址/key/模型从前端配置实时读，改动立即生效。
+   * 给了 provider 就以它为准，上面的静态字段只作独立模式（env 配置）的退路。
+   */
+  readonly upstreamProvider?: () => Promise<UpstreamRoute | null>;
 };
+
+/** 一份可立即使用的上游路由。null 表示还没配。 */
+export type UpstreamRoute = { readonly baseUrl: string; readonly apiKey: string; readonly models: GatewayModels };
 
 type GatewayEnv = { Variables: { computerId: ComputerId; lane: { botId: BotId; groupId: GroupId } } };
 
@@ -98,7 +106,15 @@ export function createGateway(deps: GatewayDeps): Hono<GatewayEnv> {
       const purpose = typeof requestedModel === "string" ? PURPOSE_BY_ALIAS.get(requestedModel) : undefined;
       if (purpose === undefined) return c.json({ error: INVALID_MODEL_ERROR }, 400);
       const modelAlias = gatewayAlias(purpose);
-      const upstreamModel = deps.models[purpose];
+
+      const route =
+        deps.upstreamProvider === undefined
+          ? { baseUrl: deps.upstreamBaseUrl, apiKey: deps.upstreamApiKey, models: deps.models }
+          : await deps.upstreamProvider();
+      if (route === null) {
+        return c.json({ error: "模型网关还没配：请管理员在知行人生的「模型网关」页填上游地址、API key 和模型名" }, 502);
+      }
+      const upstreamModel = route.models[purpose];
 
       const client = c.req.raw.signal;
       const deadline = new Deadline(deps.limits, client);
@@ -112,9 +128,9 @@ export function createGateway(deps: GatewayDeps): Hono<GatewayEnv> {
 
       let upstream: Response;
       try {
-        upstream = await fetch(`${deps.upstreamBaseUrl}/chat/completions`, {
+        upstream = await fetch(`${route.baseUrl}/chat/completions`, {
           method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${deps.upstreamApiKey}` },
+          headers: { "content-type": "application/json", authorization: `Bearer ${route.apiKey}` },
           // 选哪个模型由网关说了算，电脑代理报上来的 model 一律换掉。
           body: JSON.stringify({ ...parsed.data, model: upstreamModel }),
           signal: deadline.signal,

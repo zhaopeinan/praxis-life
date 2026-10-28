@@ -1063,6 +1063,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("admin")}>用户管理</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("backup")}>数据备份</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("usage")}>使用度量</button>}
+              {user.role === "admin" && features?.baize && <button type="button" className="secondary" onClick={() => setDialog("model-gateway")}>模型网关</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("agents")}>Agent 管理</button>}
               {user.role === "admin" && <button type="button" className="secondary" onClick={() => setDialog("smart-agents")}>智能体</button>}
               <span>{user.name}</span>
@@ -1088,6 +1089,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("admin")}>用户管理</button>}
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("backup")}>数据备份</button>}
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("usage")}>使用度量</button>}
+                {user.role === "admin" && features?.baize && <button type="button" onClick={() => setDialog("model-gateway")}>模型网关</button>}
                 {user.role === "admin" && <button type="button" onClick={() => setDialog("agents")}>Agent 管理</button>}
                 {payload && canOwn && (
                   <button type="button" className="danger-text" onClick={() => deleteCurrentTable().catch(fail)}>
@@ -1710,6 +1712,7 @@ function Workspace({ user, onUser, onLogout }: { user: PublicUser; onUser: (user
       {dialog === "admin" && <AdminDialog selfId={user.id} onSelf={onUser} onClose={closeDialog} />}
       {dialog === "backup" && user.role === "admin" && <BackupDialog onClose={closeDialog} />}
       {dialog === "usage" && user.role === "admin" && <UsageDialog onClose={closeDialog} />}
+      {dialog === "model-gateway" && user.role === "admin" && <ModelGatewayDialog onClose={closeDialog} />}
       {dialog === "agents" && user.role === "admin" && (
         <AgentManageDialog bases={bases} onClose={closeDialog} />
       )}
@@ -4199,6 +4202,99 @@ function UsageDialog({ onClose }: { onClose: () => void }) {
           知道了
         </button>
       </div>
+    </Modal>
+  );
+}
+
+/** 白泽 Bot 的模型网关：上游地址、API key、plan/fast 两个用途的模型名。key 只写不读，留空表示不换。 */
+function ModelGatewayDialog({ onClose }: { onClose: () => void }) {
+  const [form, setForm] = useState<{ upstreamBaseUrl: string; planModel: string; fastModel: string; hasApiKey: boolean } | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api
+      .modelGateway()
+      .then((data) => setForm(data))
+      .catch((err) => setError(message(err)));
+  }, []);
+
+  if (!form) {
+    return (
+      <Modal title="模型网关" onClose={onClose}>
+        <p className="fine">{error ?? "加载中…"}</p>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal title="模型网关 · AI 助理" onClose={onClose}>
+      <p className="fine">Bot 的模型请求都从这里转发到上游（OpenAI 兼容接口）。保存后最迟 2 秒生效，不用重启。</p>
+      <form
+        className="backup-form"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setError(null);
+          setNotice(null);
+          setBusy(true);
+          try {
+            await api.saveModelGateway({
+              upstreamBaseUrl: form.upstreamBaseUrl,
+              apiKey: apiKey || undefined,
+              planModel: form.planModel,
+              fastModel: form.fastModel,
+            });
+            setNotice("已保存");
+            setApiKey("");
+            const data = await api.modelGateway();
+            setForm(data);
+          } catch (err) {
+            setError(message(err));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <label>
+          上游地址
+          <input
+            type="text"
+            value={form.upstreamBaseUrl}
+            placeholder="https://api.example.com/v1"
+            onChange={(event) => setForm({ ...form, upstreamBaseUrl: event.target.value })}
+          />
+        </label>
+        <label>
+          API Key{form.hasApiKey && <span className="fine">（已配置，留空保持不变）</span>}
+          <input
+            type="password"
+            value={apiKey}
+            placeholder={form.hasApiKey ? "••••••••" : "首次保存必须填"}
+            autoComplete="off"
+            onChange={(event) => setApiKey(event.target.value)}
+          />
+        </label>
+        <label>
+          plan 模型（规划、写稿等重活）
+          <input type="text" value={form.planModel} onChange={(event) => setForm({ ...form, planModel: event.target.value })} />
+        </label>
+        <label>
+          fast 模型（分类、摘要等轻活）
+          <input type="text" value={form.fastModel} onChange={(event) => setForm({ ...form, fastModel: event.target.value })} />
+        </label>
+        {error && <p className="form-error">{error}</p>}
+        {notice && <p className="fine">{notice}</p>}
+        <div className="dialog-actions">
+          <button type="submit" className="primary" disabled={busy}>
+            {busy ? "保存中…" : "保存"}
+          </button>
+          <button type="button" onClick={onClose}>
+            关闭
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }

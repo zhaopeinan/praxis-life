@@ -27,6 +27,7 @@ import { concealed, log, redactInLog } from "./log.js";
 import { countRunsByState } from "./repo/runs.js";
 import { countPendingContinuations } from "./agent/continuation.js";
 import { DEFAULT_GATEWAY_LIMITS } from "./http/gateway-limits.js";
+import type { UpstreamRoute } from "./http/gateway.js";
 import { acceptLiveViewer } from "./live/accept.js";
 import { LiveRelay, type LiveRelayDeps } from "./live/relay.js";
 import { MetricPoller, type MetricPollerOptions } from "./metrics/poller.js";
@@ -91,6 +92,8 @@ export type RuntimeOptions = {
   readonly pathPrefix?: string;
   /** external 模式下把 WS 握手解析成宿主用户；缺了恒 401。 */
   readonly externalUserFromRequest?: (request: IncomingMessage) => Promise<ExternalUser | null>;
+  /** external 模式下上游模型配置实时取自宿主（前端可配）；给了它 config 里的上游三件套只作退路。 */
+  readonly upstreamProvider?: () => Promise<UpstreamRoute | null>;
 };
 
 export type StartOptions = RuntimeOptions & {
@@ -210,6 +213,7 @@ export async function buildRuntime(options: RuntimeOptions): Promise<Runtime> {
       models: config.gatewayModels,
       upstreamBaseUrl: config.upstreamBaseUrl,
       upstreamApiKey: config.upstreamApiKey,
+      ...(options.upstreamProvider === undefined ? {} : { upstreamProvider: options.upstreamProvider }),
       limits: config.gatewayLimits,
       responses: gatewayResponses,
     },

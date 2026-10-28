@@ -10,10 +10,12 @@ import { parse as parseCookie } from "hono/utils/cookie";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { Accounts } from "../accounts.js";
+import type { Store } from "../store.js";
 import { COOKIE, readSecret } from "../server.js";
 import { baizeConfig } from "./config.js";
 
 export const BAIZE_PATH_PREFIX = "/assistant";
+export const MODEL_GATEWAY_SETTING_KEY = "model_gateway";
 
 type ProvisionExternalUser = (
   db: import("@baize/control-plane").Db,
@@ -31,11 +33,11 @@ let booting: Promise<Handles | null> | null = null;
 let handles: Handles | null = null;
 let provision: ProvisionExternalUser | null = null;
 
-export function mountBaize(app: Hono, accounts: Accounts): void {
+export function mountBaize(app: Hono, accounts: Accounts, store: Store): void {
   const config = baizeConfig();
   if (config === null) return;
 
-  const boot = bootBaize(app, accounts);
+  const boot = bootBaize(app, accounts, store);
 
   // 知行人生会话 → 白泽用户。白泽子应用自己的认证中间件在 external 模式下只验这个 user 存在。
   // health 和例行 webhook 是白泽的公开面，不拦（子应用内部也各认一份白名单）。
@@ -62,7 +64,7 @@ export function mountBaize(app: Hono, accounts: Accounts): void {
   }
 }
 
-function bootBaize(app: Hono, accounts: Accounts): Promise<Handles | null> {
+function bootBaize(app: Hono, accounts: Accounts, store: Store): Promise<Handles | null> {
   booting ??= (async (): Promise<Handles | null> => {
     const config = baizeConfig();
     if (config === null) return null;
@@ -75,15 +77,15 @@ function bootBaize(app: Hono, accounts: Accounts): Promise<Handles | null> {
         db,
         config: {
           ...controlPlane.DEFAULT_RUNTIME_CONFIG,
-          upstreamBaseUrl: config.upstreamBaseUrl,
-          upstreamApiKey: config.upstreamApiKey,
-          gatewayModels: config.gatewayModels,
+          upstreamBaseUrl: "",
+          upstreamApiKey: "",
         },
         toolSecretKey: config.toolSecretKey,
         credentialsKey: config.credentialsKey,
         auth: "external",
         pathPrefix: BAIZE_PATH_PREFIX,
         externalUserFromRequest: (request) => duoUserFromRequest(accounts, request),
+        upstreamProvider: modelGatewayProvider(store),
       });
       // 运行时建成才挂路由：静态伺服在 createApp 里更早注册，文件不存在的路径会落到这边来。
       app.route(BAIZE_PATH_PREFIX, runtime.app);
@@ -127,4 +129,34 @@ async function duoUserFromRequest(
   const duo = await accounts.userFromSecret(token);
   if (duo === null || duo.kind === "agent" || duo.disabled) return null;
   return { id: duo.id, name: duo.name, email: duo.email };
+}
+
+let routeCache: { at: number; route: import("@baize/control-plane").UpstreamRoute | null } | null = null;
+
+/**
+ * 模型网关配置实时读知行人生的 app_settings（管理员在前端改），2 秒缓存抗并发，
+ * 保存后最迟 2 秒生效；没配或配得不全返回 null，网关回一句人话 502。
+ */
+function modelGatewayProvider(store: Store): () => Promise<import("@baize/control-plane").UpstreamRoute | null> {
+  return async () => {
+    if (routeCache !== null && Date.now() - routeCache.at < 2_000) return routeCache.route;
+    const raw = await store.getAppSetting(MODEL_GATEWAY_SETTING_KEY);
+    let route: import("@baize/control-plane").UpstreamRoute | null = null;
+    if (raw !== null) {
+      try {
+        const v = JSON.parse(raw) as Record<string, unknown>;
+        const baseUrl = typeof v["upstreamBaseUrl"] === "string" ? v["upstreamBaseUrl"].replace(/\/+$/, "") : "";
+        const apiKey = typeof v["apiKey"] === "string" ? v["apiKey"] : "";
+        const plan = typeof v["planModel"] === "string" ? v["planModel"] : "";
+        const fast = typeof v["fastModel"] === "string" ? v["fastModel"] : "";
+        if (baseUrl !== "" && apiKey !== "" && plan !== "" && fast !== "") {
+          route = { baseUrl, apiKey, models: { plan, fast } };
+        }
+      } catch {
+        route = null;
+      }
+    }
+    routeCache = { at: Date.now(), route };
+    return route;
+  };
 }
