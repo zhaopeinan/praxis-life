@@ -53,17 +53,24 @@ remote 'set -euo pipefail
   APP_IMAGE="'"$APP_IMAGE"'"
   DB_URL=$(grep "^ZHIXINGBOT_DATABASE_URL=" '"$REMOTE_ZHIXINGBOT_ENV"' | cut -d= -f2-)
   test -n "$DB_URL"
-  ADMIN_EMAIL=$(podman run --rm -v /opt/duowei/data:/data:ro "$APP_IMAGE" \
-    node -e "const {createClient}=require(\"@libsql/client\");createClient({url:\"file:/data/duowei.db\"}).execute(\"SELECT email FROM users WHERE role=\x27admin\x27 ORDER BY created_at LIMIT 1\").then(r=>{if(!r.rows[0])process.exit(1);console.log(r.rows[0].email)})")
-  test -n "$ADMIN_EMAIL"
+  ADMIN_ROW=$(podman run --rm -v /opt/duowei/data:/data:ro "$APP_IMAGE" \
+    node -e "const {createClient}=require(\"@libsql/client\");createClient({url:\"file:/data/duowei.db\"}).execute(\"SELECT id || char(9) || name || char(9) || email FROM users WHERE role=\x27admin\x27 ORDER BY created_at LIMIT 1\").then(r=>{if(!r.rows[0])process.exit(1);console.log(r.rows[0][Object.keys(r.rows[0])[0]])})")
+  ADMIN_ID=$(printf "%s" "$ADMIN_ROW" | cut -f1)
+  ADMIN_NAME=$(printf "%s" "$ADMIN_ROW" | cut -f2)
+  ADMIN_EMAIL=$(printf "%s" "$ADMIN_ROW" | cut -f3)
+  test -n "$ADMIN_ID" && test -n "$ADMIN_EMAIL"
   echo "admin: $ADMIN_EMAIL"
+  # 白泽库的用户行是首次访问 /assistant 时才 provisioning 的；这里先把知行人生 admin 同步过去
+  podman run --rm --network '"$ZHIXINGBOT_NETWORK"' -e DATABASE_URL="$DB_URL" \
+    -e ADMIN_ID="$ADMIN_ID" -e ADMIN_NAME="$ADMIN_NAME" -e ADMIN_EMAIL="$ADMIN_EMAIL" "$APP_IMAGE" \
+    node --import tsx --input-type=module -e "import { connect, provisionExternalUser } from \"@zhixingbot/control-plane\"; const { db, sql } = connect(process.env.DATABASE_URL, { max: 1 }); await provisionExternalUser(db, { id: process.env.ADMIN_ID, name: process.env.ADMIN_NAME, email: process.env.ADMIN_EMAIL }); await sql.end();"
   ISSUED=$(podman run --rm --network '"$ZHIXINGBOT_NETWORK"' -e DATABASE_URL="$DB_URL" "$APP_IMAGE" \
     ./node_modules/.bin/tsx packages/control-plane/src/scripts/computer-token.ts remote "$ADMIN_EMAIL")
   COMPUTER_ID=$(printf "%s\n" "$ISSUED" | sed -n "s/^COMPUTER_ID=//p")
   AGENT_TOKEN=$(printf "%s\n" "$ISSUED" | sed -n "s/^AGENT_TOKEN=//p")
   test -n "$COMPUTER_ID" && test -n "$AGENT_TOKEN"
   mkdir -p '"$REMOTE_RUN_DIR"' '"$REMOTE_BOTS_DIR"'
-  printf "{\"url\":\"%s\",\"computerId\":\"%s\",\"token\":\"%s\",\"dataDir\":\"/home/node/.baize/bots\"}\n" \
+  printf "{\"url\":\"%s\",\"computerId\":\"%s\",\"token\":\"%s\",\"dataDir\":\"/home/node/.zhixingbot/bots\"}\n" \
     "'"$AGENT_URL"'" "$COMPUTER_ID" "$AGENT_TOKEN" > '"$REMOTE_RUN_DIR"'/launch.json
   chmod 600 '"$REMOTE_RUN_DIR"'/launch.json
   chown -R 1000:1000 '"$REMOTE_BOTS_DIR"' 2>/dev/null || true
@@ -92,7 +99,7 @@ remote 'set -e
     --security-opt seccomp='"$REMOTE_ZHIXINGBOT_DIR"'/seccomp-bwrap.json \
     --security-opt apparmor=unconfined \
     --shm-size 1g --init \
-    -v '"$REMOTE_BOTS_DIR"':/home/node/.baize/bots \
+    -v '"$REMOTE_BOTS_DIR"':/home/node/.zhixingbot/bots \
     -v '"$REMOTE_RUN_DIR"':/run/baize \
     '"$REMOTE_IMAGE"' >/dev/null
   podman ps --format "{{.Names}} | {{.Status}}" | grep '"$REMOTE_CONTAINER"' >/dev/null

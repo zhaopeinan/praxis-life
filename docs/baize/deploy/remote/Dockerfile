@@ -44,7 +44,7 @@ RUN if [ -n "$APT_MIRROR" ]; then sed -i "s#http://deb.debian.org#${APT_MIRROR}#
   && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app /app
 COPY docs/baize/deploy/remote/remote-entrypoint.sh /usr/local/bin/remote-entrypoint.sh
-RUN install -d -o node -g node -m 700 /home/node/.baize /home/node/.baize/bots \
+RUN install -d -o node -g node -m 700 /home/node/.zhixingbot /home/node/.zhixingbot/bots \
   && install -d -m 1777 /tmp/.X11-unix
 WORKDIR /app/packages/computer-agent
 USER node
