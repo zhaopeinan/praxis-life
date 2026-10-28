@@ -79,6 +79,15 @@ remote 'set -euo pipefail
 step "传 bwrap seccomp 配置"
 sshpass -e scp "${SSH_OPTS[@]}" "$ROOT/docs/baize/deploy/remote/seccomp-bwrap.json" "$SSH_USER@$HOST:$REMOTE_ZHIXINGBOT_DIR/seccomp-bwrap.json"
 
+step "同步构建上下文到服务器（$REMOTE_SRC_DIR）"
+tar czf - -C "$ROOT" \
+    package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json patches \
+    packages/shared packages/control-plane packages/bot-runner packages/computer-agent \
+    packages/desktop/package.json packages/web/package.json packages/e2e/package.json \
+    docs/baize/deploy \
+  | sshpass -e ssh "${SSH_OPTS[@]}" "$SSH_USER@$HOST" \
+      "rm -rf '$REMOTE_SRC_DIR' && mkdir -p '$REMOTE_SRC_DIR' && tar xzf - -C '$REMOTE_SRC_DIR'"
+
 step "服务器侧构建 zhixingbot-remote 镜像（只在不存在时；chromium 层很重）"
 remote 'set -e
   cd '"$REMOTE_SRC_DIR"'
