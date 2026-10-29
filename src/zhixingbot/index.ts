@@ -55,12 +55,16 @@ export function mountBaize(app: Hono, accounts: Accounts, store: Store): void {
     await next();
   });
 
-  // 知行Bot Web 构建产物。文件不存在的路径落到 notFound，由它回 index.html 做 SPA 兜底。
+  // 知行Bot Web 构建产物（Vite base=/assistant，产物文件在 dist 根下，盘上的路径不带前缀）。
+  // 文件不存在的路径落到 notFound，由它回 index.html 做 SPA 兜底。
   if (config.webDir) {
-    app.use(
-      `${ZHIXINGBOT_PATH_PREFIX}/*`,
-      serveStatic({ root: config.webDir, rewriteRequestPath: (p) => (p === ZHIXINGBOT_PATH_PREFIX ? "/index.html" : p) }),
-    );
+    const stripPrefix = (p: string): string =>
+      p === ZHIXINGBOT_PATH_PREFIX
+        ? "/index.html"
+        : p.startsWith(`${ZHIXINGBOT_PATH_PREFIX}/`)
+          ? p.slice(ZHIXINGBOT_PATH_PREFIX.length)
+          : p;
+    app.use(`${ZHIXINGBOT_PATH_PREFIX}/*`, serveStatic({ root: config.webDir, rewriteRequestPath: stripPrefix }));
   }
 }
 
