@@ -293,6 +293,33 @@ export function createApp(store: Store, accounts: Accounts, backupService?: Back
     return c.json({ ok: true });
   });
 
+  /**
+   * 用表单里的值（apiKey 留空回退到已保存的）真实打一次上游 chat/completions，
+   * plan/fast 各测一次，返回每个模型的可用性、耗时和出错原因，保存前就能验证。
+   */
+  app.post("/api/admin/model-gateway/test", async (c) => {
+    await requireAdmin(c);
+    const body = (await readBody(c)) as {
+      upstreamBaseUrl?: unknown;
+      apiKey?: unknown;
+      planModel?: unknown;
+      fastModel?: unknown;
+    };
+    const baseUrl = typeof body.upstreamBaseUrl === "string" ? body.upstreamBaseUrl.trim().replace(/\/+$/, "") : "";
+    if (!/^https?:\/\/.+/.test(baseUrl)) throw new DomainError("上游地址必须是 http(s):// 开头", 400);
+    const existing = parseModelGateway(await store.getAppSetting(MODEL_GATEWAY_KEY));
+    const apiKey = (typeof body.apiKey === "string" && body.apiKey.trim() !== "" ? body.apiKey.trim() : existing?.apiKey) ?? "";
+    if (apiKey === "") throw new DomainError("还没配过 API key：测试前先填一把新的，或先保存一次", 400);
+    const models: Array<["plan" | "fast", string]> = [];
+    const planModel = typeof body.planModel === "string" ? body.planModel.trim() : "";
+    const fastModel = typeof body.fastModel === "string" ? body.fastModel.trim() : "";
+    if (planModel !== "") models.push(["plan", planModel]);
+    if (fastModel !== "") models.push(["fast", fastModel]);
+    if (models.length === 0) throw new DomainError("至少填一个模型名再测", 400);
+    const results = await Promise.all(models.map(([purpose, model]) => testUpstreamModel(baseUrl, apiKey, model, purpose)));
+    return c.json({ ok: results.every((result) => result.ok), results });
+  });
+
   app.get("/api/system/backup", async (c) => {
     await requireAdmin(c);
     return c.json({
@@ -1918,6 +1945,42 @@ function parseModelGateway(raw: string | null): { baseUrl: string; apiKey: strin
     return { baseUrl, apiKey, planModel, fastModel };
   } catch {
     return null;
+  }
+}
+
+const MODEL_TEST_TIMEOUT_MS = 30_000;
+
+type ModelTestResult = {
+  purpose: "plan" | "fast";
+  model: string;
+  ok: boolean;
+  latencyMs: number;
+  error?: string;
+};
+
+/** 用最小 chat/completions 请求探一次上游：2xx 算可用，其余把状态和上游报错带回来。 */
+async function testUpstreamModel(baseUrl: string, apiKey: string, model: string, purpose: "plan" | "fast"): Promise<ModelTestResult> {
+  const started = Date.now();
+  const timeout = AbortSignal.timeout(MODEL_TEST_TIMEOUT_MS);
+  try {
+    const upstream = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: "user", content: "ping" }], max_tokens: 1 }),
+      signal: timeout,
+    });
+    const latencyMs = Date.now() - started;
+    if (upstream.ok) return { purpose, model, ok: true, latencyMs };
+    let detail = "";
+    try {
+      detail = (await upstream.text()).slice(0, 200);
+    } catch {
+      detail = "";
+    }
+    return { purpose, model, ok: false, latencyMs, error: `上游返回 ${upstream.status}${detail === "" ? "" : `：${detail}`}` };
+  } catch (error) {
+    const reason = timeout.aborted ? `超过 ${MODEL_TEST_TIMEOUT_MS / 1000} 秒没响应` : String(error);
+    return { purpose, model, ok: false, latencyMs: Date.now() - started, error: `连不上：${reason}` };
   }
 }
 

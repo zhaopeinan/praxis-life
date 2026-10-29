@@ -4214,6 +4214,8 @@ function ModelGatewayDialog({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testLines, setTestLines] = useState<{ ok: boolean; lines: string[] } | null>(null);
 
   useEffect(() => {
     api
@@ -4239,6 +4241,7 @@ function ModelGatewayDialog({ onClose }: { onClose: () => void }) {
           event.preventDefault();
           setError(null);
           setNotice(null);
+          setTestLines(null);
           setBusy(true);
           try {
             await api.saveModelGateway({
@@ -4287,8 +4290,47 @@ function ModelGatewayDialog({ onClose }: { onClose: () => void }) {
         </label>
         {error && <p className="form-error">{error}</p>}
         {notice && <p className="fine">{notice}</p>}
+        {testLines && (
+          <div className={testLines.ok ? "fine" : "form-error"}>
+            {testLines.lines.map((line, index) => (
+              <div key={index}>{line}</div>
+            ))}
+          </div>
+        )}
         <div className="dialog-actions">
-          <button type="submit" className="primary" disabled={busy}>
+          <button
+            type="button"
+            disabled={busy || testing}
+            onClick={async () => {
+              setError(null);
+              setNotice(null);
+              setTestLines(null);
+              setTesting(true);
+              try {
+                const result = await api.testModelGateway({
+                  upstreamBaseUrl: form.upstreamBaseUrl,
+                  apiKey: apiKey || undefined,
+                  planModel: form.planModel,
+                  fastModel: form.fastModel,
+                });
+                setTestLines({
+                  ok: result.ok,
+                  lines: result.results.map((r) =>
+                    r.ok
+                      ? `✓ ${r.purpose} 模型 ${r.model} 可用（${r.latencyMs}ms）`
+                      : `✗ ${r.purpose} 模型 ${r.model} 不可用：${r.error ?? "未知错误"}`,
+                  ),
+                });
+              } catch (err) {
+                setError(message(err));
+              } finally {
+                setTesting(false);
+              }
+            }}
+          >
+            {testing ? "测试中…" : "测试"}
+          </button>
+          <button type="submit" className="primary" disabled={busy || testing}>
             {busy ? "保存中…" : "保存"}
           </button>
           <button type="button" onClick={onClose}>

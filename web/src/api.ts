@@ -492,5 +492,10 @@ export const api = {
     ),
   saveModelGateway: (body: { upstreamBaseUrl: string; apiKey?: string; planModel: string; fastModel: string }) =>
     request<{ ok: true }>("/api/admin/model-gateway", { method: "PUT", body: JSON.stringify(body) }),
+  testModelGateway: (body: { upstreamBaseUrl: string; apiKey?: string; planModel: string; fastModel: string }) =>
+    request<{
+      ok: boolean;
+      results: Array<{ purpose: "plan" | "fast"; model: string; ok: boolean; latencyMs: number; error?: string }>;
+    }>("/api/admin/model-gateway/test", { method: "POST", body: JSON.stringify(body) }),
 };
 
