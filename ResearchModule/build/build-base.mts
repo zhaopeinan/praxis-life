@@ -13,7 +13,8 @@
  * 可选参数：
  *   --base <名称>    目标空间名（默认「科研方法」）
  *   --create-base    空间不存在时新建（仅管理员/用户令牌可用；Agent 令牌调用会被 403）
- *   --only <k1,k2>   只构建指定表，表 key：prompts / matrix / hypotheses / library / runs
+ *   --only <k1,k2>   只构建指定表；骨架 key：prompts / matrix / hypotheses / library / runs
+ *                    模块 01 追加：gaps / gap_qs / sprint / abandon / decisions / reviews / redteam
  *   --dry-run        只打印将要执行的写请求，不落库（预演时读回走内存影子状态）
  *   --verify         只读回读校验：把线上落库与 spec 声明逐项比对，不一致则以退出码 1 结束
  *
@@ -352,6 +353,17 @@ const SPEC: TableSpec[] = [
       { name: "审定状态", type: "single_select", options: ["待审定", "已审定", "退回"] },
       { name: "审定人", type: "person" },
       { name: "审定时间", type: "date" },
+      {
+        name: "可进入实验判定",
+        type: "formula",
+        formula:
+          'IF(AND(可证伪条件<>"", 要素齐备="六项齐全", 审定状态="已审定", OR(状态="已收紧待验证", 状态="验证中", 状态="得到支持")), "是", "否")',
+        note: "模块 01 出口闸门：单视图过滤器无法表达 AND+状态 OR，用公式压成一列再过滤。",
+      },
+    ],
+    links: [
+      { name: "来源", type: "link", linkTable: "gaps" },
+      { name: "来源冲刺", type: "link", linkTable: "sprint" },
     ],
     views: [
       { name: "假设看板", type: "kanban", groupField: "状态" },
@@ -367,6 +379,13 @@ const SPEC: TableSpec[] = [
         name: "基线自欺检查",
         type: "grid",
         filters: [{ field: "基线强度自查", op: "neq", value: "已核对是最强基线" }],
+      },
+      {
+        name: "可进入实验",
+        type: "grid",
+        filters: [{ field: "可进入实验判定", op: "eq", value: "是" }],
+        sorts: [{ field: "优先级", direction: "desc" }],
+        note: "模块 01 → 模块 03 硬接口；实验表只允许关联本视图中的 H-。",
       },
     ],
     automations: [
@@ -408,13 +427,12 @@ const SPEC: TableSpec[] = [
           },
         ],
         manualTodo:
-          "设计里的附加条件「红队审查 关联数 < 3」表达不了（过滤/条件没有关联计数操作符），等 `09 红队审查` 表建好后用视图承接未齐清单。",
+          "设计里的附加条件「红队审查 关联数 < 3」表达不了（过滤/条件没有关联计数操作符）；配对闸门见 `09 红队审查` 的 `三轮未齐` / `未处置` 视图。",
       },
     ],
     deferred: [
-      { field: "来源", target: "02 差异假设 / 03 可行性冲刺" },
-      { field: "关联配置", target: "配置台账" },
-      { field: "关联段落", target: "17 段落卡" },
+      { field: "关联配置", target: "配置台账（模块 03）" },
+      { field: "关联段落", target: "17 段落卡（模块 04）" },
     ],
   },
 
@@ -452,7 +470,7 @@ const SPEC: TableSpec[] = [
       { name: "审定人", type: "person" },
       { name: "审定时间", type: "date" },
     ],
-    links: [{ name: "关联假设", type: "link", linkTable: "hypotheses" }],
+    links: [{ name: "关联假设", type: "link", linkTable: "gaps", note: "契约：指向 `02 差异假设`；模块 01 批次校正原骨架误指 `假设登记`。" }],
     views: [
       {
         name: "矩阵总览",
@@ -556,7 +574,429 @@ const SPEC: TableSpec[] = [
         ],
       },
     ],
-    deferred: [{ field: "关联假设", target: "02 差异假设（本批先建成指向 `假设登记`）" }],
+    deferred: [],
+  },
+
+  // ------------------------------------------------------------ 02 差异假设（模块 01）
+  {
+    key: "gaps",
+    name: "02 差异假设",
+    fields: [
+      { name: "编号", type: "auto_number", prefix: "G-" },
+      { name: "核心假设一句话", type: "text" },
+      { name: "方法要素", type: "text" },
+      { name: "对象", type: "text" },
+      { name: "约束", type: "text" },
+      { name: "重叠区域", type: "long_text" },
+      { name: "未覆盖部分", type: "long_text" },
+      { name: "差异算子", type: "long_text" },
+      {
+        name: "差异维度数",
+        type: "multi_select",
+        options: ["方法", "设定", "结论"],
+      },
+      {
+        name: "三问状态",
+        type: "single_select",
+        options: ["未开始", "部分完成", "三问通过", "三问否决"],
+      },
+      {
+        name: "状态",
+        type: "single_select",
+        options: ["待检索", "已检索", "存活", "并入他题", "已证伪", "已放弃"],
+      },
+      { name: "最近重检时间", type: "date" },
+      { name: "下次重检时间", type: "date" },
+      { name: "新进预印本", type: "long_text" },
+      { name: "创建时间", type: "created_time" },
+      { name: "审定状态", type: "single_select", options: ["待审定", "已审定", "退回"] },
+      { name: "审定人", type: "person" },
+      { name: "审定时间", type: "date" },
+    ],
+    links: [{ name: "立案来源", type: "link", linkTable: "matrix" }],
+    views: [
+      { name: "存活假设", type: "kanban", groupField: "状态" },
+      {
+        name: "三问待答",
+        type: "grid",
+        conjunction: "or",
+        filters: [
+          { field: "三问状态", op: "eq", value: "未开始" },
+          { field: "三问状态", op: "eq", value: "部分完成" },
+        ],
+        sorts: [{ field: "创建时间", direction: "asc" }],
+      },
+      {
+        name: "重检到期",
+        type: "grid",
+        filters: [
+          { field: "下次重检时间", op: "lte", value: "today" },
+          { field: "状态", op: "eq", value: "存活" },
+        ],
+      },
+      {
+        name: "差异单薄",
+        type: "grid",
+        note: "完整「差异维度 < 2」需多选计数；本视图先人工筛，后续用公式补。",
+      },
+    ],
+    automations: [
+      {
+        name: "三问通过即给节奏",
+        trigger: { type: "field_equals", field: "三问状态", value: "三问通过" },
+        actions: [
+          { type: "set_field", field: "下次重检时间", value: "today+90" },
+          {
+            type: "add_comment",
+            body: "三问通过：已把下次重检时间置为今天+90 天；请回填最近重检时间，并按新进预印本重算差异算子。",
+          },
+        ],
+      },
+      {
+        name: "立案来源回填",
+        trigger: { type: "record_created" },
+        conditions: [{ field: "立案来源", op: "is_empty" }],
+        actions: [
+          {
+            type: "add_comment",
+            body: "若这条假设来自某个问题矩阵单元格，请建立关联——没有来源的假设无法被统计进选题命中率。",
+          },
+        ],
+      },
+      {
+        name: "重检巡检",
+        trigger: { type: "schedule", cron: "daily:09:00" },
+        actions: [
+          {
+            type: "feishu_bot",
+            text: "今日重检清单见 `02 差异假设` 的 `重检到期` 视图",
+          },
+        ],
+        manualTodo: "设计里还有 run_agent 逐条留言；待站内智能体建好后补。",
+      },
+    ],
+    deferred: [{ field: "最接近工作", target: "文献库（模块 02；P0 可先写在重叠区域）" }],
+  },
+
+  // ------------------------------------------------------------ 02 空白三问（模块 01）
+  {
+    key: "gap_qs",
+    name: "02 空白三问",
+    fields: [
+      {
+        name: "问序",
+        type: "single_select",
+        options: ["一问·有没有人做过", "二问·为什么没做成", "三问·条件是否刚成熟"],
+      },
+      { name: "结论", type: "single_select", options: ["通过", "不通过", "未知"] },
+      { name: "依据", type: "long_text" },
+      { name: "负结果线索", type: "long_text" },
+      { name: "回答人", type: "person" },
+      { name: "日期", type: "date" },
+    ],
+    links: [{ name: "假设", type: "link", linkTable: "gaps" }],
+    views: [
+      {
+        name: "未过二问",
+        type: "grid",
+        filters: [
+          { field: "问序", op: "eq", value: "二问·为什么没做成" },
+          { field: "结论", op: "neq", value: "通过" },
+        ],
+      },
+    ],
+    automations: [],
+    deferred: [{ field: "检索式", target: "05 检索日志（模块 02）" }],
+  },
+
+  // ------------------------------------------------------------ 03 可行性冲刺（模块 01）
+  {
+    key: "sprint",
+    name: "03 可行性冲刺",
+    fields: [
+      { name: "冲刺编号", type: "auto_number", prefix: "fs-" },
+      { name: "开始时间", type: "date" },
+      { name: "截止时间", type: "date" },
+      {
+        name: "第 1 天·数据探针",
+        type: "single_select",
+        options: ["未开始", "进行中", "完成", "受阻"],
+      },
+      { name: "数据探针记录", type: "long_text" },
+      {
+        name: "第 2 天·基线",
+        type: "single_select",
+        options: ["未开始", "进行中", "完成", "受阻"],
+      },
+      { name: "基线记录", type: "long_text" },
+      {
+        name: "第 3 天·跑通与判读",
+        type: "single_select",
+        options: ["未开始", "进行中", "完成", "受阻"],
+      },
+      {
+        name: "第一个卡壳点",
+        type: "single_select",
+        options: ["数据格式", "模型加载", "环境配置", "指标计算", "数据不可得", "无"],
+      },
+      { name: "卡壳点描述", type: "long_text" },
+      { name: "可及性评分", type: "rating", max: 5 },
+      { name: "MVE 设计", type: "long_text" },
+      { name: "MVE 时长（小时）", type: "number" },
+      { name: "证伪条件", type: "long_text" },
+      {
+        name: "MVE 结果",
+        type: "single_select",
+        options: ["支持核心假设", "证伪核心假设", "不确定"],
+      },
+      { name: "四象限·数据", type: "single_select", options: ["已公开", "需申请", "需自建"] },
+      { name: "四象限·算力", type: "single_select", options: ["单卡可跑", "需多卡", "需集群"] },
+      { name: "四象限·时间", type: "single_select", options: ["三个月", "六周", "四周"] },
+      { name: "四象限·能力", type: "single_select", options: ["已掌握", "需学习", "需合作"] },
+      { name: "红色缺口", type: "long_text" },
+      {
+        name: "止损线",
+        type: "multi_select",
+        options: ["72 小时冲刺失败", "MVE 证伪", "资源缺口无法弥补", "同行强负面信号"],
+      },
+      {
+        name: "结论",
+        type: "single_select",
+        options: ["继续投入", "暂停观察", "果断放弃"],
+      },
+      { name: "审定状态", type: "single_select", options: ["待审定", "已审定", "退回"] },
+      { name: "审定人", type: "person" },
+      { name: "审定时间", type: "date" },
+    ],
+    links: [
+      { name: "选题", type: "link", linkTable: "gaps" },
+      { name: "放弃备忘录", type: "link", linkTable: "abandon" },
+    ],
+    views: [
+      {
+        name: "72 小时冲刺",
+        type: "gantt",
+        dateField: "开始时间",
+        note: "甘特需起止字段；截止时间人工/自动化维护。",
+      },
+      { name: "进行中", type: "kanban", groupField: "结论" },
+      { name: "红色缺口", type: "grid", filters: [{ field: "红色缺口", op: "is_not_empty" }] },
+      {
+        name: "止损清单",
+        type: "grid",
+        filters: [{ field: "止损线", op: "is_not_empty" }],
+      },
+    ],
+    automations: [
+      {
+        name: "放弃即归档",
+        trigger: { type: "field_equals", field: "结论", value: "果断放弃" },
+        actions: [
+          {
+            type: "add_comment",
+            body: "请在 `03 放弃备忘录` 建一条记录并回填选题关联，写完三段结构与下次启用条件。",
+          },
+        ],
+      },
+      {
+        name: "继续投入提示晋升假设",
+        trigger: { type: "field_equals", field: "结论", value: "继续投入" },
+        actions: [
+          {
+            type: "add_comment",
+            body: "冲刺结论=继续投入：请人工在 `假设登记` 新建 H-（六要素+可证伪条件），并把来源冲刺指回本条——系统不自动建假设（模块 01 / G2）。",
+          },
+        ],
+      },
+      {
+        name: "冲刺超时提醒",
+        trigger: { type: "schedule", cron: "daily:09:00" },
+        actions: [
+          {
+            type: "feishu_bot",
+            text: "请检查 `03 可行性冲刺` 的进行中视图：截止已过且结论为空的，到点就停，先写速报。",
+          },
+        ],
+        manualTodo: "设计里还有 run_agent 逐条留言；待智能体补。",
+      },
+    ],
+  },
+
+  // ------------------------------------------------------------ 03 放弃备忘录（模块 01）
+  {
+    key: "abandon",
+    name: "03 放弃备忘录",
+    fields: [
+      { name: "归档时间", type: "date" },
+      { name: "已验证的事实", type: "long_text" },
+      { name: "被证伪的假设", type: "long_text" },
+      { name: "遗留线索", type: "long_text" },
+      { name: "下次启用条件", type: "long_text" },
+    ],
+    links: [{ name: "选题", type: "link", linkTable: "gaps" }],
+    views: [{ name: "线索池", type: "grid", sorts: [{ field: "归档时间", direction: "desc" }] }],
+    automations: [],
+  },
+
+  // ------------------------------------------------------------ 04 选题决策日志（模块 01）
+  {
+    key: "decisions",
+    name: "04 选题决策日志",
+    fields: [
+      { name: "决策编号", type: "auto_number", prefix: "D-" },
+      { name: "决策内容", type: "text" },
+      {
+        name: "决策类型",
+        type: "single_select",
+        options: ["选定方向", "放弃方向", "调整假设", "改换坐标轴", "模板修改"],
+      },
+      { name: "AI 输入", type: "long_text" },
+      { name: "人工判断", type: "long_text" },
+      { name: "被否决的选项", type: "long_text" },
+      { name: "预期验证点", type: "date" },
+      { name: "预期内容", type: "long_text" },
+      {
+        name: "验证结论",
+        type: "single_select",
+        options: ["未到验证期", "判断正确", "判断失误", "部分正确"],
+      },
+      {
+        name: "失误类型",
+        type: "single_select",
+        options: ["被热点带走", "高估可及性", "低估工程成本", "文献盲区", "其他"],
+      },
+      {
+        name: "讨论对象",
+        type: "single_select",
+        options: ["独立决策", "导师", "同行", "合作者"],
+      },
+      { name: "方向锁定期至", type: "date" },
+      { name: "审定状态", type: "single_select", options: ["待审定", "已审定", "退回"] },
+      { name: "审定人", type: "person" },
+      { name: "审定时间", type: "date" },
+    ],
+    links: [
+      { name: "关联矩阵", type: "link", linkTable: "matrix" },
+      { name: "关联差异假设", type: "link", linkTable: "gaps" },
+    ],
+    views: [
+      {
+        name: "待验证",
+        type: "grid",
+        filters: [{ field: "验证结论", op: "eq", value: "未到验证期" }],
+        sorts: [{ field: "预期验证点", direction: "asc" }],
+      },
+      {
+        name: "失误复盘",
+        type: "grid",
+        filters: [{ field: "验证结论", op: "eq", value: "判断失误" }],
+        groups: ["失误类型"],
+      },
+      {
+        name: "锁定期内",
+        type: "grid",
+        filters: [{ field: "方向锁定期至", op: "gte", value: "today" }],
+      },
+    ],
+    automations: [
+      {
+        name: "决策未写预期",
+        trigger: { type: "record_created" },
+        conditions: [{ field: "预期内容", op: "is_empty" }],
+        actions: [
+          {
+            type: "add_comment",
+            body: "请在 24 小时内补写预期内容与预期验证点——没有预期的决策无法被验证。",
+          },
+        ],
+      },
+      {
+        name: "预期验证点到期提醒",
+        trigger: { type: "schedule", cron: "daily:09:00" },
+        actions: [
+          {
+            type: "feishu_bot",
+            text: "请检查 `04 选题决策日志` 的待验证视图：预期验证点到期的请回填验证结论。",
+          },
+        ],
+        manualTodo: "设计里还有 run_agent 逐条留言；待智能体补。",
+      },
+    ],
+  },
+
+  // ------------------------------------------------------------ 复核记录（模块 01 共享）
+  {
+    key: "reviews",
+    name: "复核记录",
+    fields: [
+      { name: "编号", type: "auto_number", prefix: "cf-" },
+      {
+        name: "对象类型",
+        type: "single_select",
+        options: ["文献存在性", "数据集可下载性", "指标公认性", "数字一致性", "引用真实性", "段落主张", "AI 摘要"],
+      },
+      { name: "对象描述", type: "text" },
+      { name: "关联记录", type: "text" },
+      { name: "结论", type: "single_select", options: ["通过", "不通过", "待查"] },
+      { name: "证据", type: "long_text" },
+      {
+        name: "复核方式",
+        type: "single_select",
+        options: ["人工回原文", "AI 检索后人工确认", "脚本机械比对"],
+      },
+      { name: "复核人", type: "person" },
+      { name: "复核日期", type: "date" },
+    ],
+    views: [
+      { name: "待查", type: "grid", filters: [{ field: "结论", op: "eq", value: "待查" }] },
+      { name: "不通过", type: "grid", filters: [{ field: "结论", op: "eq", value: "不通过" }] },
+      { name: "按对象类型分组", type: "grid", groups: ["对象类型"] },
+    ],
+    automations: [],
+    deferred: [{ field: "关联文献", target: "文献库（模块 02）" }],
+  },
+
+  // ------------------------------------------------------------ 09 红队审查（模块 01）
+  {
+    key: "redteam",
+    name: "09 红队审查",
+    fields: [
+      {
+        name: "轮次",
+        type: "single_select",
+        options: ["第一轮·可证伪性", "第二轮·机制攻击", "第三轮·审稿人模拟"],
+      },
+      { name: "审查意见", type: "long_text" },
+      { name: "替代解释", type: "long_text" },
+      { name: "结论", type: "single_select", options: ["通过", "需修订", "建议搁置"] },
+      {
+        name: "处置",
+        type: "single_select",
+        options: ["修订假设", "加对照实验", "接受风险", "无行动"],
+      },
+      { name: "执行者", type: "single_select", options: ["AI", "人", "合作者"] },
+      { name: "日期", type: "date" },
+      { name: "审定状态", type: "single_select", options: ["待审定", "已审定", "退回"] },
+      { name: "审定人", type: "person" },
+      { name: "审定时间", type: "date" },
+    ],
+    links: [{ name: "假设", type: "link", linkTable: "hypotheses" }],
+    views: [
+      {
+        name: "未处置",
+        type: "grid",
+        filters: [
+          { field: "处置", op: "eq", value: "无行动" },
+          { field: "结论", op: "eq", value: "需修订" },
+        ],
+      },
+      {
+        name: "三轮未齐",
+        type: "grid",
+        note: "完整「每假设关联数<3」需跨表计数；本视图作人工巡检入口，与假设登记三轮未齐提醒配对。",
+      },
+    ],
+    automations: [],
   },
 
   // ------------------------------------------------------------ 文献库
