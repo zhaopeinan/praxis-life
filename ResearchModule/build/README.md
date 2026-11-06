@@ -14,13 +14,21 @@
 | `03 可行性冲刺` / `03 放弃备忘录` | `sprint` / `abandon` | 模块 01 |
 | `04 选题决策日志` / `复核记录` | `decisions` / `reviews` | 模块 01 |
 | `09 红队审查` | `redteam` | 模块 01 |
-| `文献库` | `library` | 模块 02（骨架保留） |
+| `科研项目` | `projects` | 横切编排 |
+| `交接卡` | `handoffs` | 横切编排 |
+| `文献库` | `library` | 模块 02（骨架保留；跨项目共用） |
 | `实验记录` | `runs` | 模块 03（骨架保留） |
 
 模块 01 批次示例：
 
 ```bash
 --only prompts,hypotheses,matrix,gaps,gap_qs,sprint,abandon,decisions,reviews,redteam
+```
+
+编排横切（项目壳 + 交接卡 + 协调员提示词种子）：
+
+```bash
+--only prompts,projects,handoffs
 ```
 
 每张表连同字段、关联字段、视图（含闸门视图与表单入口）、自动化、提示词种子记录一起收敛；

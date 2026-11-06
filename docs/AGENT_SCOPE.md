@@ -148,6 +148,15 @@ duowei-agent/
 
 **验收：** 「每日 9 点汇总状态为进行中的需求，写进日报表并评论」可配置跑通——定时自动化挂 `run_agent` 动作，智能体开 `query_records` + `create_record` + `add_comment` 即满足；试跑与定时两条路径共用同一运行时与运行日志。
 
+### P0.5 — 科研编排契约（2026-11-06，记录层先行）
+
+借鉴 grok-bot / Root Agent 的组织方法（非宿主代码），在科研空间落地：
+
+- [x] Skill 清单与协调员提示词种子（`提示词库`：`coord-research·科研协调员`）  
+- [x] 表 `科研项目` / `交接卡`（Tier、人审闸门、证据回写）  
+- [x] 契约：[`ResearchModule/design_docs/_科研智能体编排.md`](../ResearchModule/design_docs/_科研智能体编排.md)  
+- [ ] 站内 LLM Agent 与 Skill ID 配置打通、`run_agent` 认领待办交接卡（归 P1）
+
 ### P1 — 触发器与嵌入
 
 - [ ] 记录创建/更新/删除触发  
@@ -156,6 +165,8 @@ duowei-agent/
 - [ ] 应用模式关联智能体  
 - [ ] 仪表盘「智能体组件」（对话或一键结论）  
 - [ ] 工作流「调用智能体」节点（先整包调用，不做完整子图）  
+- [ ] 交接卡 `已分派` → `run_agent` 认领（接 P0.5）  
+
 
 ### P2 — 字段捷径与搭建类
 
