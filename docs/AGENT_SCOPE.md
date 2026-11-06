@@ -155,7 +155,8 @@ duowei-agent/
 - [x] Skill 清单与协调员提示词种子（`提示词库`：`coord-research·科研协调员`）  
 - [x] 表 `科研项目` / `交接卡`（Tier、人审闸门、证据回写）  
 - [x] 契约：[`ResearchModule/design_docs/_科研智能体编排.md`](../ResearchModule/design_docs/_科研智能体编排.md)  
-- [ ] 站内 LLM Agent 与 Skill ID 配置打通、`run_agent` 认领待办交接卡（归 P1）
+- [x] 站内 LLM Agent 已按 Skill 种子创建（协调员 / 纠偏 / 红队 / 隐藏格）；脚本见 `ResearchModule/build/setup-research-agents.mts`  
+- [ ] `run_agent` 认领待办交接卡（归 P1）
 
 ### P1 — 触发器与嵌入
 
